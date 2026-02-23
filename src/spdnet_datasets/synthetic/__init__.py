@@ -3,9 +3,14 @@
 from .config import (
     ExperimentConfig,
     BATCHNORM_METHODS,
+    BATCHNORM_METHODS_WITH_AFFINE,
     METHOD_SHORT_NAMES,
+    EXPERIMENT_SETS,
+    GRID_REGISTRY,
     generate_experiment_configs,
     get_configs_for_grid,
+    list_grid_info,
+    list_experiment_sets,
 )
 from .data_generator import (
     ScaleMatrixGeneratorDiagonal,
@@ -20,9 +25,14 @@ __all__ = [
     # Configuration
     'ExperimentConfig',
     'BATCHNORM_METHODS',
+    'BATCHNORM_METHODS_WITH_AFFINE',
     'METHOD_SHORT_NAMES',
+    'EXPERIMENT_SETS',
+    'GRID_REGISTRY',
     'generate_experiment_configs',
     'get_configs_for_grid',
+    'list_grid_info',
+    'list_experiment_sets',
 
     # Generators
     'ScaleMatrixGeneratorDiagonal',
