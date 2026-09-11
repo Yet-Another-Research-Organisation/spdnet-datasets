@@ -4,14 +4,14 @@ Supports classification task with multiple crop types.
 Dataset from https://www.scidb.cn/en/detail?dataSetId=6de15e4ec9b74dacab12e29cb557f041
 """
 
-import numpy as np
-import torch
-from typing import Tuple, Optional, List
 from pathlib import Path
 
+import numpy as np
+import torch
+
 from spdnet_datasets.base import BaseDataset
-from spdnet_datasets.manager import DatasetManager
 from spdnet_datasets.estimator import EstimateCovariance
+from spdnet_datasets.manager import DatasetManager
 
 
 @DatasetManager.register_dataset('uav')
@@ -29,6 +29,7 @@ class UAVDataset(BaseDataset):
     # Geographic split configuration (best combination found: MJK_N + MJK_S)
     TRAIN_SCENES = ['MJK_N']
     TEST_SCENES = ['MJK_S']
+    ALL_SCENES = ['MJK_N', 'MJK_S', 'XJM']
     # Common labels between MJK_N and MJK_S
     COMMON_LABELS = [1, 2, 3, 4, 7, 8, 10, 11, 14, 15, 16, 19, 20, 22, 23, 24, 25, 26]
 
@@ -86,10 +87,30 @@ class UAVDataset(BaseDataset):
         else:
             self._load_standard_split()
 
+    def _resolve_scene_dir(self, scene: str) -> Path | None:
+        """
+        Resolve a scene name to its actual directory.
+
+        Handles directories with parameter suffixes, e.g. MJK_N_W15_T80
+        when looking for MJK_N.
+        """
+        # Exact match first
+        exact = self.data_dir / scene
+        if exact.exists():
+            return exact
+        # Prefix match: find dirs starting with scene name
+        candidates = sorted(
+            d for d in self.data_dir.iterdir()
+            if d.is_dir() and d.name.startswith(scene)
+        )
+        if candidates:
+            return candidates[0]
+        return None
+
     def _load_geographic_split(self):
         """Load with geographic split: MJK_N (train) vs MJK_S (test)."""
         if self.verbose:
-            print(f"Loading UAV dataset with GEOGRAPHIC split")
+            print("Loading UAV dataset with GEOGRAPHIC split")
             print(f"  Split: {self.split}")
 
         # Determine which scenes to load
@@ -101,14 +122,18 @@ class UAVDataset(BaseDataset):
         # Load data from selected scenes
         all_windows = []
         all_labels = []
+        all_cov_paths = []
 
         for scene in scenes_to_load:
-            scene_dir = self.data_dir / scene
-            if not scene_dir.exists():
-                raise FileNotFoundError(f"Scene directory not found: {scene_dir}")
+            scene_dir = self._resolve_scene_dir(scene)
+            if scene_dir is None:
+                raise FileNotFoundError(
+                    f"Scene directory not found for '{scene}' in {self.data_dir}"
+                )
 
             windows_file = scene_dir / 'uav_windows_data.npy'
             labels_file = scene_dir / 'uav_windows_labels.npy'
+            scene_cov_dir = scene_dir / 'cov'
 
             if not windows_file.exists() or not labels_file.exists():
                 raise FileNotFoundError(f"Data files not found in {scene_dir}")
@@ -118,8 +143,13 @@ class UAVDataset(BaseDataset):
 
             # Filter to keep only common labels
             mask = np.isin(labels, self.COMMON_LABELS)
+            original_indices = np.where(mask)[0]
             windows = windows[mask]
             labels = labels[mask]
+
+            # Build per-sample cov paths using original (pre-filter) indices
+            for orig_idx in original_indices:
+                all_cov_paths.append(scene_cov_dir / f"{orig_idx:06d}.pt")
 
             all_windows.append(windows)
             all_labels.append(labels)
@@ -131,10 +161,13 @@ class UAVDataset(BaseDataset):
         all_windows = np.concatenate(all_windows, axis=0)
         all_labels = np.concatenate(all_labels, axis=0)
 
-        # Setup cov_dir for covariance mode
-        self.cov_dir = self.data_dir / "cov"
-        if self.mode == 'cov' and not self.cov_dir.exists():
-            raise FileNotFoundError(f"Covariance directory not found: {self.cov_dir}")
+        if self.mode == 'cov':
+            # Verify at least one cov dir exists
+            cov_dirs_exist = any(p.parent.exists() for p in all_cov_paths[:1])
+            if not cov_dirs_exist:
+                raise FileNotFoundError(
+                    "Covariance directories not found in scene folders"
+                )
 
         # Store windows data for raw mode
         self.all_windows = all_windows
@@ -154,6 +187,7 @@ class UAVDataset(BaseDataset):
         for idx in range(len(all_windows)):
             self.samples.append({
                 'index': idx,  # Store index instead of window data
+                'cov_path': str(all_cov_paths[idx]),
                 'class_idx': remapped_labels[idx],
                 'class_name': self.classes[remapped_labels[idx]]
             })
@@ -169,23 +203,25 @@ class UAVDataset(BaseDataset):
     def _load_standard_split(self):
         """Load all scenes together for standard random split."""
         if self.verbose:
-            print(f"Loading UAV dataset with STANDARD split")
-            print(f"  Loading all scenes together")
+            print("Loading UAV dataset with STANDARD split")
+            print("  Loading all scenes together")
 
         # Load all scenes
-        scenes = ['MJK_N', 'MJK_S', 'XJM']
+        scenes = self.ALL_SCENES
         all_windows = []
         all_labels = []
+        all_cov_paths = []
 
         for scene in scenes:
-            scene_dir = self.data_dir / scene
-            if not scene_dir.exists():
+            scene_dir = self._resolve_scene_dir(scene)
+            if scene_dir is None:
                 if self.verbose:
                     print(f"  Warning: Scene {scene} not found, skipping")
                 continue
 
             windows_file = scene_dir / 'uav_windows_data.npy'
             labels_file = scene_dir / 'uav_windows_labels.npy'
+            scene_cov_dir = scene_dir / 'cov'
 
             if not windows_file.exists() or not labels_file.exists():
                 if self.verbose:
@@ -194,6 +230,10 @@ class UAVDataset(BaseDataset):
 
             windows = np.load(str(windows_file))
             labels = np.load(str(labels_file)).astype(int)
+
+            # Build per-sample cov paths using original indices
+            for orig_idx in range(len(windows)):
+                all_cov_paths.append(scene_cov_dir / f"{orig_idx:06d}.pt")
 
             all_windows.append(windows)
             all_labels.append(labels)
@@ -215,11 +255,6 @@ class UAVDataset(BaseDataset):
 
         remapped_labels = np.array([self.label_mapping[label] for label in all_labels])
 
-        # Setup cov_dir for covariance mode
-        self.cov_dir = self.data_dir / "cov"
-        if self.mode == 'cov' and not self.cov_dir.exists():
-            raise FileNotFoundError(f"Covariance directory not found: {self.cov_dir}")
-
         # Store windows data for raw mode
         self.all_windows = all_windows
 
@@ -235,7 +270,8 @@ class UAVDataset(BaseDataset):
             class_name = self.classes[class_idx]
 
             samples_by_class[class_name].append({
-                'index': idx,  # Store index instead of window data
+                'index': idx,
+                'cov_path': str(all_cov_paths[idx]),
                 'class_idx': class_idx,
                 'class_name': class_name
             })
@@ -282,7 +318,7 @@ class UAVDataset(BaseDataset):
 
         for sample in self.samples:
             idx = sample['index']
-            cov_path = self.cov_dir / f"{idx:06d}.pt"
+            cov_path = Path(sample['cov_path'])
             if cov_path.exists():
                 cov_matrix = torch.load(cov_path, weights_only=False)
                 if isinstance(cov_matrix, np.ndarray):
@@ -294,7 +330,7 @@ class UAVDataset(BaseDataset):
         if self.verbose:
             print(f"Preloaded {len(self._cache)} matrices to RAM")
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
         """
         Get a sample.
 
@@ -311,7 +347,7 @@ class UAVDataset(BaseDataset):
 
         elif self.mode == 'cov':
             # Load pre-computed covariance
-            cov_path = self.cov_dir / f"{sample_idx:06d}.pt"
+            cov_path = Path(sample['cov_path'])
 
             if not cov_path.exists():
                 raise FileNotFoundError(f"Covariance file not found: {cov_path}")
