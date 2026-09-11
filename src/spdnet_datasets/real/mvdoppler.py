@@ -108,6 +108,8 @@ class MVDopplerDataset(BaseDataset):
         """Get sample at index. Returns (covariance_matrix, class_idx)."""
         sample = self.samples[idx]
         cov_matrix = torch.load(sample['file_path'], weights_only=True)
+        if cov_matrix.dtype != torch.float64:
+            cov_matrix = cov_matrix.double()
         cov_matrix = cov_matrix * self.scaling_factor
         class_idx = self.class_to_idx[sample['class_name']]
         return cov_matrix, class_idx

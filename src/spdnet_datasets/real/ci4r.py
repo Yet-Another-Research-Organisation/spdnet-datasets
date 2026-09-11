@@ -3,7 +3,7 @@ CI4R-MULTI3 Radar Activity Dataset Loader.
 
 Dataset: CI4R-MULTI3 (radar-based activity recognition)
 Format: Pre-computed covariance matrices from 77GHz and Xethru spectrograms
-Size: 471×471 covariance matrices (from center-cropped frequency axis)
+Size: 236×236 covariance matrices (from center-cropped frequency axis)
 Modalities: '77GHz', 'Xethru'
 """
 
@@ -118,6 +118,8 @@ class CI4RDataset(BaseDataset):
         """Get sample at index. Returns (covariance_matrix, class_idx)."""
         sample = self.samples[idx]
         cov_matrix = torch.load(sample['file_path'], weights_only=True)
+        if cov_matrix.dtype != torch.float64:
+            cov_matrix = cov_matrix.double()
         cov_matrix = cov_matrix * self.scaling_factor
         class_idx = self.class_to_idx[sample['class_name']]
         return cov_matrix, class_idx
