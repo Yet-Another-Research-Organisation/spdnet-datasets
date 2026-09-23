@@ -171,11 +171,13 @@ def precompute_ntu120(
         for f in check:
             cov = torch.load(f, weights_only=True)
             eigs = torch.linalg.eigvalsh(cov).numpy()
-            eigs = eigs[eigs > 1e-15]
-            gm = float(np.exp(np.mean(np.log(eigs))))
+            # PSD check on all eigenvalues; only the geometric mean needs the
+            # strictly positive ones
+            is_psd = eigs.min() > -1e-6
+            eigs_pos = eigs[eigs > 1e-15]
+            gm = float(np.exp(np.mean(np.log(eigs_pos))))
             gm_after.append(gm)
             is_sym = torch.allclose(cov, cov.T, atol=1e-6)
-            is_psd = eigs.min() > -1e-6
             if not (is_sym and is_psd):
                 print(f"  WARNING: {f.name} sym={is_sym} psd={is_psd}")
         print(f"Geometric mean after scaling (avg over {len(check)} samples): "
