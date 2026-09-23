@@ -61,3 +61,8 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Generated dataset verification reports and scratch reference scripts
+tests/dataset_reports/
+.assets/
+uv.lock

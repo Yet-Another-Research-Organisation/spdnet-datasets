@@ -52,6 +52,7 @@ class BaseDataset(Dataset, ABC):
         self.transform = transform
         self.max_samples_per_class = max_samples_per_class
         self.max_classes = max_classes
+        self._requested_classes = classes  # explicit class list takes priority over max_classes
         self.seed = seed
         self.verbose = verbose
         self.rng = np.random.RandomState(seed)
@@ -80,7 +81,14 @@ class BaseDataset(Dataset, ABC):
         return len(self.samples)
 
     def _limit_classes(self, all_classes: List[str]) -> List[str]:
-        """Limit number of classes if max_classes is set."""
+        """Limit classes: use explicit list if provided, else apply max_classes."""
+        if self._requested_classes:
+            missing = [c for c in self._requested_classes if c not in all_classes]
+            if missing:
+                raise ValueError(f"Requested classes not found in dataset: {missing}")
+            if self.verbose:
+                print(f"Using {len(self._requested_classes)} specified classes: {sorted(self._requested_classes)}")
+            return sorted(self._requested_classes)
         if self.max_classes is not None and self.max_classes < len(all_classes):
             rng_classes = np.random.RandomState(42)  # Fixed seed for class selection
             selected = rng_classes.choice(all_classes, size=self.max_classes, replace=False).tolist()
