@@ -138,6 +138,7 @@ def verify_dataset(name: str, base_config: dict, mode_kwargs: dict,
     step = max(1, n_samples // max_samples_check)
     indices = list(range(0, n_samples, step))
     cov_dim = None
+    n_errors = 0
 
     for i in indices:
         try:
@@ -145,6 +146,11 @@ def verify_dataset(name: str, base_config: dict, mode_kwargs: dict,
             if isinstance(result, tuple) and len(result) >= 2:
                 cov, label = result[0], result[1]
             else:
+                n_errors += 1
+                report_lines.append(
+                    f"  Error at index {i}: expected a (cov, label) tuple, "
+                    f"got {type(result).__name__}"
+                )
                 continue
 
             if isinstance(label, int):
@@ -179,10 +185,11 @@ def verify_dataset(name: str, base_config: dict, mode_kwargs: dict,
                 cd['sample_eigs'] = eigs
 
         except Exception as e:
+            n_errors += 1
             report_lines.append(f"  Error at index {i}: {e}")
             continue
 
-    report_lines.append(f"Samples checked: {len(indices)}\n")
+    report_lines.append(f"Samples checked: {len(indices)}, errors: {n_errors}\n")
 
     # Per-class report
     report_lines.append(f"\n{'='*70}")
@@ -276,6 +283,10 @@ def verify_dataset(name: str, base_config: dict, mode_kwargs: dict,
 
     # Write report
     _write_report(report_dir / "report.txt", report_lines)
+    if n_errors:
+        print(f"  FAIL [{name}/{suffix}]: {n_errors}/{len(indices)} checked "
+              f"samples could not be loaded (see {report_dir / 'report.txt'})")
+        return False
     print(f"  OK  [{name}/{suffix}]: {n_samples} samples, "
           f"{n_classes} classes, dim={cov_dim}")
     return True

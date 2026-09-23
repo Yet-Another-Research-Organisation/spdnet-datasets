@@ -31,7 +31,7 @@ This is a **shared infrastructure library** for SPDNet research. It provides dat
 
 ### Real datasets (`real/`)
 
-Nine dataset classes, each decorated with `@DatasetManager.register_dataset(...)`:
+Thirteen dataset classes, each decorated with `@DatasetManager.register_dataset(...)`:
 
 | Registration name | Class | Domain |
 |---|---|---|
@@ -44,6 +44,13 @@ Nine dataset classes, each decorated with `@DatasetManager.register_dataset(...)
 | `deephsfruit` | `DeepHSFruitDataset` | Fruit classification |
 | `placenta` | `PlacentaDataset` | Tissue hyperspectral |
 | `kaggle_wheat` | `KaggleWheatDataset` | Wheat disease |
+| `ci4r` | `CI4RDataset` | Radar human activity, CI4R-MULTI3 (`modality`: `77GHz` or `Xethru`) |
+| `dopnet` | `DopNetDataset` | Doppler radar gestures, Dop-NET (`split`: `train`, `test`, `all`) |
+| `mvdoppler` | `MVDopplerDataset` | Radar human activity from I/Q data, MVDoppler (96×96 covariances) |
+| `ntu120` | `NTU120Dataset` | Skeleton actions, NTU RGB+D 120 (25 joints × 3 = 75 features) |
+
+The four radar/skeleton loaders only read pre-computed covariances
+(`cov/…/<class>/*.pt`, produced by `utils/<name>_covariance_precompute.py`).
 
 Most datasets support two modes: `'cov'` (pre-computed covariance matrices) and `'raw'` (compute from source images on the fly).
 

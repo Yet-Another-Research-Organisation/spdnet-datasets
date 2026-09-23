@@ -95,11 +95,13 @@ class DopNetDataset(BaseDataset):
                 if d.is_dir():
                     all_class_names.add(d.name)
 
-        self.classes = sorted(all_class_names)
+        # Class selection (explicit `classes`, else `max_classes`) and the
+        # per-class sample limit go through the BaseDataset helpers.
+        self.classes = self._limit_classes(sorted(all_class_names))
         self.class_to_idx = {name: idx for idx, name in enumerate(self.classes)}
 
         # Collect samples
-        self.samples = []
+        samples_by_class = {name: [] for name in self.classes}
         for split_dir in split_dirs:
             for class_dir in sorted(split_dir.iterdir()):
                 if not class_dir.is_dir():
@@ -108,11 +110,12 @@ class DopNetDataset(BaseDataset):
                 if class_name not in self.class_to_idx:
                     continue
                 for pt_file in sorted(class_dir.glob("*.pt")):
-                    self.samples.append({
+                    samples_by_class[class_name].append({
                         'file_path': str(pt_file),
                         'class_name': class_name,
                         'split': split_dir.name,
                     })
+        self.samples = self._limit_samples_per_class(samples_by_class)
 
         if not self.samples:
             raise ValueError(f"No .pt files found in {cov_dir}")

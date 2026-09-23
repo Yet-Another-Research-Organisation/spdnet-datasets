@@ -81,18 +81,21 @@ class CI4RDataset(BaseDataset):
         if not class_dirs:
             raise ValueError(f"No class directories found in {cov_dir}")
 
-        self.classes = sorted([d.name for d in class_dirs])
+        # Class selection (explicit `classes`, else `max_classes`) and the
+        # per-class sample limit go through the BaseDataset helpers.
+        self.classes = self._limit_classes(sorted(d.name for d in class_dirs))
         self.class_to_idx = {name: idx for idx, name in enumerate(self.classes)}
 
-        self.samples = []
+        samples_by_class = {}
         for class_dir in class_dirs:
             class_name = class_dir.name
-            pt_files = sorted(class_dir.glob("*.pt"))
-            for pt_file in pt_files:
-                self.samples.append({
-                    'file_path': str(pt_file),
-                    'class_name': class_name,
-                })
+            if class_name not in self.class_to_idx:
+                continue
+            samples_by_class[class_name] = [
+                {'file_path': str(pt_file), 'class_name': class_name}
+                for pt_file in sorted(class_dir.glob("*.pt"))
+            ]
+        self.samples = self._limit_samples_per_class(samples_by_class)
 
         if not self.samples:
             raise ValueError(f"No .pt files found in {cov_dir}")

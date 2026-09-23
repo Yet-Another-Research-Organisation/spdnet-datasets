@@ -42,24 +42,22 @@ class TestCI4RDataset:
         ds = CI4RDataset(data_dir=str(data_dir), modality="Xethru", verbose=False)
         _check_spd_sample(ds)
 
-    def test_ci4r_does_not_support_explicit_classes_yet(self):
-        """
-        BaseDataset._limit_classes (explicit `classes=` list) is currently only
-        wired into Rices90Dataset (see test_explicit_classes_subset below) --
-        CI4RDataset._load_data sets self.classes directly and never calls it,
-        so the `classes` kwarg is silently ignored here. Tracked as a known
-        gap rather than papered over with a test that would mislead.
-        """
+    def test_ci4r_explicit_classes_and_limits(self):
+        """The `classes` and `max_samples_per_class` kwargs are honoured."""
         data_dir = dataset_dir("CI4R-MULTI3")
         skip_if_missing(data_dir)
         full = CI4RDataset(data_dir=str(data_dir), modality="77GHz", verbose=False)
+        subset = sorted(full.classes)[:2]
         restricted = CI4RDataset(
             data_dir=str(data_dir),
             modality="77GHz",
-            classes=sorted(full.classes)[:2],
+            classes=subset,
+            max_samples_per_class=3,
             verbose=False,
         )
-        assert sorted(restricted.classes) == sorted(full.classes)
+        assert restricted.classes == subset
+        assert {s["class_name"] for s in restricted.samples} == set(subset)
+        assert len(restricted.samples) <= 3 * len(subset)
 
 
 class TestDopNetDataset:
