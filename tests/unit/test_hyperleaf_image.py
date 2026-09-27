@@ -95,7 +95,7 @@ def test_hdm05_loads_float64(tmp_path):
     ds = HDM05Dataset(data_dir=str(tmp_path), scaling_factor=2.0, verbose=False)
     x, _ = ds[0]
     assert x.dtype == torch.float64 and x.shape == (5, 5)
-    assert (
-        torch.allclose(torch.diagonal(x).unique(), torch.tensor([2.0], dtype=x.dtype))
-        or x.max() > 0
-    )
+    # every sample is k * I (k = 1..4), multiplied by the scaling factor 2
+    scale = x[0, 0].item()
+    assert scale in {2.0, 4.0, 6.0, 8.0}
+    assert torch.equal(x, scale * torch.eye(5, dtype=torch.float64))
