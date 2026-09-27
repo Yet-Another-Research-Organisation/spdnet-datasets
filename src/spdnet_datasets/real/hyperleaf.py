@@ -20,11 +20,13 @@ class HyperLeafDataset(BaseDataset):
     HyperLeaf hyperspectral dataset for classification.
 
     Supports three classification tasks:
+
     - 'cultivar': 4 barley varieties (Heerup, Kvium, Rembrandt, Sheriff)
     - 'fertilizer': 3 fertilizer levels (0.0, 0.5, 1.0)
     - 'combined': 12 classes (3 fertilizer × 4 cultivar combinations)
 
     Images are hyperspectral with 204 bands. Three modes:
+
     - 'cov': pre-computed 204x204 covariance matrices (cov/<id>.pt)
     - 'raw': covariance computed on the fly from the hyperspectral image
     - 'image': the image itself restricted to a few bands (``bands``), as a
