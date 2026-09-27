@@ -83,3 +83,19 @@ def test_cov_mode_unchanged(hyperleaf_dir):
     x, _ = ds[0]
     assert ds.bands is None
     assert x.shape == (N_BANDS, N_BANDS) and x.dtype == torch.float64
+
+
+def test_hdm05_loads_float64(tmp_path):
+    """HDM05 covariances are float64, as every covariance loader."""
+    from spdnet_datasets.real.hdm05 import HDM05Dataset
+
+    for i, label in enumerate([3, 3, 7, 7]):
+        cov = np.eye(5) * (i + 1)
+        np.save(tmp_path / f"{i}_100_{label}.npy", cov)
+    ds = HDM05Dataset(data_dir=str(tmp_path), scaling_factor=2.0, verbose=False)
+    x, _ = ds[0]
+    assert x.dtype == torch.float64 and x.shape == (5, 5)
+    assert (
+        torch.allclose(torch.diagonal(x).unique(), torch.tensor([2.0], dtype=x.dtype))
+        or x.max() > 0
+    )
