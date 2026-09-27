@@ -21,6 +21,7 @@ class UAVDataset(BaseDataset):
 
     Contains three geographical scenes: MJK_N, MJK_S, XJM
     Supports two split modes:
+
     - split_geographic=False: Standard random train/val/test split from all scenes
     - split_geographic=True: Geographic split with MJK_N (train), MJK_S (test)
       using only the 18 common labels between them
