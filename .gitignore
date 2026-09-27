@@ -66,3 +66,6 @@ logs/
 tests/dataset_reports/
 .assets/
 uv.lock
+
+# Sphinx
+docs/_build/
