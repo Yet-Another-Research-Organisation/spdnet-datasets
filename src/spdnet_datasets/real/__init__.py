@@ -6,6 +6,7 @@ from .chikusei import ChikuseiDataset
 from .ci4r import CI4RDataset
 from .deephsfruit import DeepHSFruitDataset
 from .dopnet import DopNetDataset
+from .fusar import FUSARShipDataset
 from .gsoff import GSOffDataset
 from .hdm05 import HDM05Dataset
 from .hyperleaf import HyperLeafDataset
@@ -30,4 +31,5 @@ __all__ = [
     'CI4RDataset',
     'DopNetDataset',
     'MVDopplerDataset',
+    'FUSARShipDataset',
 ]

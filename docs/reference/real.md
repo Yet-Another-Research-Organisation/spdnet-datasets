@@ -35,6 +35,14 @@ One class per dataset, registered under the name shown in the
    :exclude-members: num_classes
 ```
 
+## `fusar`
+
+```{eval-rst}
+.. automodule:: spdnet_datasets.real.fusar
+   :members:
+   :exclude-members: num_classes
+```
+
 ## `gsoff`
 
 ```{eval-rst}
