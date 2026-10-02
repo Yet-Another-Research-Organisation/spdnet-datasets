@@ -133,7 +133,8 @@ class HDM05Dataset(BaseDataset):
         # Load covariance matrix
         cov_matrix = np.load(sample['file_path'])
         cov_matrix = cov_matrix * self.scaling_factor
-        cov_matrix = torch.from_numpy(cov_matrix).float()
+        # float64, like every covariance loader (SPD eigendecompositions)
+        cov_matrix = torch.from_numpy(cov_matrix).double()
 
         # Get class index
         class_idx = self.class_to_idx[sample['class_name']]

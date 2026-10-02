@@ -24,11 +24,19 @@ class HyperLeafDataset(BaseDataset):
     - 'fertilizer': 3 fertilizer levels (0.0, 0.5, 1.0)
     - 'combined': 12 classes (3 fertilizer × 4 cultivar combinations)
 
-    Images are hyperspectral with 204 bands
-    Can load either pre-computed covariance matrices or raw images
+    Images are hyperspectral with 204 bands. Three modes:
+    - 'cov': pre-computed 204x204 covariance matrices (cov/<id>.pt)
+    - 'raw': covariance computed on the fly from the hyperspectral image
+    - 'image': the image itself restricted to a few bands (``bands``), as a
+      standardized float32 tensor (C, 48, 352) -- e.g. the RGB-like case where
+      no hyperspectral covariance is available and a CNN backbone is needed
     """
 
     CULTIVAR_NAMES = ['Heerup', 'Kvium', 'Rembrandt', 'Sheriff']
+    N_BANDS = 204
+    # Approximate R, G, B bands (~640, 550, 460 nm), assuming 204 regularly
+    # spaced bands over 397-1004 nm (Specim IQ); the TIFFs carry no wavelengths.
+    RGB_BANDS = (81, 51, 21)
     FERTILIZER_NAMES = ['0.0', '0.5', '1.0']
 
     def __init__(
@@ -36,7 +44,8 @@ class HyperLeafDataset(BaseDataset):
         data_dir: str,
         split: str = 'train',
         task: str = 'cultivar',  # 'cultivar', 'fertilizer', or 'combined'
-        mode: str = 'cov',  # 'cov' for covariance, 'raw' for images
+        mode: str = 'cov',  # 'cov', 'raw' or 'image' (see class docstring)
+        bands: list[int] | None = None,  # 'image' mode: bands to load (None = RGB_BANDS)
         cov_method: str = 'scm',  # 'scm' or 'ledoit_wolf'
         exclude_zero: bool = True,
         preload: bool = False,  # Disabled by default to avoid contention in multirun
@@ -50,7 +59,10 @@ class HyperLeafDataset(BaseDataset):
             split: 'train' or 'test'
             task: Classification task - 'cultivar' (4 classes), 'fertilizer' (3 classes),
                   or 'combined' (12 classes)
-            mode: 'cov' for pre-computed covariances, 'raw' for computing from images
+            mode: 'cov' for pre-computed covariances, 'raw' for computing from images,
+                  'image' for the (band-restricted) image itself
+            bands: 'image' mode only: indices of the bands to load, in output
+                   channel order (default RGB_BANDS)
             cov_method: 'scm' (empirical) or 'ledoit_wolf'
             exclude_zero: Exclude zero pixels when computing covariance
             preload: If True, load all data to RAM at init (faster training, more RAM)
@@ -62,7 +74,13 @@ class HyperLeafDataset(BaseDataset):
         self.cov_method = cov_method
         self.exclude_zero = exclude_zero
         self.preload = preload
-        self.target_size = (204, 204)  # Covariance matrices are 204x204
+        if mode not in ('cov', 'raw', 'image'):
+            raise ValueError(f"mode must be 'cov', 'raw' or 'image', got {mode}")
+        self.bands = list(bands if bands is not None else self.RGB_BANDS) if mode == 'image' else None
+        if self.bands is not None and not all(0 <= b < self.N_BANDS for b in self.bands):
+            raise ValueError(f"bands must be in [0, {self.N_BANDS}), got {self.bands}")
+        # Covariance matrices are 204x204; images are (bands, 48, 352)
+        self.target_size = (204, 204) if mode != 'image' else (len(self.bands), 48, 352)
         self._cache = {}  # Cache for preloaded data
 
         # Validate task
@@ -233,8 +251,8 @@ class HyperLeafDataset(BaseDataset):
         Get a sample.
 
         Returns:
-            Tuple of (covariance_matrix, class_index) if has_labels
-            Or just covariance_matrix if test set
+            Tuple of (data, class_index) if has_labels, else just data, where data
+            is a 204x204 covariance ('cov', 'raw') or a (C, 48, 352) image ('image')
         """
         sample = self.samples[idx]
         image_id = sample['image_id']
@@ -257,27 +275,22 @@ class HyperLeafDataset(BaseDataset):
             elif cov_matrix.dtype != torch.float64:
                 cov_matrix = cov_matrix.double()
 
-        else:  # mode == 'raw'
-            images_dir = self.data_dir / 'images'
-            image_path = images_dir / f"{image_id}.tiff"
-
-            # Load hyperspectral image
+        else:  # 'raw' or 'image': read the TIFF (one page per band, so only the
+            # requested bands are read in 'image' mode)
+            image_path = self.data_dir / 'images' / f"{image_id}.tiff"
             if not image_path.exists():
                 raise FileNotFoundError(f"Image file not found: {image_path}")
+            image_array = tifffile.imread(str(image_path), key=self.bands).astype(np.float32)
+            image_array = image_array.reshape(-1, *image_array.shape[-2:])  # (C, H, W)
 
-            try:
-                # Load with tifffile (better for scientific data)
-                image_array = tifffile.imread(str(image_path))
-            except Exception as e:
-                raise RuntimeError(f"Error loading image {image_path}: {e}")
-
-            # Convert to float and move bands to last dimension
-            image_array = image_array.astype(np.float32)
-            image_array = np.moveaxis(image_array, 0, -1)  # (H, W, C)
-
-            # Compute covariance
-            cov_matrix = self.cov_estimator.from_image(image_array)
-            cov_matrix = torch.from_numpy(cov_matrix).float()
+            if self.mode == 'image':
+                # per-image, per-channel standardization (raw uint16 counts)
+                mean = image_array.mean(axis=(1, 2), keepdims=True)
+                std = image_array.std(axis=(1, 2), keepdims=True)
+                cov_matrix = torch.from_numpy((image_array - mean) / (std + 1e-6))
+            else:
+                cov_matrix = self.cov_estimator.from_image(np.moveaxis(image_array, 0, -1))
+                cov_matrix = torch.from_numpy(cov_matrix).float()
 
         # Apply transform if specified
         if self.transform is not None:
