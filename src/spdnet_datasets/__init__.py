@@ -8,20 +8,24 @@ This package provides:
 """
 
 from .base import BaseDataset, create_dataloaders
-from .manager import DatasetManager
 from .estimator import EstimateCovariance, EstimateCovarianceTorch
+from .manager import DatasetManager
 
 # Import real datasets to register them
 from .real import (
-    Rices90Dataset,
-    HyperLeafDataset,
-    HDM05Dataset,
-    UAVDataset,
-    GSOffDataset,
     ChikuseiDataset,
+    CI4RDataset,
     DeepHSFruitDataset,
-    PlacentaDataset,
+    DopNetDataset,
+    GSOffDataset,
+    HDM05Dataset,
+    HyperLeafDataset,
     KaggleWheatDataset,
+    MVDopplerDataset,
+    NTU120Dataset,
+    PlacentaDataset,
+    Rices90Dataset,
+    UAVDataset,
 )
 
 __version__ = "0.1.0"
@@ -46,4 +50,8 @@ __all__ = [
     'DeepHSFruitDataset',
     'PlacentaDataset',
     'KaggleWheatDataset',
+    'NTU120Dataset',
+    'CI4RDataset',
+    'DopNetDataset',
+    'MVDopplerDataset',
 ]
