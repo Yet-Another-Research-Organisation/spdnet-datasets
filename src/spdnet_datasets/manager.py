@@ -44,7 +44,8 @@ class DatasetManager:
         Returns:
             Dataset instance
 
-        Example config:
+        Example config::
+
             {
                 'name': 'rices90',
                 'path': '/path/to/data',

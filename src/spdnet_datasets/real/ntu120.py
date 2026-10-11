@@ -23,7 +23,8 @@ class NTU120Dataset(BaseDataset):
     Each skeleton has 25 joints × 3 coordinates = 75 features.
     Covariance is computed over time steps.
 
-    Expected structure:
+    Expected structure::
+
         data_dir/
             cov/
                 A001/
