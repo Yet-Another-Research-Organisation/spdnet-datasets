@@ -26,7 +26,8 @@ Scenarios (``SeriesConfig.scenario``):
   angular speed ``c_i`` (``class_speeds``, default +1, -1, +2, ...), ``omega = pi / (T - 1)``.
   At any fixed step, the class vector is uniform on the circle of radius ``r`` for every
   class: a single token says nothing about the class, its direction of rotation does.
-  The centre of the centres is ``G(t)`` in expectation over the phase.
+  The centre of the centres is ``G(t)`` in expectation over the phase. ``target``, ``match_log_det`` and
+  ``class_angles`` are not defined for this scenario: setting them raises ``ValueError``.
 - ``"per_position"``: as ``"static"``, but the plane of the class vectors is drawn
   independently at each step (orthogonal to ``v``): ``u_i(t) = r (cos a_i e1(t) + sin a_i e2(t))``.
   The class is readable at every step, but its signature differs from one position to the
@@ -42,7 +43,6 @@ import math
 from dataclasses import dataclass, field
 
 import torch
-
 from yetanotherspdnet.functions.spd_geometries.affine_invariant import (
     affine_invariant_distance,
     affine_invariant_exp,
@@ -245,7 +245,10 @@ def _rotating_series(
 ) -> SeriesData:
     """Scenario "rotating": one centre series per sample, the class is the rotation speed."""
     p, n_classes, n_steps = config.n_features, config.n_classes, config.n_steps
-    assert config.tangent_noise_std == 0, "no tangent noise in the rotating scenario"
+    unsupported = {"tangent_noise_std": config.tangent_noise_std != 0, "target": config.target != "class",
+                   "match_log_det": config.match_log_det, "class_angles": config.class_angles is not None}
+    if any(unsupported.values()):
+        raise ValueError(f"the rotating scenario does not support {[k for k, v in unsupported.items() if v]}")
     speeds = config.class_speeds
     if speeds is None:
         speeds = [(1 + i // 2) * (-1) ** i for i in range(n_classes)]  # +1, -1, +2, -2, ...
@@ -308,25 +311,28 @@ def validate_series(series: SeriesData, quantile: float = 0.95) -> dict:
     - ``step_distance``: d(G(t), G(t+1)), constant along the geodesic
     - ``class_radius``: max_i d(G(t), G_i(t))
     - ``separation_ratio``: step_distance / class_radius (the spec asks for > 2)
-    - ``dispersion_q``: per class, ``quantile`` of d(Sigma, G_i(t))
+    - ``dispersion_q``: per class, ``quantile`` of d(Sigma, G_i(t)); for a continuous
+      target (one centre series per sample), a single value over all the samples
     - ``no_temporal_overlap``: step_distance > 2 * max dispersion_q, i.e. the
       samples of G_i(t) and G_i(t+1) do not overlap
     """
     data, labels, centres = series.data, series.labels, series.centres
     trajectory = series.trajectory
     assert "class_speeds" not in series.info, "validate_series checks the static scenario"
-    n_classes = centres.shape[0]
     steps = affine_invariant_distance(trajectory[:-1], trajectory[1:])
     radius = affine_invariant_distance(trajectory[None], centres)
-    dispersion = torch.stack(
-        [
-            torch.quantile(
-                affine_invariant_distance(data[labels == i], centres[i]).flatten(),
-                quantile,
-            )
-            for i in range(n_classes)
-        ]
-    )
+    if labels.is_floating_point():  # continuous target: centres (n_series, T, p, p), one per sample
+        dispersion = torch.quantile(affine_invariant_distance(data, centres).flatten(), quantile)[None]
+    else:
+        dispersion = torch.stack(
+            [
+                torch.quantile(
+                    affine_invariant_distance(data[labels == i], centres[i]).flatten(),
+                    quantile,
+                )
+                for i in range(centres.shape[0])
+            ]
+        )
     step_distance = steps.mean().item()
     return {
         "min_eigval": torch.linalg.eigvalsh(data).min().item(),
