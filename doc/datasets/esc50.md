@@ -38,6 +38,14 @@ with 5 official folds of 400 clips.
   `category`, `esc10`, `src_file`, `take`, `audio`). The ESC-10 subset (10
   classes, 400 clips) is flagged by the `esc10` column.
 
+## Getting the data
+
+Direct access, no account. Without a local copy, `fetch_esc50()` downloads the two
+parquet shards (773 MB) of the Hugging Face mirror `ashraq/esc50` at a pinned
+revision and checks their sha256. Already downloaded shards (folder, zip or tar)
+can be given with `fetch_esc50(archive="~/Downloads/esc50/")`. Licence CC BY-NC 3.0.
+The official GitHub archive (WAV + `meta/esc50.csv`) is not read.
+
 ## Raw data
 
 Each clip is a mono 16-bit PCM (pulse-code modulation) WAV (Waveform Audio

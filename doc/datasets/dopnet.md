@@ -28,12 +28,20 @@ front of an Ancortek 24 GHz FMCW (frequency-modulated continuous wave) radar.
 - Reference: M. Ritchie, R. Capraru and F. Fioranelli, "Dop-NET: a micro-Doppler
   radar data challenge", *Electronics Letters* 56(11), 568–570, 2020,
   doi:[10.1049/el.2019.4153](https://doi.org/10.1049/el.2019.4153).
-- Source: <https://dop-net.com> (registration; manual download). Licence: not
-  stated in the copy (public challenge data).
+- Source: <https://rdr.ucl.ac.uk/articles/dataset/Dop-Net_Data/25486597> (UCL
+  repository, CC0; the former site dop-net.com no longer resolves).
 - The paper announces 3 452 files from 10 persons; the copy holds 6 persons
   and 2 433 + 643 gestures.
 - Local copy: `<data root>/RADAR_DOPPLER/Dop-NET/Training Data/*.mat` and
   `Test Data/Data_For_Test_Random.mat`.
+
+## Getting the data
+
+Direct access, no account: UCL research data repository (figshare 25486597,
+doi:10.5522/04/25486597.v1, CC0). Without a local copy, `fetch_dopnet()` downloads
+`Gesture Data.zip` (5.99 GB), checks its figshare MD5, extracts it into the cache
+and deletes the zip; `fetch_dopnet(archive="~/Downloads/Gesture Data.zip")` uses a
+downloaded copy (kept).
 
 ## Raw data
 
