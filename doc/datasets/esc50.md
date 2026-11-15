@@ -12,7 +12,7 @@
 * - Outputs
   - cov · mean · raw (frames × p)
 * - Samples
-  - 1 996 clips (2 000 minus 4 silent clips)
+  - 1 979 clips (2 000 minus 4 mostly silent clips and 17 numerically singular covariances)
 * - Splits
   - `official` = `recommended`: 5 official folds, test = fold `fold`, val = next fold, train = the 3 others (fold 1: 1 198 / 400 / 398)
 * - Module
@@ -60,8 +60,8 @@ image.
 
 ## Classes
 
-The 50 classes have 40 clips each, except the four classes that lost a silent
-clip (dog, footsteps, mouse_click, pig: 39). The bar chart gives the counts per
+The 50 classes have 40 clips each before exclusion; 21 clips are excluded
+(see *Covariance construction*), so a few classes have 37 to 39 clips. The bar chart gives the counts per
 class in the train, validation and test parts of the official split with test
 fold 1. The second figure shows the mean MFCC profile of the first 8 classes.
 
@@ -91,10 +91,16 @@ One symmetric positive definite (SPD) covariance per clip, over its frames
 
 A clip with fewer than 2p non-silent frames, or whose estimate is not SPD, is
 excluded and listed in `dataset.excluded`; nothing is regularised silently.
-With MFCC, 4 clips are excluded (30 to 34 non-silent frames for 2p = 40):
-`1-100032-A-0` (dog), `1-223162-A-25` (footsteps), `3-155556-A-31`
-(mouse_click) and `5-103422-A-2` (pig). The atlas counts 216 clips that are
-mostly silent; their non-silent frames are enough for the other 212.
+With MFCC, 21 clips are excluded (measured on 2026-11-15):
+
+- 4 clips have too few non-silent frames (30 to 34 for 2p = 40):
+  `1-100032-A-0` (dog), `1-223162-A-25` (footsteps), `3-155556-A-31`
+  (mouse_click) and `5-103422-A-2` (pig);
+- 17 clips give a numerically singular covariance (condition number above
+  `1e12`, from `1.2e12` to `9.8e16`): near-constant MFCC over the clip.
+
+The atlas counts 216 clips that are mostly silent; the non-silent frames of the
+others are enough.
 
 With `normalize=True` (default) the covariances are multiplied by a scalar
 `s` fitted on the training part so that the geometric mean of their eigenvalues
@@ -116,7 +122,7 @@ fifth (1 600 / 400, the protocol of the atlas benchmark): merge `train` and
 `val` to reproduce it.
 
 Groups (`dataset.groups`) are the source Freesound recording (`src_file`):
-1 520 recordings among the 1 996 kept clips. The second panel of the figure
+1 506 recordings among the 1 979 kept clips. The second panel of the figure
 shows the number of clips per recording. Its title says that groups never
 cross splits: for ESC-50 this holds except for the 4 recordings that span two
 official folds (see the next section).
