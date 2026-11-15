@@ -20,6 +20,11 @@ Split: no plot, flight or position is available, so the patches are split
 with a stratified K-fold (``"stratified"`` = ``"recommended"``; test = fold
 ``fold``, val = fold ``fold + 1``). Neighbouring patches of one plot may fall
 on both sides: the leakage cannot be measured (atlas fiche).
+
+Download (manual): Kaggle competition of the ICPR 2026 challenge
+(https://han-research.gitlab.io/Agvision/; Kaggle account and acceptance of the
+competition rules required). Download ``train/`` and ``val/`` and place it under
+``data_dir`` (default ``<data root>/HYPERSPECTRAL/Wheat_Disease_ICPR26``).
 """
 
 from pathlib import Path

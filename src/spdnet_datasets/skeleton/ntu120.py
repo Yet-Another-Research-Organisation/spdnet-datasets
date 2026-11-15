@@ -34,6 +34,12 @@ Splits
 Tasks: ``task="fine"`` (120 actions) or ``task="coarse"`` (daily actions,
 medical conditions, mutual actions, as in the NTU RGB+D 120 paper). Mutual
 actions involve two persons, of which only body 0 is used.
+
+Download (manual): request access on
+https://rose1.ntu.edu.sg/dataset/actionRecognition/ (ROSE Lab licence agreement,
+non-commercial research; account and approval required). Convert the ``.skeleton``
+files to ``npy_skeletons_by_class/A<action>/<name>.npy`` (layout above) and place it
+under ``data_dir`` (default ``<data root>/SKELETON/NTU_RGBD_120``).
 """
 
 import re

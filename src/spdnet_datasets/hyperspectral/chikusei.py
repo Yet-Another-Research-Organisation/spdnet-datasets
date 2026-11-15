@@ -23,6 +23,12 @@ train / val / test; a window is kept when its centre is at Chebyshev
 distance >= w + 1 from any pixel of another split). Windows of the buffer
 (645 in 15 x 15) are discarded and counted. Windows of the same split overlap
 (grid step 4 < 15): never split them at random.
+
+Download (manual): the scene is distributed after a form on
+http://park.itc.u-tokyo.ac.jp/sal/hyperdata (CC BY 3.0). The windows read here
+(``prepared_v2/chikusei_v2.h5``) are a LISTIC re-extraction from ``source/``
+(atlas), not a published file; copy both folders and place it under ``data_dir``
+(default ``<data root>/HYPERSPECTRAL/Chikusei``).
 """
 
 from pathlib import Path

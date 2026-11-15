@@ -4,6 +4,14 @@ Data: ``SAR/PAZ_S1_proc_v2/CPAZMaL.hdf5`` (+ ``CPAZMaL.txt``), also published on
 Hugging Face (``musmb/CPAZMaL``, Apache-2.0). Reference: Lin-Kwong-Chon C.,
 Gallet M., *CPAZMAL: Cryosphere PAZ SAR data for MAchine Learning* (LISTIC, 2024).
 
+Download: when ``CPAZMaL.hdf5`` is absent from ``data_dir``, the file of the
+pinned Hugging Face revision (1.5 GB, sha256 = LFS identifier, equal to the
+local copy) is downloaded once into ``<cache_dir>/cpazmal/downloads/``. This
+folder is outside the ``keep`` policy (never deleted by the fetch, remove it by
+hand): the processed stage depends on ``orbit``, ``n_dates``, ``block``..., and
+deleting the source after each run would download 1.5 GB again for every new
+combination.
+
 Sample unit
 -----------
 The annotated *parcels* are the 68 polygons of the source shapefiles (one per
@@ -63,7 +71,8 @@ from ._common import (
 
 DOMAIN, NAME = "SAR", "PAZ_S1_proc_v2"
 FILENAME = "CPAZMaL.hdf5"
-HF_URL = "https://huggingface.co/datasets/musmb/CPAZMaL/resolve/main/dataset/CPAZMaL.hdf5"
+HF_REVISION = "642e8c0f82ec94016e56b33241677f5b8d4df228"
+HF_URL = f"https://huggingface.co/datasets/musmb/CPAZMaL/resolve/{HF_REVISION}/dataset/CPAZMaL.hdf5"
 # sha256 of the Hugging Face file (x-linked-etag), identical to the local copy
 FILES = {HF_URL: "a3e58d77bf5473f8c409e06ba11c4a956cf2a0dcd7e2108e845d0ede84a9dc94"}
 CLASSES = ("ABL", "ACC", "FOR", "HAG", "ICA", "LAC", "PLA", "ROC")
@@ -210,15 +219,18 @@ def fetch_cpazmal(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
         raw_fn = None
     else:
         def raw_fn(raw_dir):
-            return download(HF_URL, Path(raw_dir) / FILENAME, checksum=FILES[HF_URL])
+            # persistent sibling of raw/, outside the keep policy (module docstring)
+            dest = Path(raw_dir).parent / "downloads" / FILENAME
+            return dest if dest.exists() else download(HF_URL, dest, checksum=FILES[HF_URL])
     opts = {"orbit": orbit, "n_dates": n_dates, "scale": scale, "max_mask_value": max_mask_value,
                 "min_pixels": min_pixels, "block": block}
-    params = dict(opts, estimator=estimator, source=str(local.resolve()) if local.exists() else HF_URL)
+    params = dict(opts, source=str(local.resolve()) if local.exists() else HF_URL)
 
     def process_fn(source, out_dir):
         _process(source if source is not None else local, out_dir, **opts)
 
-    res = run_pipeline("cpazmal", params=params, raw_fn=raw_fn, process_fn=process_fn,
+    res = run_pipeline("cpazmal", params=params, covariance_params={"estimator": estimator},
+                       raw_fn=raw_fn, process_fn=process_fn,
                        covariance_fn=lambda a, b: _covariances(a, b, estimator=estimator),
                        cache_dir=cache_dir, keep=keep, force=force)
     cdir = Path(res.covariance_dir)

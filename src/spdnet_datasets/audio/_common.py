@@ -38,6 +38,7 @@ from ..core import (
     channel_mean,
     class_weights,
     dataset_path,
+    download,
     estimate_covariance,
     geometric_scale,
     verify_local,
@@ -68,6 +69,18 @@ def check_local(data_dir, verify, required=()):
         raise OSError(f"{len(bad)} file(s) of {data_dir} differ from MANIFEST_NAS.tsv, "
                       f"e.g. {bad[:5]}")
     return report
+
+
+def download_files(files, raw_dir):
+    """Download every ``url -> sha256`` of ``files`` into ``raw_dir`` (``raw_fn`` of a fetch).
+
+    Each file is named after the last component of its URL. A complete file is
+    not downloaded again (only re-hashed, see :func:`~spdnet_datasets.core.fetch.download`).
+    """
+    raw_dir = Path(raw_dir)
+    for url, sha256 in files.items():
+        download(url, raw_dir / url.rsplit("/", 1)[-1], checksum=sha256)
+    return raw_dir
 
 
 def write_processed(out_dir, features, index, excluded, p):

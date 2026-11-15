@@ -50,6 +50,11 @@ Index: the list of chips of one protocol comes from ``MANIFEST_NAS.tsv``
 (path and size, no directory walk over the 2.1 M files) or, without manifest,
 from a walk of the protocol folder only; it is cached as JSON in
 ``<cache_dir>/atrnet_star/index/``.
+
+Download (manual): Hugging Face ``waterdisappear/ATRNet-STAR`` is gated (login and
+acceptance of the terms of use required), so nothing is downloaded automatically.
+Download ``Amplitude_8bit/``, ``Slant_Range/`` and ``annotation_coco.zip`` and place
+it under ``data_dir`` (default ``<data root>/SAR/ATRNet-STAR``).
 """
 
 import csv

@@ -37,6 +37,11 @@ train = the rest. ``"official"`` is fold ``fold``. Groups are subjects.
 Snapshots of one recording overlap by 50 %: never split them at random.
 Files without the HDF5 signature and ``.h5`` files absent from
 ``design_table.csv`` are skipped and counted.
+
+Download (manual): the data are on the authors' Google Drive, linked from
+https://github.com/soheilhr/MVDoppler (no stable direct URL or checksum). Download
+``Data/`` and ``Labels_and_metadata/`` and place it under ``data_dir`` (default
+``<data root>/RADAR_DOPPLER/MVDoppler``).
 """
 
 import numpy as np

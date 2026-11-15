@@ -24,6 +24,11 @@ physical fruit). The official v2 split cannot be used: the VIS cubes of
 and have no ``cov_VIS`` file, so ripeness mode holds the 384 annotated VIS
 cubes of ``train_only_labeled_v2`` only (it would also leak: 46 of the 140
 test cubes have the other face of their fruit in train).
+
+Download (manual): see https://github.com/cogsys-tuebingen/deephs_fruit (226 GB,
+links given by the authors). The ``cov_VIS/*.pt`` covariances read here are a local
+precomputation; copy the fruit folders, ``annotations/`` and ``cov_VIS/`` and place
+it under ``data_dir`` (default ``<data root>/HYPERSPECTRAL/DeepHS-Fruit``).
 """
 
 import json
@@ -40,6 +45,7 @@ from ..manager import DatasetManager
 from ._common import HSIDataset, group_kfold_split
 
 DOMAIN, NAME = "HYPERSPECTRAL", "DeepHS-Fruit"
+FILES = {}  # manual download (see the module docstring)
 FRUIT_CLASSES = ["Avocado", "Kaki", "Kiwi", "Mango", "Papaya"]
 RIPENESS = {"unripe": "unripe", "perfect": "perfect", "ripe": "perfect",
             "overripe": "overripe"}

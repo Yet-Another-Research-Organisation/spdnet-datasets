@@ -51,6 +51,12 @@ Splits
   official ``label_train`` and ``label_test`` pixels. Train and test form a
   256 x 256 px checkerboard: neighbouring cells sit on both sides and the
   scores are optimistic (atlas: +0.03 to +0.08 of balanced accuracy).
+
+Download (manual): KITopenData / RADAR4KIT, doi:10.35097/1700 (CC BY-NC-SA 4.0): the
+BagIt archive holds ``data/dataset/Pol-InSAR-Island_updated.zip`` (md5
+``3d10bb4afa2eb4ece3da546df0f741fb`` in ``manifest-md5.txt``); no stable direct URL
+was found. Extract the inner zip and place it under ``data_dir`` (default ``<data
+root>/SAR/Pol-InSAR-Island``).
 """
 
 import re

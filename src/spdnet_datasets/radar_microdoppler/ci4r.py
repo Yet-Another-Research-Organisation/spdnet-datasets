@@ -40,6 +40,11 @@ participants). Exact duplicates (``(copy)``/``(another copy)`` files, md5
 identical: 7 in 77 GHz, 19 in xethru) are removed. In xethru, codes 05, 11
 and 18 come from earlier sessions (February 2019) with few classes:
 participant and class are partly confounded.
+
+Download (manual): the spectrograms are linked from the README of
+https://github.com/ci4r/CI4R-Activity-Recognition-datasets (no direct URL or checksum
+registered). Download ``11_class_activity_data`` and place it
+under ``data_dir`` (default ``<data root>/RADAR_DOPPLER/CI4R-MULTI3``).
 """
 
 import hashlib

@@ -24,6 +24,11 @@ Split (atlas recommendation): StratifiedGroupKFold(5) over 96 x 96 pixel
 blocks, test = fold ``fold``, val = fold ``fold + 1``; val/test windows that
 overlap a training window (and test windows overlapping a val window) are
 removed.
+
+Download (manual): the scene comes from the Baidu Pan link of the authors'
+repository (licence unknown, see ``source/README.md``). Copy
+``source/`` and the prepared windows and place it under ``data_dir`` (default
+``<data root>/HYPERSPECTRAL/GSOFF``).
 """
 
 from pathlib import Path
