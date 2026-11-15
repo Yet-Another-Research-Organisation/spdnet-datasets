@@ -29,10 +29,10 @@ sounds, interior/domestic sounds, and exterior/urban noises. The dataset comes
 with 5 official folds of 400 clips.
 
 - Reference: K. J. Piczak, "ESC: Dataset for Environmental Sound
-  Classification", *Proc. ACM Multimedia*, 2015, pp. 1015–1018,
+  Classification", *Proc. ACM (Association for Computing Machinery) Multimedia*, 2015, pp. 1015–1018,
   doi:[10.1145/2733373.2806390](https://doi.org/10.1145/2733373.2806390).
 - Source: <https://github.com/karolpiczak/ESC-50>. Licence: CC BY-NC 3.0
-  (Freesound clips).
+  (Creative Commons Attribution-NonCommercial; Freesound clips).
 - Local copy: a Hugging Face export in two parquet files under
   `<data root>/AUDIO/ESC-50` (columns `filename`, `fold`, `target`,
   `category`, `esc10`, `src_file`, `take`, `audio`). The ESC-10 subset (10
@@ -40,7 +40,8 @@ with 5 official folds of 400 clips.
 
 ## Raw data
 
-Each clip is a mono 16-bit PCM WAV file (220 500 samples at 44 100 Hz) stored as
+Each clip is a mono 16-bit PCM (pulse-code modulation) WAV (Waveform Audio
+File Format) file (220 500 samples at 44 100 Hz) stored as
 bytes in the `audio` column and decoded to float in [−1, 1]. The figure shows
 the preprocessed data the covariance is computed from: the 20 MFCC of each non-silent frame, as a (coefficient × frame)
 image.
@@ -108,7 +109,9 @@ fifth (1 600 / 400, the protocol of the atlas benchmark): merge `train` and
 
 Groups (`dataset.groups`) are the source Freesound recording (`src_file`):
 1 520 recordings among the 1 996 kept clips. The second panel of the figure
-shows the number of clips per recording.
+shows the number of clips per recording. Its title says that groups never
+cross splits: for ESC-50 this holds except for the 4 recordings that span two
+official folds (see the next section).
 
 ```{raw} html
 <iframe src="../_static/figures/esc50/split_schema.html" class="plotly-figure" loading="lazy"></iframe>

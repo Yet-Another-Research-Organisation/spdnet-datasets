@@ -14,7 +14,7 @@ UrbanSound8K holds 8 732 labelled slices (at most 4 s) of urban sounds from
 (column `fold` of the metadata file).
 
 - Reference: J. Salamon, C. Jacoby and J. P. Bello, "A Dataset and Taxonomy
-  for Urban Sound Research", *Proc. ACM Multimedia*, 2014.
+  for Urban Sound Research", *Proc. ACM (Association for Computing Machinery) Multimedia*, 2014.
 - Expected layout: `<data root>/AUDIO/UrbanSound8K/metadata/UrbanSound8K.csv`
   and `audio/fold<k>/<slice>.wav`.
 

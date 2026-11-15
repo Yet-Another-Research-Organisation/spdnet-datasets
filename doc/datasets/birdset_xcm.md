@@ -37,11 +37,11 @@ UHH, HSN, NBP, POW, SSW, SNE).
 
 - Reference: L. Rauch et al., "BirdSet: A Large-Scale Dataset for Audio
   Classification in Avian Bioacoustics", [arXiv:2403.10380](https://arxiv.org/abs/2403.10380),
-  2024 (ICLR 2025).
+  2024 (ICLR 2025, International Conference on Learning Representations).
 - Source: <https://huggingface.co/datasets/DBD-research-group/BirdSet>
   (configuration XCM).
 - Licence: Creative Commons per recording (column `license`, mostly
-  CC BY-NC-SA 4.0 where it is filled in).
+  CC BY-NC-SA 4.0, Attribution-NonCommercial-ShareAlike, where it is filled in).
 - Local copy: `<data root>/AUDIO/BirdSet_XCM/xcm_*.parquet`.
 
 ## Raw data
@@ -72,8 +72,8 @@ names are eBird codes.
 
 ## Covariance construction
 
-Same chain as {doc}`esc50`: Hann frames of 2 048 samples at 32 kHz (about
-46 ms, rounded to a power of two) with a hop of 512, 64 mel bands from 50 Hz in
+Same chain as {doc}`esc50`: Hann frames of 2 048 samples at 32 kHz (64 ms:
+0.046·sr rounded to the nearest power of two) with a hop of 512, 64 mel bands from 50 Hz in
 dB with a floor at `max − 80 dB`, first 20 coefficients of the orthonormal
 DCT-II (discrete cosine transform), so p = 20 (`features="logmel"`: p = 64).
 Frames more than half made of exact zeros are dropped; one symmetric positive
@@ -86,7 +86,7 @@ estimator (`"scm"`, the sample covariance matrix, by default).
 
 Exclusions (listed in `dataset.excluded`): 2 recordings of the 5 185, so 5 183
 are kept. `XC539245` (easwar1) has 35 non-silent frames for 2p = 40, and the
-SCM of `XC592530` (blutit) is not SPD (smallest eigenvalue −5·10⁻¹³).
+sample covariance matrix (SCM) of `XC592530` (blutit) is not SPD (smallest eigenvalue −5·10⁻¹³).
 
 ```{raw} html
 <iframe src="../_static/figures/birdset_xcm/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>

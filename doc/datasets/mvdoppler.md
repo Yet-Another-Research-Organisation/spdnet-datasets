@@ -140,7 +140,7 @@ train, val, test = create_dataloaders(ds, split="official", batch_size=64)
 ```
 
 Changing the estimator recomputes the preprocessing stage (about 1 min,
-3.6 GB of cache).
+3.6 GB (gigabytes) of cache).
 
 ## Migration notes
 

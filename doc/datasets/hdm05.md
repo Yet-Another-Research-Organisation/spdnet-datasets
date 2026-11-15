@@ -40,7 +40,8 @@ coordinates per motion segment, in 117 action classes.
   <http://resources.mpi-inf.mpg.de/HDM05/>. Licence: free for research (site
   conditions).
 - Covariance protocol: Z. Huang and L. Van Gool, "A Riemannian Network for SPD
-  Matrix Learning", *AAAI* 2017.
+  Matrix Learning", *AAAI (Association for the Advancement of Artificial Intelligence)
+  Conference* 2017.
 - Local copy: `<data root>/SKELETON/HDM05`, 2 086 files
   `{id}_{frames}_{class}.npy`, each a symmetric 93×93 float64 matrix.
 

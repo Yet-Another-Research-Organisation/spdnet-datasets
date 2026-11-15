@@ -39,7 +39,7 @@ IWR1443 77 GHz FMCW (frequency-modulated continuous wave) radar, an Ancortek
 
 ## Raw data
 
-Only micro-Doppler spectrograms rendered as jet-coloured PNG images (no axes,
+Only micro-Doppler spectrograms rendered as jet-coloured PNG (Portable Network Graphics) images (no axes,
 no physical scale) are distributed: 653 files in 77 GHz (804 Doppler rows ×
 1 475 time columns) and 652 in xethru (626 × 1 176 useful pixels inside grey
 margins). The dynamic range and the physical units are lost in the rendering.

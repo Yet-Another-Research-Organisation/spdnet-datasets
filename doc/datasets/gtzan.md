@@ -29,10 +29,10 @@ GTZAN has no artist metadata. The stratified folds put excerpts of one artist
 
 The GTZAN genre collection holds 10 genres × 100 excerpts of 30 s (blues,
 classical, country, disco, hiphop, jazz, metal, pop, reggae, rock), taken from
-CDs, radio and other recordings.
+CDs (compact discs), radio and other recordings.
 
 - Reference: G. Tzanetakis and P. Cook, "Musical genre classification of audio
-  signals", *IEEE Transactions on Speech and Audio Processing* 10(5), 293–302,
+  signals", *IEEE (Institute of Electrical and Electronics Engineers) Transactions on Speech and Audio Processing* 10(5), 293–302,
   2002, doi:[10.1109/TSA.2002.800560](https://doi.org/10.1109/TSA.2002.800560).
 - Known defects: B. L. Sturm, "The GTZAN dataset: its contents, its faults,
   their effects on evaluation, and its future use", 2013,
@@ -45,7 +45,7 @@ CDs, radio and other recordings.
 ## Raw data
 
 The copy holds 999 excerpts: `jazz.00054` is missing (a known corrupted
-file). Each excerpt is a mono 16-bit WAV of 660 000 to 675 808 samples. The
+file). Each excerpt is a mono 16-bit WAV (Waveform Audio File Format) file of 660 000 to 675 808 samples. The
 Hugging Face metadata announce 32 kHz; the real rate, read from every WAV
 header, is 22 050 Hz, and the features use the real rate. The figure shows the
 20 MFCC of the non-silent frames of four

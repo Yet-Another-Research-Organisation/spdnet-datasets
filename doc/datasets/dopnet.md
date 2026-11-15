@@ -61,9 +61,10 @@ gestures.
 ## Classes
 
 Kept gestures in the official split: training file Click 375, Pinch 556,
-Swipe 394, Wave 428; test file Click 76, Pinch 126, Swipe 91, Wave 99. Click
-is the shortest gesture (about 100 frames) and loses most samples to the
-T ≥ 96 rule: 451 Click gestures remain out of 1 000.
+Swipe 394, Wave 428; test file Click 76, Pinch 126, Swipe 91, Wave 99. After
+deduplication and the T ≥ 96 rule, 451 of the 1 000 Click gestures remain.
+Gesture durations differ by class: median T of the kept gestures is 131
+(Click), 118 (Pinch), 241 (Swipe) and 209 (Wave) frames.
 
 ```{raw} html
 <iframe src="../_static/figures/dopnet/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
@@ -121,7 +122,7 @@ Validation parts are empty. Groups are persons. The figures show `official`.
 | 111 test gestures (17 %) identical to training gestures | global MD5 deduplication, training files first (tested: no shared hash) | none for exact copies |
 | same person in train and test (official split) | `person<k>` splits for inter-person generalisation (tested) | official split stays intra-person |
 | band fitted on the training files | — | in `person<k>`, the band (one hyperparameter) is fitted on data that include the held-out person |
-| duration bias: Click is short (≈ 100 frames) | after deduplication and T ≥ 96, 451 of the 1 000 Click gestures remain | a classifier can use T; compare with a duration-only baseline |
+| duration bias: Swipe and Wave are long (median T 241 and 209), Click and Pinch short (131 and 118) | none (T is the covariance sample size, not an input) | a classifier can exploit the duration through the raw output or the estimation noise; compare with a duration-only baseline |
 
 ## Supported tasks
 
