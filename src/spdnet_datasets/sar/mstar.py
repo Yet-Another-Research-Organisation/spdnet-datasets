@@ -42,7 +42,7 @@ import torch
 from ..base import BaseDataset
 from ..core.config import dataset_path
 from ..core.estimators import channel_mean
-from ..core.fetch import Bunch, verify_local
+from ..core.fetch import Bunch, check_local
 from ..manager import DatasetManager
 from ._common import finalize_labels
 
@@ -87,7 +87,7 @@ def fetch_mstar(data_dir=None, *, source="jpg", verify="size", val_size=0.1, see
         raise ValueError(f"source must be one of {SOURCES}")
     root = dataset_path(DOMAIN, NAME, data_dir)
     folder = "soc" if source == "jpg" else "soc_complex"
-    verify_local(root, verify=verify, required=(f"{folder}/train", f"{folder}/test"))
+    check_local(root, verify=verify, required=(f"{folder}/train", f"{folder}/test"))
     rows = []
     for part in ("train", "test"):
         for cls_dir in sorted((root / folder / part).iterdir()):

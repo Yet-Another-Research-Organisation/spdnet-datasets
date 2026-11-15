@@ -42,7 +42,6 @@ from ..core import (
     estimate_covariance,
     geometric_scale,
     get_cache_dir,
-    verify_local,
 )
 
 EXCLUDED_COLUMNS = ["id", "label", "reason"]
@@ -60,16 +59,6 @@ def evenly_spaced(n, limit):
     if limit is None or limit >= n:
         return np.arange(n)
     return np.unique(np.linspace(0, n - 1, int(limit)).round().astype(int))
-
-
-def check_local(data_dir, verify, required=()):
-    """Verify a read-only local copy against its manifest; raise on any mismatch."""
-    report = verify_local(data_dir, verify=verify, required=required)
-    bad = report.missing + report.wrong_size + report.wrong_md5
-    if bad:
-        raise OSError(f"{len(bad)} file(s) of {data_dir} differ from MANIFEST_NAS.tsv, "
-                      f"e.g. {bad[:5]}")
-    return report
 
 
 def download_files(files, raw_dir):
@@ -377,6 +366,6 @@ class SequenceCovarianceDataset(BaseDataset):
         return x, int(self._labels_all[j])
 
 
-__all__ = ["CSV", "SequenceCovarianceDataset", "check_local", "estimate_stage",
+__all__ = ["CSV", "SequenceCovarianceDataset", "estimate_stage",
            "evenly_spaced", "folds_to_split", "kfold_assignment", "load_result",
            "save_covariances", "write_processed"]

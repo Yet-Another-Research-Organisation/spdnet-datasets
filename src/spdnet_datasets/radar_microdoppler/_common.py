@@ -17,7 +17,6 @@ part of the selected split when the dataset is instantiated.
 """
 
 import json
-import warnings
 from pathlib import Path
 
 import numpy as np
@@ -26,22 +25,9 @@ import torch
 
 from ..base import BaseDataset
 from ..core.estimators import channel_mean, estimate_covariance
-from ..core.fetch import Bunch, verify_local
+from ..core.fetch import Bunch
 from ..core.normalize import geometric_scale
 from ..core.tasks import apply_task, balance_indices, class_weights
-
-
-def check_local(dataset_dir, verify="size", required=()):
-    """``verify_local`` on a read-only copy; warn when the manifest disagrees."""
-    report = verify_local(dataset_dir, verify=verify, required=required)
-    bad = report.missing + report.wrong_size + report.wrong_md5
-    if bad:
-        warnings.warn(
-            f"{dataset_dir}: {len(report.missing)} missing, {len(report.wrong_size)} wrong size, "
-            f"{len(report.wrong_md5)} wrong md5 files w.r.t. MANIFEST_NAS.tsv (e.g. {bad[:3]})",
-            UserWarning, stacklevel=3,
-        )
-    return report
 
 
 def write_processed(out_dir, spectrograms, meta, info):

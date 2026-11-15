@@ -37,11 +37,10 @@ import warnings
 from functools import partial
 from pathlib import PurePosixPath
 
-from ..core import dataset_path, run_pipeline
+from ..core import check_local, dataset_path, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     SequenceCovarianceDataset,
-    check_local,
     download_files,
     estimate_stage,
     evenly_spaced,
@@ -129,7 +128,7 @@ def fetch_gtzan(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
     """
     root = dataset_path(DOMAIN, NAME, data_dir)
     if root.is_dir():
-        check_local(root, verify)
+        check_local(root, verify=verify)
         raw_fn, source = None, str(root.resolve())
     else:
         raw_fn, source = partial(download_files, FILES), f"hf:{HF_REPO}@{HF_REVISION}"

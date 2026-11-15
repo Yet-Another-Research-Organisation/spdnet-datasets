@@ -30,6 +30,7 @@ import hashlib
 import json
 import shutil
 import urllib.request
+import warnings
 from pathlib import Path
 
 from .config import get_cache_dir
@@ -142,6 +143,35 @@ def verify_local(dataset_dir, manifest="MANIFEST_NAS.tsv", verify="size", requir
             report.wrong_size.append(rel)
         if verify == "md5" and row.get("md5") and md5sum(p) != row["md5"]:
             report.wrong_md5.append(rel)
+    return report
+
+
+def check_local(dataset_dir, *, required=(), verify="size", manifest="MANIFEST_NAS.tsv",
+                strict=True):
+    """:func:`verify_local`, then raise or warn if a file differs from the manifest.
+
+    Parameters
+    ----------
+    dataset_dir, required, verify, manifest
+        See :func:`verify_local`.
+    strict : bool
+        ``True``: raise ``OSError`` on a missing, wrong-size or wrong-md5 file;
+        ``False``: emit a ``UserWarning`` instead.
+
+    Returns
+    -------
+    Bunch
+        The report of :func:`verify_local`.
+    """
+    report = verify_local(dataset_dir, manifest=manifest, verify=verify, required=required)
+    bad = report.missing + report.wrong_size + report.wrong_md5
+    if bad:
+        msg = (f"{dataset_dir}: {len(report.missing)} missing, {len(report.wrong_size)} wrong "
+               f"size, {len(report.wrong_md5)} wrong md5 files w.r.t. {manifest} "
+               f"(e.g. {bad[:5]})")
+        if strict:
+            raise OSError(msg)
+        warnings.warn(msg, UserWarning, stacklevel=2)
     return report
 
 

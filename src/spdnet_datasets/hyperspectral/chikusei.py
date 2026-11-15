@@ -38,7 +38,7 @@ import pandas as pd
 
 from ..core.config import dataset_path
 from ..core.estimators import check_sample_size
-from ..core.fetch import Bunch, run_pipeline, verify_local
+from ..core.fetch import Bunch, check_local, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     HSIDataset,
@@ -83,7 +83,7 @@ def fetch_chikusei(data_dir=None, cache_dir=None, keep=None, estimator="scm", fo
     if window not in (15, 23):
         raise ValueError("window must be 15 or 23 (sizes of the v2 extraction)")
     root = dataset_path(DOMAIN, NAME, data_dir)
-    verify_local(root, verify=verify, required=(PREPARED,))
+    check_local(root, verify=verify, required=(PREPARED,))
     bands = band_index(N_BANDS, band_step)
     check_sample_size(window * window, len(bands))
     group = f"w{window}"

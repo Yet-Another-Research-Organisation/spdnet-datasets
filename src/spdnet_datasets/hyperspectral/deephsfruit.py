@@ -40,7 +40,7 @@ import pandas as pd
 import torch
 
 from ..core.config import dataset_path
-from ..core.fetch import Bunch, verify_local
+from ..core.fetch import Bunch, check_local
 from ..manager import DatasetManager
 from ._common import HSIDataset, group_kfold_split
 
@@ -90,8 +90,8 @@ def fetch_deephsfruit(data_dir=None, verify="size", *, classification_mode="frui
     if classification_mode not in ("fruit", "ripeness"):
         raise ValueError("classification_mode must be 'fruit' or 'ripeness'")
     root = dataset_path(DOMAIN, NAME, data_dir)
-    verify_local(root, verify=verify,
-                 required=("cov_VIS", "annotations/merged_annotations.json"))
+    check_local(root, verify=verify,
+                required=("cov_VIS", "annotations/merged_annotations.json"))
     merged = json.loads((root / "annotations/merged_annotations.json").read_text())
     records = {r["id"]: r for r in merged["records"]}
     ripeness, official = {}, {}

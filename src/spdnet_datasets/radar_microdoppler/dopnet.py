@@ -48,11 +48,10 @@ import numpy as np
 import pandas as pd
 
 from ..core.config import dataset_path
-from ..core.fetch import run_pipeline
+from ..core.fetch import check_local, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     RadarCovarianceDataset,
-    check_local,
     covariance_stage,
     load_bunch,
     write_processed,
@@ -143,7 +142,7 @@ def fetch_dopnet(data_dir=None, cache_dir=None, keep=None, estimator="scm", forc
     if min_frames < 2 * p:
         raise ValueError(f"min_frames={min_frames} < 2p={2 * p}: covariances need n >= 2p")
     root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify=verify, required=("Training Data", TEST_FILE))
+    check_local(root, verify=verify, required=("Training Data", TEST_FILE), strict=False)
 
     def process_fn(_source, out_dir):
         rows, seen, profiles = [], set(), []

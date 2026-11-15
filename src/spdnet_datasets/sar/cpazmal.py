@@ -59,7 +59,7 @@ import torch
 from ..base import BaseDataset
 from ..core.config import dataset_path, get_cache_dir
 from ..core.estimators import channel_mean, estimate_covariance
-from ..core.fetch import Bunch, download, run_pipeline, verify_local
+from ..core.fetch import Bunch, check_local, download, run_pipeline
 from ..core.normalize import apply_scale
 from ..manager import DatasetManager
 from ._common import (
@@ -215,7 +215,7 @@ def fetch_cpazmal(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
     root = dataset_path(DOMAIN, NAME, data_dir)
     local = root / FILENAME
     if local.exists():
-        verify_local(root, verify=verify, required=(FILENAME,))
+        check_local(root, verify=verify, required=(FILENAME,))
         raw_fn = None
     else:
         def raw_fn(raw_dir):

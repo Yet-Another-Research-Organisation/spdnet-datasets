@@ -42,7 +42,7 @@ import pandas as pd
 
 from ..core.config import dataset_path
 from ..core.estimators import check_sample_size
-from ..core.fetch import Bunch, run_pipeline, verify_local
+from ..core.fetch import Bunch, check_local, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     HSIDataset,
@@ -111,7 +111,7 @@ def fetch_uav(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=F
     if not set(scenes) <= set(SCENES):
         raise ValueError(f"scenes must be among {SCENES}")
     root = dataset_path(DOMAIN, NAME, data_dir)
-    verify_local(root, verify=verify, required=("source/Test/gt", "source/Train/Training/gt"))
+    check_local(root, verify=verify, required=("source/Test/gt", "source/Train/Training/gt"))
     bands = band_index(N_BANDS, band_step)
     check_sample_size(window * window, len(bands))
     params = {"scenes": list(scenes), "window": window, "band_step": band_step,

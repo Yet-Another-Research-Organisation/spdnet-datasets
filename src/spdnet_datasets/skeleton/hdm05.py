@@ -49,7 +49,6 @@ import pandas as pd
 from ..audio._common import (
     CSV,
     SequenceCovarianceDataset,
-    check_local,
     evenly_spaced,
     exclusion,
     folds_to_split,
@@ -60,6 +59,7 @@ from ..audio._common import (
 from ..core import (
     InsufficientSamplesError,
     NotSPDError,
+    check_local,
     check_sample_size,
     check_spd,
     dataset_path,
@@ -157,7 +157,7 @@ def fetch_hdm05(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
     if features not in FEATURES:
         raise ValueError(f"features must be one of {FEATURES}, got {features!r}")
     root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify)
+    check_local(root, verify=verify)
     params = {"data_dir": str(root.resolve()), "features": features, "limit": limit}
     run = run_pipeline(
         "hdm05", params=params,

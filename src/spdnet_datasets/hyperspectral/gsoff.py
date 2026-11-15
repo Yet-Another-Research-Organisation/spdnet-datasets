@@ -38,7 +38,7 @@ import pandas as pd
 
 from ..core.config import dataset_path
 from ..core.estimators import check_sample_size
-from ..core.fetch import Bunch, run_pipeline, verify_local
+from ..core.fetch import Bunch, check_local, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     HSIDataset,
@@ -95,7 +95,7 @@ def fetch_gsoff(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
     (``"spatial"`` = ``"recommended"``), ``window``, ``processed_path``.
     """
     root = dataset_path(DOMAIN, NAME, data_dir)
-    verify_local(root, verify=verify, required=(SCENE, GROUND_TRUTH))
+    check_local(root, verify=verify, required=(SCENE, GROUND_TRUTH))
     bands = band_index(N_BANDS, band_step)
     check_sample_size(window * window, len(bands))
     params = {"window": window, "band_step": band_step, "threshold": threshold,

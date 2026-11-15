@@ -51,13 +51,12 @@ import pandas as pd
 
 from ..audio._common import (
     SequenceCovarianceDataset,
-    check_local,
     estimate_stage,
     evenly_spaced,
     load_result,
     write_processed,
 )
-from ..core import dataset_path, run_pipeline
+from ..core import check_local, dataset_path, run_pipeline
 from ..manager import DatasetManager
 
 DOMAIN, NAME = "SKELETON", "NTU_RGBD_120"
@@ -187,7 +186,7 @@ def fetch_ntu120(data_dir=None, cache_dir=None, keep=None, estimator="scm", forc
     if features not in FEATURES:
         raise ValueError(f"features must be one of {FEATURES}, got {features!r}")
     root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify, required=(SKELETON_DIR,))
+    check_local(root, verify=verify, required=(SKELETON_DIR,))
     params = {"data_dir": str(root.resolve()), "features": features, "limit": limit,
                   "estimator": estimator}
     run = run_pipeline(

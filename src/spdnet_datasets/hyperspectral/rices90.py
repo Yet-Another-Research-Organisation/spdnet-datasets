@@ -39,7 +39,7 @@ import numpy as np
 import pandas as pd
 
 from ..core.config import dataset_path
-from ..core.fetch import Bunch, run_pipeline, verify_local
+from ..core.fetch import Bunch, check_local, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     HSIDataset,
@@ -112,7 +112,7 @@ def fetch_rices90(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
     if N_BANDS % band_bin:
         raise ValueError(f"band_bin must divide {N_BANDS}")
     root = dataset_path(DOMAIN, NAME, data_dir)
-    verify_local(root, verify=verify, required=("index.csv",))
+    check_local(root, verify=verify, required=("index.csv",))
     p = N_BANDS // band_bin
     params = {"band_bin": band_bin, "estimator": estimator, "version": 2}
 

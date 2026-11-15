@@ -48,11 +48,10 @@ import numpy as np
 import pandas as pd
 
 from ..core.config import dataset_path
-from ..core.fetch import run_pipeline
+from ..core.fetch import check_local, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     RadarCovarianceDataset,
-    check_local,
     covariance_stage,
     finish_processed,
     load_bunch,
@@ -149,7 +148,7 @@ def fetch_mvdoppler(data_dir=None, cache_dir=None, keep=None, estimator="scm", f
     import h5py
 
     root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify=verify, required=("Labels_and_metadata/design_table.csv", "Data"))
+    check_local(root, verify=verify, required=("Labels_and_metadata/design_table.csv", "Data"), strict=False)
 
     def process_fn(_source, out_dir):
         meta, info = index_mvdoppler(root, limit)

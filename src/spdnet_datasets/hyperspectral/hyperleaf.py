@@ -37,7 +37,7 @@ import pandas as pd
 import torch
 
 from ..core.config import dataset_path
-from ..core.fetch import Bunch, run_pipeline, verify_local
+from ..core.fetch import Bunch, check_local, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     HSIDataset,
@@ -101,7 +101,7 @@ def fetch_hyperleaf(data_dir=None, cache_dir=None, keep=None, estimator="scm", f
     ``plot``, ``n_valid``), ``groups`` (plot), ``info`` and ``splits``.
     """
     root = dataset_path(DOMAIN, NAME, data_dir)
-    verify_local(root, verify=verify, required=("train.csv", "images"))
+    check_local(root, verify=verify, required=("train.csv", "images"))
     bands = band_index(N_BANDS, band_step)
     params = {"band_step": band_step, "estimator": estimator, "version": 2}
 

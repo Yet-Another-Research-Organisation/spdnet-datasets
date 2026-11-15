@@ -43,7 +43,7 @@ import torch.nn.functional as F
 
 from ..base import BaseDataset
 from ..core.config import dataset_path
-from ..core.fetch import Bunch, verify_local
+from ..core.fetch import Bunch, check_local
 from ..manager import DatasetManager
 from ._common import check_split_groups, finalize_labels, group_kfold_splits
 
@@ -84,7 +84,7 @@ def fetch_fusar_ship(data_dir=None, *, class_level="basic", min_samples_per_clas
     if class_level not in ("basic", "fine"):
         raise ValueError(f"class_level must be 'basic' or 'fine', got {class_level}")
     root = dataset_path(DOMAIN, NAME, data_dir)
-    verify_local(root, verify=verify)
+    check_local(root, verify=verify)
     rows = []
     for path in sorted(root.glob("*/*/*.tif*")):
         cat, sub = path.relative_to(root).parts[:2]

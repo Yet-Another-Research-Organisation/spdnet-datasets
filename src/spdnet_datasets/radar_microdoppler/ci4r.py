@@ -55,11 +55,10 @@ import numpy as np
 import pandas as pd
 
 from ..core.config import dataset_path
-from ..core.fetch import run_pipeline
+from ..core.fetch import check_local, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     RadarCovarianceDataset,
-    check_local,
     covariance_stage,
     group_folds,
     load_bunch,
@@ -193,7 +192,7 @@ def fetch_ci4r(data_dir=None, cache_dir=None, keep=None, estimator=None, force=F
     p = defaults["p"] if p is None else p
     estimator = estimator or defaults["estimator"]
     root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify=verify, required=(f"11_class_activity_data/{MODES[mode]}",))
+    check_local(root, verify=verify, required=(f"11_class_activity_data/{MODES[mode]}",), strict=False)
 
     def process_fn(_source, out_dir):
         from PIL import Image

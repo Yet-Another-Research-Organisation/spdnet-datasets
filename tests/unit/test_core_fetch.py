@@ -92,6 +92,19 @@ def test_verify_local_missing(tmp_path):
     assert F.verify_local(tmp_path).missing == ["a.npy"]
 
 
+def test_check_local_raises_or_warns(tmp_path):
+    _make_local_dataset(tmp_path)
+    assert F.check_local(tmp_path, verify="md5").n_checked == 2
+    (tmp_path / "a.npy").write_bytes(b"1")
+    with pytest.raises(OSError, match="1 wrong size"):
+        F.check_local(tmp_path)
+    with pytest.warns(UserWarning, match="1 wrong size"):
+        rep = F.check_local(tmp_path, strict=False)
+    assert rep.wrong_size == ["a.npy"]
+    with pytest.raises(FileNotFoundError):
+        F.check_local(tmp_path, required=["absent.h5"])
+
+
 class _Pipeline:
     """Counts the calls of each stage; can fail once in the covariance stage."""
 

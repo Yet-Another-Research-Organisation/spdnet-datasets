@@ -46,7 +46,7 @@ import torch
 
 from ..base import BaseDataset
 from ..core.config import dataset_path
-from ..core.fetch import Bunch, run_pipeline, verify_local
+from ..core.fetch import Bunch, check_local, run_pipeline
 from ..manager import DatasetManager
 from ._common import check_split_groups, finalize_labels, group_kfold_splits
 
@@ -225,7 +225,7 @@ def fetch_air_polsar_seg(data_dir=None, cache_dir=None, keep=None, force=False, 
     ``processed_dir`` (``cells.npy``, uint16 amplitudes ``(N, cell, cell, 4)``).
     """
     root = dataset_path(DOMAIN, NAME, data_dir)
-    verify_local(root, verify=verify, required=("train_set", "test_set"))
+    check_local(root, verify=verify, required=("train_set", "test_set"))
     opts = {"cell": cell, "purity": purity, "min_annotated": min_annotated, "macro": macro}
     params = dict(opts, source=str(root.resolve()), version=3)  # bump when the processing changes
 

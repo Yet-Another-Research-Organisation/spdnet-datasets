@@ -70,7 +70,7 @@ import torch
 from ..base import BaseDataset
 from ..core.config import dataset_path
 from ..core.estimators import check_sample_size, check_spd, estimate_covariance
-from ..core.fetch import Bunch, run_pipeline, verify_local
+from ..core.fetch import Bunch, check_local, run_pipeline
 from ..core.normalize import apply_scale
 from ..manager import DatasetManager
 from ._common import (
@@ -292,7 +292,7 @@ def fetch_pol_insar_island(data_dir=None, cache_dir=None, keep=None, estimator="
     if min_labelled is None:
         min_labelled = cell * cell // (2 if cells == "union" else 4)
     root = dataset_path(DOMAIN, NAME, data_dir)
-    verify_local(root, verify=verify, required=("label/FP1/label_train.bin",))
+    check_local(root, verify=verify, required=("label/FP1/label_train.bin",))
     opts = {"cell": cell, "purity": purity, "min_labelled": min_labelled, "block": block, "bands": bands, "cells": cells,
             "representation": representation}
     params = dict(opts, estimator=estimator, source=str(root.resolve()))

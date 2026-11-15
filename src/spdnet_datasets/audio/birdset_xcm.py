@@ -45,11 +45,10 @@ from pathlib import PurePosixPath
 
 import numpy as np
 
-from ..core import dataset_path, run_pipeline
+from ..core import check_local, dataset_path, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     SequenceCovarianceDataset,
-    check_local,
     estimate_stage,
     evenly_spaced,
     folds_to_split,
@@ -152,7 +151,7 @@ def fetch_birdset_xcm(data_dir=None, cache_dir=None, keep=None, estimator="scm",
         ``covariance_path``.
     """
     root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify)
+    check_local(root, verify=verify)
     params = {"data_dir": str(root.resolve()), "features": features, "n_mfcc": n_mfcc,
                   "n_mels": n_mels, "limit": limit, "min_recordings": min_recordings, "crop_s": crop_s,
                   "estimator": estimator}
