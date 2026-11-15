@@ -90,7 +90,8 @@ Splits
 ------
 ``"official"``: folds 1-3 train, 4 validation, 5 test (by patch, the folds being
 spatially separated). ``"cv1"`` ... ``"cv5"``: test fold k, validation fold k - 1
-(fold 5 for k = 1), training the three others; ``"cv5"`` equals ``"official"``.
+(fold 5 for k = 1), training the three others; ``"cv5"`` and ``"recommended"``
+equal ``"official"``.
 The group of a sample is its patch; train, validation and test never share one.
 
 ``return_raw`` gives the standardised pixels of the parcel, an array ``(n, p)``
@@ -174,6 +175,7 @@ for _k in range(1, 6):
     _val = (_k - 2) % 5 + 1
     SPLITS[f"cv{_k}"] = {"train": tuple(f for f in range(1, 6) if f not in (_k, _val)),
                          "val": (_val,), "test": (_k,)}
+SPLITS["recommended"] = SPLITS["official"]
 
 DEFAULT_REF_DATE = "2019-07-15"
 DEFAULTS = {
@@ -593,7 +595,7 @@ def fetch_pastis_r(data_dir=None, cache_dir=None, keep=None, estimator="scm", fo
     verify : {"size", "md5", None}
         Check of the local copy against ``MANIFEST_NAS.tsv``.
     scenario : {"A", "B", "C", "D", "E"}
-    split : {"official", "cv1", ..., "cv5"}
+    split : {"official", "recommended", "cv1", ..., "cv5"}
         Its training folds fit the channel standardisation.
     ref_date : str or date, optional
         Reference date (default ``"2019-07-15"``); ignored with ``date_index``.
