@@ -37,18 +37,34 @@ files); ``"recommended"`` is ``person{fold}``. The band of step 3 is fitted on
 the training files, which include the held-out person of ``person<k>``.
 ``raw`` has a variable length ``T``: use ``batch_size=1`` or a custom collate.
 
-Download (manual): registration on https://dop-net.com. Download ``Training Data/``
-and ``Test Data/`` (``.mat`` files listed above) and place it under ``data_dir``
-(default ``<data root>/RADAR_DOPPLER/Dop-NET``).
+Download
+--------
+Access: direct (UCL research data repository, figshare article 25486597,
+doi:10.5522/04/25486597.v1, licence CC0; no account). The former site
+dop-net.com no longer resolves. One archive ``Gesture Data.zip`` (5.99 GB,
+:data:`ARCHIVE_URL`) whose figshare MD5 is registered in :data:`FILES`; it holds
+``Gesture Data/Training Data/Data_Per_PersonData_Training_Person_<A-F>.mat`` and
+``Gesture Data/Test Data/Data_For_Test_Random.mat``. Resolution order:
+
+1. ``data_dir`` (default ``<data root>/RADAR_DOPPLER/Dop-NET``) exists: read in
+   place;
+2. ``archive=`` given: the zip (checked, extracted into
+   ``<cache_dir>/dopnet/downloads/``, kept) or its extracted folder;
+3. otherwise the zip is downloaded into ``<cache_dir>/dopnet/downloads/``,
+   checked, extracted (about 6 GB) and deleted.
+
+Example: ``fetch_dopnet(archive="~/Downloads/Gesture Data.zip")``.
 """
 
 import hashlib
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from ..audio._common import downloads_dir
 from ..core.config import dataset_path
-from ..core.fetch import check_local, run_pipeline
+from ..core.fetch import check_local, download, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     RadarCovarianceDataset,
@@ -58,12 +74,41 @@ from ._common import (
 )
 
 DOMAIN, NAME = "RADAR_DOPPLER", "Dop-NET"
-FILES = {}  # registration on dop-net.com: manual download (see the dataset page)
+ARCHIVE_URL = "https://ndownloader.figshare.com/files/45297967"  # "Gesture Data.zip"
+ARCHIVE_SIZE = 5992189216
+FILES = {ARCHIVE_URL: "20f6a7ef1814d9dcd051664eea55c7d8"}  # url -> md5 (figshare)
+PAGE = "https://rdr.ucl.ac.uk/articles/dataset/Dop-Net_Data/25486597"
 CLASSES = ["Click", "Pinch", "Swipe", "Wave"]
 CELL_CLASSES = ["Wave", "Pinch", "Swipe", "Click"]  # order of the training cells
 PERSONS = ["A", "B", "C", "D", "E", "F"]
 TRAIN_GLOB = "Training Data/Data_Per_PersonData_Training_Person_*.mat"
 TEST_FILE = "Test Data/Data_For_Test_Random.mat"
+
+
+def download_dopnet(cache_dir=None, archive=None):
+    """Folder holding ``Training Data`` and ``Test Data`` (see "Download").
+
+    The figshare zip is downloaded into ``<cache_dir>/dopnet/downloads/``, checked
+    (MD5), extracted once and deleted; a user-provided ``archive`` (zip or
+    folder) is checked and extracted but never deleted.
+    """
+    from ..core.access import extract_archive, manual_source
+
+    dest = downloads_dir(cache_dir, "dopnet")
+    out = dest / NAME
+    if archive is not None:
+        out = manual_source(NAME, page_url=PAGE, expected="Gesture Data.zip", dest_dir=out,
+                            archive=archive, checksum=FILES[ARCHIVE_URL], algo="md5",
+                            size=ARCHIVE_SIZE)
+    elif not (out / ".extracted").exists():
+        zipped = download(ARCHIVE_URL, dest / "Gesture Data.zip", checksum=FILES[ARCHIVE_URL],
+                          algo="md5")
+        extract_archive(zipped, out)
+        zipped.unlink()
+    found = [d for d in [Path(out), *Path(out).rglob("*")] if (d / TEST_FILE).is_file()]
+    if not found:
+        raise FileNotFoundError(f"No {TEST_FILE} in {out}")
+    return found[0]
 
 
 def iter_gestures(root):
@@ -110,7 +155,7 @@ def band_features(signal, start, stop, p):
 
 
 def fetch_dopnet(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
-                 verify="size", *, energy=0.95, p=48, min_frames=None, fold=0):
+                 verify="size", *, energy=0.95, p=48, min_frames=None, fold=0, archive=None):
     """48 x 48 covariances of the Dop-NET gestures over time frames.
 
     Parameters
@@ -131,6 +176,9 @@ def fetch_dopnet(data_dir=None, cache_dir=None, keep=None, estimator="scm", forc
         Shortest gesture kept (default ``2p``).
     fold : int
         Held-out person of ``splits["recommended"]`` (0 = A).
+    archive : path, optional
+        ``Gesture Data.zip`` or its extracted folder, used when ``data_dir`` does
+        not exist (see "Download" in the module docstring).
 
     Returns
     -------
@@ -142,7 +190,10 @@ def fetch_dopnet(data_dir=None, cache_dir=None, keep=None, estimator="scm", forc
     if min_frames < 2 * p:
         raise ValueError(f"min_frames={min_frames} < 2p={2 * p}: covariances need n >= 2p")
     root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify=verify, required=("Training Data", TEST_FILE), strict=False)
+    if root.is_dir():
+        check_local(root, verify=verify, required=("Training Data", TEST_FILE), strict=False)
+    else:
+        root = download_dopnet(cache_dir, archive)
 
     def process_fn(_source, out_dir):
         rows, seen, profiles = [], set(), []
@@ -189,6 +240,7 @@ def fetch_dopnet(data_dir=None, cache_dir=None, keep=None, estimator="scm", forc
                          covariance_params={"estimator": estimator}, cache_dir=cache_dir,
                          keep=keep, force=force)
     bunch = load_bunch(paths, CLASSES)
+    bunch.source_dir = root
     source = bunch.meta.source.to_numpy()
     empty = np.array([], dtype=np.int64)
     bunch.splits = {"official": {"train": np.flatnonzero(source == "train"), "val": empty,
@@ -211,7 +263,7 @@ class DopNetDataset(RadarCovarianceDataset):
     Parameters
     ----------
     data_dir : path, optional
-    energy, p, min_frames, fold, cache_dir, keep, force, verify
+    energy, p, min_frames, fold, cache_dir, keep, force, verify, archive
         See :func:`fetch_dopnet`.
     split : str
         ``"official"``, ``"recommended"`` or ``"person<k>"``. For backward
@@ -224,13 +276,13 @@ class DopNetDataset(RadarCovarianceDataset):
 
     def __init__(self, data_dir=None, *, energy=0.95, p=48, min_frames=None, fold=0,
                  split="official", subset=None, cache_dir=None, keep=None, force=False,
-                 verify="size", estimator="scm", **kwargs):
+                 verify="size", estimator="scm", archive=None, **kwargs):
         if split in ("train", "test"):
             split, subset = "official", split
         elif split == "all":
             split = "official"
         root = dataset_path(DOMAIN, NAME, data_dir)
         bunch = fetch_dopnet(root, cache_dir, keep, estimator, force, verify, energy=energy, p=p,
-                             min_frames=min_frames, fold=fold)
-        super().__init__(bunch, split=split, subset=subset, data_dir=root,
+                             min_frames=min_frames, fold=fold, archive=archive)
+        super().__init__(bunch, split=split, subset=subset, data_dir=bunch.source_dir,
                          estimator=estimator, **kwargs)

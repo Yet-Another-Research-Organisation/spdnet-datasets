@@ -41,21 +41,44 @@ identical: 7 in 77 GHz, 19 in xethru) are removed. In xethru, codes 05, 11
 and 18 come from earlier sessions (February 2019) with few classes:
 participant and class are partly confounded.
 
-Download (manual): the spectrograms are linked from the README of
-https://github.com/ci4r/CI4R-Activity-Recognition-datasets (no direct URL or checksum
-registered). Download ``11_class_activity_data`` and place it
-under ``data_dir`` (default ``<data root>/RADAR_DOPPLER/CI4R-MULTI3``).
+Download
+--------
+Access: direct (public Google Cloud Storage bucket ``cross-frequency_dataset``,
+read without an account through its JSON API; the README link
+storage.cloud.google.com asks for a Google login, storage.googleapis.com does
+not). Folder ``Spectrograms/11_class_activity_data/<24GHz|77GHz|Xethru>/<class>/``:
+653 PNG files per sensor (77 GHz 150 MB, xethru 26 MB, 24 GHz 6 MB, not used).
+The bucket listing gives the MD5 of every object (base64, converted to hex), which
+the download checks; the local copy matches it file for file (one 24 GHz file is
+missing locally). No licence is stated by the repository
+https://github.com/ci4r/CI4R-Activity-Recognition-datasets. Resolution order:
+
+1. ``data_dir`` (default ``<data root>/RADAR_DOPPLER/CI4R-MULTI3``) exists:
+   read in place;
+2. ``archive=`` given: a folder, zip or tar holding ``11_class_activity_data``,
+   extracted into ``<cache_dir>/ci4r/downloads/``;
+3. otherwise the 653 images of the requested mode are listed and downloaded into
+   ``<cache_dir>/ci4r/downloads/CI4R-MULTI3/`` (once per mode).
+
+The raw radar data (``Raw Data/raw_data.zip``, 93 GB) are not used. Example:
+``fetch_ci4r(data_dir="absent", mode="xethru")`` or
+``fetch_ci4r(archive="~/Downloads/CI4R-MULTI3.zip")``.
 """
 
+import base64
 import hashlib
+import json
 import re
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from ..audio._common import downloads_dir
 from ..core.config import dataset_path
-from ..core.fetch import check_local, run_pipeline
+from ..core.fetch import check_local, download, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     RadarCovarianceDataset,
@@ -66,7 +89,12 @@ from ._common import (
 )
 
 DOMAIN, NAME = "RADAR_DOPPLER", "CI4R-MULTI3"
-FILES = {}  # not downloadable: manual copy (see the dataset page)
+FILES = {}  # no static registry: the bucket listing gives the files and their MD5
+BUCKET = "cross-frequency_dataset"
+LIST_API = f"https://storage.googleapis.com/storage/v1/b/{BUCKET}/o"
+PREFIX = "Spectrograms/"
+N_IMAGES = 653  # per sensor
+PAGE = "https://github.com/ci4r/CI4R-Activity-Recognition-datasets"
 MODES = {"77GHz": "77GHz", "xethru": "Xethru"}  # mode -> image sub-directory
 DEFAULTS = {
     "77GHz": {"band": 0.5, "p": 64, "estimator": "scm"},
@@ -130,6 +158,67 @@ def participant_of(filename):
     return "14" if code == "00" else code
 
 
+def list_bucket(mode):
+    """``[(object name, md5 hex)]`` of the PNG files of one mode (bucket JSON API)."""
+    prefix = f"{PREFIX}11_class_activity_data/{MODES[_resolve_mode(mode)]}/"
+    items, token = [], None
+    while True:
+        query = {"prefix": prefix, "fields": "nextPageToken,items(name,md5Hash)"}
+        if token:
+            query["pageToken"] = token
+        req = urllib.request.Request(f"{LIST_API}?{urllib.parse.urlencode(query)}")
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            page = json.load(resp)
+        items += [(i["name"], base64.b64decode(i["md5Hash"]).hex())
+                  for i in page.get("items", []) if i["name"].endswith(".png")]
+        token = page.get("nextPageToken")
+        if not token:
+            return items
+
+
+def download_ci4r(mode="77GHz", cache_dir=None):
+    """Download the spectrograms of one mode; return the ``CI4R-MULTI3`` folder.
+
+    Every image goes to ``<cache_dir>/ci4r/downloads/CI4R-MULTI3/`` (path of the
+    bucket without ``Spectrograms/``) and is checked against the MD5 of the
+    listing; a ``.<mode>.done`` marker avoids listing the bucket again.
+    """
+    mode = _resolve_mode(mode)
+    root = downloads_dir(cache_dir, "ci4r") / NAME
+    done = root / f".{mode}.done"
+    if done.exists():
+        return root
+    items = list_bucket(mode)
+    if len(items) != N_IMAGES:
+        raise OSError(f"CI4R bucket lists {len(items)} {mode} images, expected {N_IMAGES}")
+    for name, md5 in items:
+        url = f"https://storage.googleapis.com/{BUCKET}/{urllib.parse.quote(name)}"
+        download(url, root / name[len(PREFIX):], checksum=md5, algo="md5")
+    done.write_text(str(len(items)))
+    return root
+
+
+def _resolve_root(data_dir, cache_dir, mode, archive, verify):
+    """Folder holding ``11_class_activity_data`` (see "Download" in the module docstring)."""
+    root = dataset_path(DOMAIN, NAME, data_dir)
+    if root.is_dir():
+        check_local(root, verify=verify, required=(f"11_class_activity_data/{MODES[mode]}",),
+                    strict=False)
+        return root
+    if archive is None:
+        return download_ci4r(mode, cache_dir)
+    from ..core.access import manual_source
+
+    out = manual_source(NAME, page_url=PAGE, expected="11_class_activity_data",
+                        dest_dir=downloads_dir(cache_dir, "ci4r") / "archive" / Path(archive).name,
+                        archive=archive)
+    found = [d for d in [Path(out), *Path(out).rglob("*")]
+             if (d / "11_class_activity_data").is_dir()]
+    if not found:
+        raise FileNotFoundError(f"No 11_class_activity_data folder in {out}")
+    return found[0]
+
+
 def index_ci4r(data_dir=None, mode="77GHz"):
     """List the images of one mode with labels, participants and md5 duplicates.
 
@@ -159,7 +248,8 @@ def index_ci4r(data_dir=None, mode="77GHz"):
 
 
 def fetch_ci4r(data_dir=None, cache_dir=None, keep=None, estimator=None, force=False,
-               verify="size", *, mode="77GHz", band=None, p=None, n_folds=4, fold=0):
+               verify="size", *, mode="77GHz", band=None, p=None, n_folds=4, fold=0,
+               archive=None):
     """Covariances of the CI4R-MULTI3 spectrograms (77 GHz or xethru).
 
     Parameters
@@ -179,20 +269,23 @@ def fetch_ci4r(data_dir=None, cache_dir=None, keep=None, estimator=None, force=F
         Number of Doppler bins, i.e. covariance size (default per mode).
     n_folds, fold : int
         Participant-grouped K-fold; ``splits["recommended"]`` is fold ``fold``.
+    archive : path, optional
+        Folder, zip or tar holding ``11_class_activity_data``, used when
+        ``data_dir`` does not exist (see "Download" in the module docstring).
 
     Returns
     -------
     Bunch with ``covariances`` (B, p, p) unscaled, ``means`` (B, p),
     ``labels``, ``class_names``, ``groups`` (participant), ``meta``,
-    ``info`` (counts), ``splits``, ``covariance_path`` and ``processed_path``.
+    ``info`` (counts), ``splits``, ``covariance_path``, ``processed_path`` and
+    ``source_dir`` (folder read).
     """
     mode = _resolve_mode(mode)
     defaults = DEFAULTS[mode]
     band = defaults["band"] if band is None else band
     p = defaults["p"] if p is None else p
     estimator = estimator or defaults["estimator"]
-    root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify=verify, required=(f"11_class_activity_data/{MODES[mode]}",), strict=False)
+    root = _resolve_root(data_dir, cache_dir, mode, archive, verify)
 
     def process_fn(_source, out_dir):
         from PIL import Image
@@ -215,6 +308,7 @@ def fetch_ci4r(data_dir=None, cache_dir=None, keep=None, estimator=None, force=F
                          covariance_params={"estimator": estimator}, cache_dir=cache_dir,
                          keep=keep, force=force)
     bunch = load_bunch(paths, CLASSES)
+    bunch.source_dir = root
     bunch.splits = group_folds(bunch.groups, n_folds, bunch.labels)
     if f"fold{fold}" not in bunch.splits:  # n_folds is capped by the number of participants
         raise ValueError(f"fold={fold} is out of range: {len(bunch.splits)} folds "
@@ -236,7 +330,7 @@ class CI4RDataset(RadarCovarianceDataset):
     data_dir : path, optional
     mode : {"77GHz", "xethru"}
         ``modality`` is accepted as a deprecated alias.
-    band, p, n_folds, fold, cache_dir, keep, force, verify
+    band, p, n_folds, fold, cache_dir, keep, force, verify, archive
         See :func:`fetch_ci4r`.
     split : str
         Split fitting the normalisation (``"recommended"`` or ``"fold<k>"``).
@@ -248,7 +342,7 @@ class CI4RDataset(RadarCovarianceDataset):
 
     def __init__(self, data_dir=None, *, mode="77GHz", band=None, p=None, n_folds=4, fold=0,
                  split="recommended", subset=None, cache_dir=None, keep=None, force=False,
-                 verify="size", estimator=None, modality=None, **kwargs):
+                 verify="size", estimator=None, modality=None, archive=None, **kwargs):
         if modality is not None:
             mode = modality
         mode = _resolve_mode(mode)
@@ -256,6 +350,6 @@ class CI4RDataset(RadarCovarianceDataset):
         root = dataset_path(DOMAIN, NAME, data_dir)
         self.mode = mode
         bunch = fetch_ci4r(root, cache_dir, keep, estimator, force, verify, mode=mode,
-                           band=band, p=p, n_folds=n_folds, fold=fold)
-        super().__init__(bunch, split=split, subset=subset, data_dir=root,
+                           band=band, p=p, n_folds=n_folds, fold=fold, archive=archive)
+        super().__init__(bunch, split=split, subset=subset, data_dir=bunch.source_dir,
                          estimator=estimator, **kwargs)
