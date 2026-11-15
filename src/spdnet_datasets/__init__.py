@@ -26,8 +26,6 @@ from .real import (
     Rices90Dataset,
     UAVDataset,
 )
-from .sits import PastisRDataset, fetch_pastis_r
-from .skeleton import HDM05Dataset, NTURGBD120Dataset
 from .sar import (
     AIRPolSARSegDataset,
     ATRNetSTARDataset,
@@ -37,6 +35,8 @@ from .sar import (
     PolInSARIslandDataset,
     S1SLCCVDLDataset,
 )
+from .sits import PastisRDataset, fetch_pastis_r
+from .skeleton import HDM05Dataset, NTURGBD120Dataset
 
 __version__ = "0.1.0"
 
