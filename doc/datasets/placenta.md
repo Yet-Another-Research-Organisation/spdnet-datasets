@@ -37,6 +37,22 @@ annotated manually. Acquisition dates are not given.
   green). The ICG images were taken after the red/blue injection, on the same
   placentas.
 
+## Getting the data
+
+Direct, no account: Zenodo record
+[8045940](https://zenodo.org/records/8045940) (CC BY-NC-SA 4.0). Without a local
+`imagettes/`, `fetch_placenta()` downloads the four zips of the annotated images
+P007-P101 (7.86 GB, md5 of the record checked) into
+`<cache>/Hyperspectral_Placenta_Dataset/downloads/` and rebuilds the windows with
+`utils.placenta_preprocess.build_windows` (same rule as the LISTIC extraction,
+written image by image). On BERTHA the rebuild gives the same 77 203 windows of
+81 images, and the 24 519 windows of P007-P030 are bit-identical to the local
+copy. The other files of the record (16.7 GB) are not used.
+
+```python
+fetch_placenta(archive="~/Downloads/placenta")  # folder with the four zips or their folders
+```
+
 ## Raw data
 
 The loader reads the local derived version `imagettes/`:

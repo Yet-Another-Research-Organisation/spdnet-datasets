@@ -28,10 +28,20 @@ Splits (``positions`` are per scene; scenes never share a block):
   of that patch; windows straddling two patches are left out;
 - ``"scene_transfer"`` (when both are loaded): train MJK_N, test MJK_S.
 
-Download (manual): ScienceDB, doi:10.57760/sciencedb.01898 (download from the web
-page, no stable direct URL or checksum registered). Extract the archive into
-``source/`` (layout above) and place it under ``data_dir`` (default ``<data
-root>/HYPERSPECTRAL/UAV-HSI-Crop``).
+Download
+--------
+Manual (ScienceDB, doi:10.57760/sciencedb.01898, version V6, CC BY-SA 4.0; the
+page is rendered in JavaScript and no stable file URL was found). The record
+holds one file of 1 017 930 890 bytes (name not recorded, no checksum). Without a
+local copy, ``fetch_uav()`` opens the page and raises
+:class:`~spdnet_datasets.core.access.ManualDownloadRequired`; then pass the file
+(zip or tar; its size is checked) or the extracted folder::
+
+    fetch_uav(archive="~/Downloads/<file of the ScienceDB record>")
+
+It is extracted into ``<cache_dir>/UAV-HSI-Crop/downloads/``; the folder holding
+``Train/Training/gt`` and ``Test/gt`` is used as ``source/`` (symbolic link
+``downloads/root/source``).
 """
 
 import re
@@ -42,8 +52,9 @@ import pandas as pd
 
 from ..core.config import dataset_path
 from ..core.estimators import check_sample_size
-from ..core.fetch import Bunch, check_local, run_pipeline
+from ..core.fetch import Bunch, run_pipeline
 from ..manager import DatasetManager
+from ..utils.sources import downloads_dir, expose_as, source_dir
 from ._common import (
     HSIDataset,
     band_index,
@@ -58,7 +69,9 @@ from ._common import (
 )
 
 DOMAIN, NAME = "HYPERSPECTRAL", "UAV-HSI-Crop"
-FILES = {}  # ScienceDB 10.57760/sciencedb.01898 (manual download)
+PAGE = "https://www.scidb.cn/detail?dataSetId=6de15e4ec9b74dacab12e29cb557f041"
+ARCHIVE_SIZE = 1_017_930_890  # single file of the ScienceDB record V6 (name unknown)
+FILES = {}  # manual download (ScienceDB 10.57760/sciencedb.01898)
 SCENES = ("MJK_N", "MJK_S", "XJM")
 PARTS = {"Train/Training": "train", "Train/Validation": "val", "Test": "test"}
 PATCH, N_BANDS = 96, 200
@@ -97,28 +110,40 @@ def recompose_scene(patches, bands):
 
 def fetch_uav(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
               verify="size", *, scenes=SCENES, window=15, band_step=2, threshold=0.8,
-              block=480, n_splits=5, fold=0, seed=0):
+              block=480, n_splits=5, fold=0, seed=0, archive=None):
     """Window covariances of UAV-HSI-Crop, extracted from the source patches.
+
+    Parameters
+    ----------
+    archive : path, optional
+        File of the ScienceDB record, or its extracted folder (see "Download"
+        in the module docstring).
 
     Returns
     -------
     Bunch with ``covariances`` (B, p, p) unscaled, ``means``, ``labels``
     (``"code k"``), ``groups`` (scene and 480-pixel block), ``positions``
     (top-left corner in its scene), ``scene`` (index into ``scenes``),
-    ``meta``, ``info`` and ``splits``.
+    ``meta``, ``info``, ``splits`` and ``root`` (dataset folder holding
+    ``source/``, to pass as ``data_dir`` to :class:`UAVDataset`).
     """
     scenes = tuple(scenes)
     if not set(scenes) <= set(SCENES):
         raise ValueError(f"scenes must be among {SCENES}")
-    root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify=verify, required=("source/Test/gt", "source/Train/Training/gt"))
+    source = source_dir(
+        NAME, dataset_path(DOMAIN, NAME, data_dir) / "source",
+        required=("Test/gt", "Train/Training/gt"), page_url=PAGE,
+        expected=f"the single file of the record, version V6 ({ARCHIVE_SIZE} bytes)",
+        cache_dir=cache_dir, archive=archive, size=ARCHIVE_SIZE, verify=verify)
+    root = expose_as(source, "source", downloads_dir(NAME, cache_dir) / "root")
+    source = root / "source"
     bands = band_index(N_BANDS, band_step)
     check_sample_size(window * window, len(bands))
     params = {"scenes": list(scenes), "window": window, "band_step": band_step,
               "threshold": threshold, "source": str(root.resolve()), "version": 2}
 
     def process(_, out_dir):
-        patches = list_patches(root / "source")
+        patches = list_patches(source)
         windows, rows, info = [], [], {"p": len(bands), "window": window, "scenes": {}}
         for s, scene in enumerate(scenes):
             cube, gt, part = recompose_scene(patches[patches["scene"] == scene], bands)
@@ -171,7 +196,7 @@ def fetch_uav(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=F
         covariances=out.covariances, means=out.means, n_obs=out.n_obs, labels=labels,
         groups=groups, positions=positions, scene=scene, scenes=scenes, window=window,
         meta=meta, info=out.info, splits=splits,
-        processed_path=res.processed_dir, covariance_path=res.covariance_dir,
+        processed_path=res.processed_dir, covariance_path=res.covariance_dir, root=root,
     )
 
 

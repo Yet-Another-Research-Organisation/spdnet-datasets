@@ -24,10 +24,18 @@ TS-LR cultivar 0.915 random vs 0.669 grouped).
 ``bands`` (default approximate R, G, B), standardised per channel, float32
 (C, 48, 352), for CNN backbones; no covariance is computed.
 
-Download (manual): Kaggle competition
-https://www.kaggle.com/competitions/hyperleaf2024 (Kaggle account and acceptance of
-the rules required). Download ``images/``, ``train.csv`` and ``test.csv`` and place
-it under ``data_dir`` (default ``<data root>/HYPERSPECTRAL/HyperLeaf2024``).
+Download
+--------
+Kaggle competition ``hyperleaf2024`` (https://www.kaggle.com/competitions/hyperleaf2024;
+no Kaggle dataset of that name: ``kaggle.com/datasets/hyperleaf2024`` redirects).
+Needs Kaggle credentials (``KAGGLE_USERNAME`` / ``KAGGLE_KEY`` or
+``~/.kaggle/kaggle.json``, see :mod:`spdnet_datasets.core.access`) and the
+competition rules accepted on its page; licence: the competition rules. Without a
+local copy, ``fetch_hyperleaf`` downloads the competition archive through the
+Kaggle API into ``<cache_dir>/HyperLeaf2024/downloads/`` (no checksum published)
+and uses the folder holding ``train.csv`` and ``images/``. Already downloaded::
+
+    fetch_hyperleaf(archive="~/Downloads/hyperleaf2024.zip")
 """
 
 from pathlib import Path
@@ -36,9 +44,11 @@ import numpy as np
 import pandas as pd
 import torch
 
+from ..core.access import kaggle_download
 from ..core.config import dataset_path
-from ..core.fetch import Bunch, check_local, run_pipeline
+from ..core.fetch import Bunch, run_pipeline
 from ..manager import DatasetManager
+from ..utils.sources import source_dir
 from ._common import (
     HSIDataset,
     band_index,
@@ -51,7 +61,9 @@ from ._common import (
 )
 
 DOMAIN, NAME = "HYPERSPECTRAL", "HyperLeaf2024"
-FILES = {}  # Kaggle competition data (account required): manual download
+COMPETITION = "hyperleaf2024"
+PAGE = f"https://www.kaggle.com/competitions/{COMPETITION}/data"
+FILES = {}  # Kaggle competition archive (credentials and accepted rules), no checksum
 CULTIVARS = ("Heerup", "Kvium", "Rembrandt", "Sheriff")
 TARGETS = ("cultivar", "fertilizer", "combined")
 REGRESSION_TARGETS = ("GrainWeight", "Gsw", "PhiPS2")
@@ -91,8 +103,14 @@ def _splits(df, n_splits, fold, seed):
 
 
 def fetch_hyperleaf(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
-                    verify="size", *, band_step=1, n_splits=5, fold=0, seed=0):
+                    verify="size", *, band_step=1, n_splits=5, fold=0, seed=0, archive=None):
     """Leaf covariances of the HyperLeaf2024 training images.
+
+    Parameters
+    ----------
+    archive : path, optional
+        Competition archive already downloaded, or its extracted folder (see
+        "Download" in the module docstring).
 
     Returns
     -------
@@ -100,8 +118,11 @@ def fetch_hyperleaf(data_dir=None, cache_dir=None, keep=None, estimator="scm", f
     ``train.csv`` columns plus ``cultivar``, ``fertilizer``, ``combined``,
     ``plot``, ``n_valid``), ``groups`` (plot), ``info`` and ``splits``.
     """
-    root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify=verify, required=("train.csv", "images"))
+    root = source_dir(
+        NAME, dataset_path(DOMAIN, NAME, data_dir), required=("train.csv", "images"),
+        page_url=PAGE, expected=f"the archive of the Kaggle competition {COMPETITION}",
+        cache_dir=cache_dir, archive=archive, verify=verify,
+        download=lambda d: kaggle_download(COMPETITION, d, competition=True))
     bands = band_index(N_BANDS, band_step)
     params = {"band_step": band_step, "source": str(root.resolve()), "version": 2}
 

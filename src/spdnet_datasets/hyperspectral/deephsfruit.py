@@ -25,10 +25,22 @@ and have no ``cov_VIS`` file, so ripeness mode holds the 384 annotated VIS
 cubes of ``train_only_labeled_v2`` only (it would also leak: 46 of the 140
 test cubes have the other face of their fruit in train).
 
-Download (manual): see https://github.com/cogsys-tuebingen/deephs_fruit (226 GB,
-links given by the authors). The ``cov_VIS/*.pt`` covariances read here are a local
-precomputation; copy the fruit folders, ``annotations/`` and ``cov_VIS/`` and place
-it under ``data_dir`` (default ``<data root>/HYPERSPECTRAL/DeepHS-Fruit``).
+Download
+--------
+Manual, and **outside the selection**: the covariances read here (``cov_VIS/*.pt``)
+are a local precomputation of undocumented construction that no download
+provides, so a download of the sources cannot feed this loader. The sources
+(v2, 2023, 226 GB) are listed at https://github.com/cogsys-tuebingen/deephs_fruit:
+HTTP index https://cogsys.cs.uni-tuebingen.de/webprojects/DeepHS-Fruit-2023-Datasets/
+(and its ``.torrent``), v1 (2021) on the Nextcloud share
+https://cloud.cs.uni-tuebingen.de/index.php/s/nWKxxtN5wM9fz5E; licence not
+stated; these servers did not answer on 2026-11-15. Without a local copy,
+``fetch_deephsfruit()`` opens the repository page and raises
+:class:`~spdnet_datasets.core.access.ManualDownloadRequired`; ``archive=`` accepts a
+zip or folder with the local layout (``cov_VIS/``, ``annotations/`` and the fruit
+folders)::
+
+    fetch_deephsfruit(archive="~/copies/DeepHS-Fruit")
 """
 
 import json
@@ -40,12 +52,14 @@ import pandas as pd
 import torch
 
 from ..core.config import dataset_path
-from ..core.fetch import Bunch, check_local
+from ..core.fetch import Bunch
 from ..manager import DatasetManager
+from ..utils.sources import source_dir
 from ._common import HSIDataset, group_kfold_split
 
 DOMAIN, NAME = "HYPERSPECTRAL", "DeepHS-Fruit"
-FILES = {}  # manual download (see the module docstring)
+PAGE = "https://github.com/cogsys-tuebingen/deephs_fruit"
+FILES = {}  # manual: the cov_VIS covariances are a local precomputation (no source)
 FRUIT_CLASSES = ["Avocado", "Kaki", "Kiwi", "Mango", "Papaya"]
 RIPENESS = {"unripe": "unripe", "perfect": "perfect", "ripe": "perfect",
             "overripe": "overripe"}
@@ -79,8 +93,16 @@ def _physical_fruit(header_file):
 
 
 def fetch_deephsfruit(data_dir=None, verify="size", *, classification_mode="fruit",
-                      n_splits=5, fold=0, seed=0):
+                      n_splits=5, fold=0, seed=0, cache_dir=None, archive=None):
     """Index of the precomputed DeepHS-Fruit VIS covariances (no computation).
+
+    Parameters
+    ----------
+    cache_dir : path, optional
+        Where an ``archive`` is extracted.
+    archive : path, optional
+        Zip or folder with the local layout (see "Download" in the module
+        docstring): the sources of the authors do not contain ``cov_VIS/``.
 
     Returns
     -------
@@ -89,9 +111,12 @@ def fetch_deephsfruit(data_dir=None, verify="size", *, classification_mode="frui
     """
     if classification_mode not in ("fruit", "ripeness"):
         raise ValueError("classification_mode must be 'fruit' or 'ripeness'")
-    root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify=verify,
-                required=("cov_VIS", "annotations/merged_annotations.json"))
+    root = source_dir(
+        NAME, dataset_path(DOMAIN, NAME, data_dir),
+        required=("cov_VIS", "annotations/merged_annotations.json"), page_url=PAGE,
+        expected="a copy with the local layout (cov_VIS/, annotations/): the precomputed "
+                 "cov_VIS covariances are not in the sources of the authors (226 GB)",
+        cache_dir=cache_dir, archive=archive, verify=verify)
     merged = json.loads((root / "annotations/merged_annotations.json").read_text())
     records = {r["id"]: r for r in merged["records"]}
     ripeness, official = {}, {}
@@ -127,7 +152,7 @@ def fetch_deephsfruit(data_dir=None, verify="size", *, classification_mode="frui
         splits["official"] = official  # absent locally: no cov_VIS file for val/test cubes
     return Bunch(covariances=_LazyCovariances(root / "cov_VIS" / f for f in meta["file"]),
                  means=None, labels=labels, groups=groups, meta=meta, splits=splits,
-                 info={"n_covariances": len(meta)})
+                 info={"n_covariances": len(meta)}, root=root)
 
 
 @DatasetManager.register_dataset("deephsfruit")
