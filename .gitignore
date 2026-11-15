@@ -71,7 +71,5 @@ uv.lock
 # Sphinx
 doc/_build/
 
-# Internal working notes and assistant files (not published)
+# Internal working notes (not published)
 docs/
-CLAUDE.md
-.claude/
