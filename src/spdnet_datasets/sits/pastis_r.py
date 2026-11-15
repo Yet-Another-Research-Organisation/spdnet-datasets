@@ -847,4 +847,7 @@ class PastisRDataset(BaseDataset):
         cov = torch.from_numpy(self.covariances[i])
         mean = torch.from_numpy(self.means[i]) if self.return_mean else None
         raw = torch.from_numpy(self.raw_pixels(i)) if self.return_raw else None
-        return self._pack(cov, mean, raw), int(self.labels[i])
+        x = self._pack(cov, mean, raw)
+        if self.transform is not None:
+            x = self.transform(x)
+        return x, int(self.labels[i])

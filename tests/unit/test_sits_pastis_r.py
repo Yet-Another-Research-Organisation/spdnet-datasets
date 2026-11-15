@@ -6,6 +6,7 @@ import json
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 
 from spdnet_datasets import DatasetManager
 from spdnet_datasets.core import assert_no_leakage
@@ -258,6 +259,13 @@ def test_output_tuples(pastis_dir, tmp_path):
     assert cov.shape == (12, 12) and mean.shape == (12,)
     assert raw.ndim == 2 and raw.shape[1] == 12 and raw.shape[0] == ds.meta.n_pixels[0]
     np.testing.assert_allclose(raw.numpy().mean(0), mean.numpy(), atol=1e-5)
+
+
+def test_transform_is_applied(pastis_dir, tmp_path):
+    kw = {"cache_dir": tmp_path / "c", "ref_date": REF, "verbose": False}
+    ds = PastisRDataset(pastis_dir, **kw)
+    doubled = PastisRDataset(pastis_dir, transform=lambda x: 2 * x, **kw)
+    torch.testing.assert_close(doubled[0][0], 2 * ds[0][0])
 
 
 def test_registered_and_tasks(pastis_dir, tmp_path):

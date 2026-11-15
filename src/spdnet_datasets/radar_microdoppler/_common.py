@@ -235,4 +235,7 @@ class RadarCovarianceDataset(BaseDataset):
             r = int(b.meta["raw_index"].iat[j])
             a, e = self._offsets[r], self._offsets[r + 1]
             raw = torch.from_numpy(np.array(self._raw[a:e], dtype=np.float32))
-        return self._pack(cov, mean, raw), int(self.labels[i])
+        x = self._pack(cov, mean, raw)
+        if self.transform is not None:
+            x = self.transform(x)
+        return x, int(self.labels[i])

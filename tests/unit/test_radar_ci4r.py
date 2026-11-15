@@ -103,6 +103,13 @@ def test_dataset_outputs_normalisation_and_registry(data, tmp_path):
     assert len(tr.dataset) + len(te.dataset) == len(ds) and len(va.dataset) == 0
 
 
+def test_transform_is_applied(data, tmp_path):
+    kw = {"band": 0.5, "p": P, "cache_dir": tmp_path / "cache", "verify": None, "verbose": False}
+    ds = CI4RDataset(data, **kw)
+    doubled = CI4RDataset(data, transform=lambda x: 2 * x, **kw)
+    torch.testing.assert_close(doubled[0][0], 2 * ds[0][0])
+
+
 def test_class_selection_and_limits(data, tmp_path):
     kw = {"band": 0.5, "p": P, "cache_dir": tmp_path / "cache", "verify": None, "verbose": False}
     ds = CI4RDataset(data, classes=["Crawl", "Away"], **kw)
