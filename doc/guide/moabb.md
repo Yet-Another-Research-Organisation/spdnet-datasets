@@ -2,8 +2,9 @@
 
 [MOABB](https://moabb.neurotechx.com) (Mother of All BCI Benchmarks) gathers
 public brain-computer interface (BCI) datasets, mostly electroencephalography
-(EEG), along with paradigms (motor imagery, P300, SSVEP, ...) and evaluation
-protocols. `spdnet_datasets.moabb` turns its epochs into symmetric positive
+(EEG), along with paradigms and evaluation protocols. The paradigms include
+motor imagery, P300 (an event-related potential, ERP) and SSVEP (steady-state
+visually evoked potentials). `spdnet_datasets.moabb` turns its epochs into symmetric positive
 definite (SPD) covariance matrices for SPDNet models. It reuses MOABB for
 everything else: the datasets, their download, the epoching, the paradigms and
 the evaluations.
@@ -112,12 +113,14 @@ depends on the `return_*` flags:
   `session` and `run`.
 - `ds.subjects` and `ds.sessions` give each trial's subject and session.
 - `ds.groups` is `"<subject>-<session>"`.
-- `ds.splits` holds the folds produced by MOABB's own splitters, so they match
-  the MOABB evaluations:
+- `ds.splits` holds the folds produced by MOABB's own splitters, so they follow
+  the same protocols as the MOABB evaluations. The within-session folds are
+  identical to those of `WithinSessionEvaluation(random_state=seed)` when both
+  use the same seed:
 
 | Split names | Protocol | Matches |
 |---|---|---|
-| `within_session_<k>` | 5-fold stratified CV inside each (subject, session) | `WithinSessionEvaluation` |
+| `within_session_<k>` | 5-fold stratified cross-validation inside each (subject, session) | `WithinSessionEvaluation` |
 | `cross_session_<k>` | leave one session out, per subject (≥ 2 sessions) | `CrossSessionEvaluation` |
 | `cross_subject_<k>` | leave one subject out (≥ 2 subjects) | `CrossSubjectEvaluation` |
 | `recommended` | first fold of the strictest available protocol | |
@@ -132,6 +135,10 @@ The covariances can be multiplied by a geometric scale, so that the geometric
 mean of the eigenvalues over the training covariances is 1. That scale is only
 computed when you pass `split=`, and it is fitted on that split's training
 indices. Without `split`, the covariances are left unscaled.
+
+Pass the same split name to `MOABBCovariances(split=...)` and to
+`create_dataloaders(split=...)`. With two different names, the scale is fitted
+on trials that may be in the test set of the other split.
 
 ### Cache and `keep`
 
