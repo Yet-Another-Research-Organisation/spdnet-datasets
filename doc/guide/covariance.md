@@ -2,34 +2,51 @@
 
 ## Estimators
 
-`EstimateCovariance` (NumPy) and `EstimateCovarianceTorch` (PyTorch, GPU)
-compute the covariance of the pixels of a hyperspectral image, the samples
-being the pixels and the features the bands:
+The loaders estimate their covariances with
+`spdnet_datasets.core.estimators.estimate_covariance(X, estimator=...)`,
+where `X` holds `n` observations (rows) of `p` channels (columns). Every
+dataset class takes the same `estimator=` argument:
 
-- `method="scm"`: sample covariance $\frac1n \sum_i (x_i - \bar x)(x_i - \bar x)^\top$
-  (`remove_mean=False` drops the centring);
-- `method="ledoit_wolf"`: Ledoit–Wolf shrinkage toward a scaled identity,
-  well conditioned when there are few pixels per band;
-- `exclude_zero=True` ignores the pixels that are zero in every band
-  (background).
+- `"scm"` (default): sample covariance matrix (SCM),
+  $\frac1n \sum_i (x_i - \bar x)(x_i - \bar x)^\top$;
+- `"ledoit_wolf"`: Ledoit–Wolf shrinkage toward a scaled identity, better
+  conditioned when n is close to p;
+- `"tyler"` and `"student"`: Tyler and Student-t M-estimators, taken from
+  `yetanotherspdnet.functions.m_estimators` (install the `robust` extra).
+
+Before estimating, the function checks that n ≥ 2p
+(`InsufficientSamplesError`). Afterwards, it checks that the result is
+symmetric positive definite (`NotSPDError`). The loaders discard and count
+the samples that fail either check; see the page of each dataset.
 
 ```python
 import numpy as np
-from spdnet_datasets.estimator import EstimateCovariance
+from spdnet_datasets.core.estimators import estimate_covariance
 
-estimator = EstimateCovariance(method="scm", remove_mean=True)
-image = np.random.rand(48, 352, 204)       # H × W × bands
-cov = estimator.from_image(image)           # 204 × 204
+X = np.random.rand(225, 63)                   # 15 × 15 pixels × 63 bands
+C = estimate_covariance(X, estimator="ledoit_wolf")   # 63 × 63
 ```
 
-Robust estimators (Tyler, Student-t M-estimators), differentiable and usable
-as network layers, are in `yetanotherspdnet.functions.m_estimators`.
+Pass `estimator=` to the dataset classes. A former argument such as
+`cov_method="ledoit_wolf"` is silently absorbed by `**kwargs`, and the SCM is
+used instead.
 
-## Precomputation scripts
+The former classes `EstimateCovariance` (NumPy) and `EstimateCovarianceTorch`
+(PyTorch, GPU) of `spdnet_datasets.estimator` remain available for images
+(`from_image`, `method="scm"` or `"ledoit_wolf"`, `exclude_zero=True` to
+ignore the background).
 
-`spdnet_datasets.utils` holds one script per dataset that reads the raw data
-and writes the covariance files used by `mode="cov"`
-(`covariance_precompute`, `ci4r_covariance_precompute`, …), and the
-preprocessing of datasets delivered in other formats (`chikusei_preprocess`,
-`placenta_preprocess`, …). Run them once per dataset; see the docstring of
-each module for its arguments.
+## Precomputation
+
+Covariances are no longer produced by standalone scripts. Each dataset's
+`fetch_<name>()` function reads (or downloads) the data, preprocesses it and
+estimates the covariances. It stores the results in the `processed/` and
+`covariance/` stages of the cache, and the dataset class calls it on first
+use. See {doc}`fetch` for the cache layout and the `keep` option, and the
+{doc}`../datasets/index` pages for the construction of each dataset. For
+example, `fetch_chikusei` replaces the former `chikusei_preprocess` script,
+and `fetch_placenta` replaces `placenta_preprocess`.
+
+The scripts left in `spdnet_datasets.utils` (`covariance_precompute`,
+`ntu120_covariance_precompute`, …) only serve the deprecated loaders of
+`spdnet_datasets.real`.
