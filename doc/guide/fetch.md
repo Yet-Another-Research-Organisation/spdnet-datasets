@@ -55,3 +55,54 @@ The local copy is never modified.
 
 `return_raw=True` needs the preprocessed tensors, hence `keep_processed` or
 `keep_full`.
+
+## Sources that need an account or a manual download
+
+Every `fetch_<name>()` states its access mode in its docstring and on the
+dataset page:
+
+| Mode | What the fetch does | What you provide |
+|---|---|---|
+| direct | downloads public files (Zenodo, GitHub, public Hugging Face) and checks their checksum | nothing |
+| Kaggle | downloads the dataset or competition archive through the Kaggle API | Kaggle credentials, and the rules accepted on the dataset or competition page |
+| Hugging Face (gated) | downloads with a token | a read token, and the conditions accepted on the dataset page |
+| manual | opens the dataset page and raises `ManualDownloadRequired` with the list of files to download | the path of the downloaded file or folder: `fetch_<name>(archive="~/Downloads/<file>")` |
+
+### Credentials
+
+Credentials are never written in code, URLs or logs, and the
+`Authorization` header is dropped when a download is redirected to another
+host. They are looked up in this order ({mod}`spdnet_datasets.core.access`):
+
+1. environment variables: `KAGGLE_USERNAME` and `KAGGLE_KEY`; `HF_TOKEN`;
+2. the tool's own file: `~/.kaggle/kaggle.json` (create it from
+   *kaggle.com > Settings > API > Create New Token*, then `chmod 600`);
+   the Hugging Face token cache written by `huggingface-cli login`;
+3. the system keyring (optional `keyring` package):
+
+   ```python
+   from spdnet_datasets.core.access import store_secret
+   store_secret("huggingface", "hf_...")                      # once
+   store_secret("kaggle", '{"username": "...", "key": "..."}')
+   ```
+
+4. a hidden prompt, when the fetch runs in a terminal.
+
+Without credentials, the fetch raises `MissingCredentialsError` with these
+instructions. On a shared machine, prefer the keyring or a file readable only
+by you over environment variables in shell history.
+
+### Manual downloads
+
+```python
+from spdnet_datasets.sar.s1slc_cvdl import fetch_s1slc_cvdl
+
+fetch_s1slc_cvdl()            # opens the IEEE DataPort page, explains what to download
+fetch_s1slc_cvdl(archive="~/Downloads/S1SLC_CVDL.zip")    # checks and extracts it
+```
+
+The archive is checked (size, checksum when the source publishes one) and
+extracted into the cache (`raw/`); paths that would escape the cache folder
+are rejected. An already extracted folder can be given instead of an
+archive; it is then read in place. Set `SPDNET_OPEN_BROWSER=0` to never open
+a browser (servers, batch jobs).
