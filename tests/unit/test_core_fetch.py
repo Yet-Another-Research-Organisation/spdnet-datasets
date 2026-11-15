@@ -159,7 +159,8 @@ def test_failed_covariance_replays_from_cache_without_download(tmp_path):
 def test_params_change_the_stage_directory(tmp_path):
     a = F.Stage(tmp_path, "toy", "covariance", {"w": 15})
     b = F.Stage(tmp_path, "toy", "covariance", {"w": 16})
-    assert a.path != b.path and a.hash == F.params_hash({"w": 15})
+    assert a.path != b.path
+    assert a.hash == F.params_hash({"w": 15, "_core_cache_version": F.CACHE_VERSION})
 
 
 def test_bad_keep(tmp_path):

@@ -66,11 +66,12 @@ def build(name, kwargs, split, page, max_samples=600, seed=0):
     from spdnet_datasets import DatasetManager
 
     cls = DatasetManager.DATASETS[name]
-    ds = cls(**kwargs)
-    has_raw = "raw" in cls.OUTPUTS
     if "cov" not in cls.OUTPUTS:
-        raise SystemExit(f"{name} has no covariance output; write its figures by hand")
-    ds.return_mean, ds.return_raw = True, has_raw
+        raise SystemExit(f"{name} has no covariance output; use make_figures_raw.py")
+    # Optional outputs are set at construction (some datasets prepare them in __init__)
+    kwargs = {"return_mean": "mean" in cls.OUTPUTS, "return_raw": "raw" in cls.OUTPUTS,
+              **kwargs}
+    ds = cls(**kwargs)
     rng = np.random.default_rng(seed)
     idx = rng.choice(len(ds), size=min(max_samples, len(ds)), replace=False)
     covs, means, raws, ys = _samples(ds, idx)
@@ -96,12 +97,13 @@ def build(name, kwargs, split, page, max_samples=600, seed=0):
 
     # class_means (8 classes at most: fixed categorical order, no cycling)
     fig = go.Figure()
-    M = np.stack(means)
+    M = np.stack(means) if means else np.stack([np.sqrt(np.diag(c)) for c in covs])
     for c, color in zip(np.unique(ys[ys >= 0])[:8], SERIES, strict=False):
         fig.add_scatter(y=M[ys == c].mean(0), mode="lines", name=names[c],
                         line={"width": 2, "color": color})
-    _layout(fig, "Mean channel profile per class (first 8 classes)", xaxis_title="channel",
-            yaxis_title="mean")
+    what = "mean" if means else "standard deviation (no mean output)"
+    _layout(fig, f"Channel {what} per class (first 8 classes)", xaxis_title="channel",
+            yaxis_title=what.split(" ")[0])
     figs["class_means"] = fig
 
     # class_hist

@@ -40,11 +40,17 @@ def check_sample_size(n: int, p: int, ratio: float = 2.0) -> None:
         )
 
 
-def check_spd(C: np.ndarray, rtol: float = 1e-8) -> None:
+MAX_CONDITION = 1e12
+
+
+def check_spd(C: np.ndarray, rtol: float = 1e-8, max_condition: float = MAX_CONDITION) -> None:
     """Raise :class:`NotSPDError` unless every matrix of ``C`` (..., p, p) is SPD.
 
     Symmetry: ``|C - C^T|_max <= rtol * |C|_max``. Positivity: the smallest
-    eigenvalue is strictly positive.
+    eigenvalue is strictly positive and the condition number
+    ``lambda_max / lambda_min`` is at most ``max_condition``: beyond about
+    ``1e12`` a float64 matrix cannot be told apart from a singular one (its
+    smallest eigenvalue changes sign from one eigensolver call to another).
     """
     C = np.asarray(C)
     if C.ndim < 2 or C.shape[-1] != C.shape[-2]:
@@ -55,9 +61,15 @@ def check_spd(C: np.ndarray, rtol: float = 1e-8) -> None:
     asym = np.max(np.abs(C - np.swapaxes(C, -1, -2)), axis=(-2, -1))
     if np.any(asym > rtol * np.maximum(scale, np.finfo(float).tiny)):
         raise NotSPDError(f"Matrix is not symmetric (max asymmetry {asym.max():.3e})")
-    lam_min = np.linalg.eigvalsh(C)[..., 0]
+    eig = np.linalg.eigvalsh(C)
+    lam_min, lam_max = eig[..., 0], eig[..., -1]
     if np.any(lam_min <= 0):
         raise NotSPDError(f"Matrix is not positive definite (min eigenvalue {lam_min.min():.3e})")
+    cond = lam_max / lam_min
+    if np.any(cond > max_condition):
+        raise NotSPDError(
+            f"Matrix is numerically singular (condition number {cond.max():.3e} > "
+            f"{max_condition:.0e})")
 
 
 def channel_mean(X: np.ndarray) -> np.ndarray:
