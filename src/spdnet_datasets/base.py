@@ -3,6 +3,8 @@ Base Dataset class for all SPDNet benchmark datasets.
 Provides common functionality and interface for data loading and splitting.
 """
 
+import warnings
+
 import torch
 from torch.utils.data import Dataset, DataLoader, random_split, Subset
 from pathlib import Path
@@ -10,6 +12,8 @@ from typing import Optional, List, Tuple, Dict
 import numpy as np
 from abc import ABC, abstractmethod
 from sklearn.model_selection import train_test_split
+
+from .core.outputs import ALL_OUTPUTS, pack_outputs, validate_output_request
 
 
 class BaseDataset(Dataset, ABC):
@@ -33,6 +37,14 @@ class BaseDataset(Dataset, ABC):
         transform: Optional[callable] = None,
         seed: int = 42,
         verbose: bool = True,
+        return_mean: bool = False,
+        return_raw: bool = False,
+        estimator: str = "scm",
+        task: str = "fine",
+        drop_classes: tuple = (),
+        merge_classes: Optional[dict] = None,
+        balance: Optional[str] = None,
+        normalize: bool = True,
         **kwargs  # Accept any additional parameters
     ):
         """
@@ -46,6 +58,14 @@ class BaseDataset(Dataset, ABC):
             transform: Optional transform to apply
             seed: Random seed
             verbose: Whether to print information during loading
+            return_mean: Also return the per-channel mean (see ADR-0002 / core.outputs)
+            return_raw: Also return the preprocessed raw data
+            estimator: Covariance estimator ('scm', 'ledoit_wolf', 'tyler', 'student')
+            task: 'fine', 'coarse' or 'regression' (see core.tasks)
+            drop_classes: Classes removed from the dataset
+            merge_classes: Mapping {old_class: new_class}
+            balance: None, 'undersample', 'oversample' or 'weights'
+            normalize: Apply the geometric scale fitted on the training split
             **kwargs: Additional dataset-specific parameters
         """
         self.data_dir = Path(data_dir)
@@ -56,15 +76,34 @@ class BaseDataset(Dataset, ABC):
         self.seed = seed
         self.verbose = verbose
         self.rng = np.random.RandomState(seed)
+        validate_output_request(self.OUTPUTS, return_mean, return_raw)
+        self.return_mean = return_mean
+        self.return_raw = return_raw
+        self.estimator = estimator
+        self.task = task
+        self.drop_classes = tuple(drop_classes)
+        self.merge_classes = merge_classes
+        self.balance = balance
+        self.normalize = normalize
 
         # Will be set by subclasses
         self.classes = []
         self.class_to_idx = {}
         self.samples = []
+        self.groups = None  # one group id per sample (subject, patch, block...)
+        self.splits = {}  # name -> {"train": idx, "val": idx, "test": idx}
 
         # Validate data directory
         if not self.data_dir.exists():
             raise FileNotFoundError(f"Data directory not found: {self.data_dir}")
+
+    # Outputs available for this dataset (raw/mean-only SAR datasets override it)
+    OUTPUTS = ALL_OUTPUTS
+
+    def _pack(self, cov=None, mean=None, raw=None):
+        """Assemble the input of one sample according to the output contract."""
+        return pack_outputs(cov, mean, raw, return_mean=self.return_mean,
+                            return_raw=self.return_raw, outputs=self.OUTPUTS)
 
     @abstractmethod
     def _load_data(self):
@@ -90,7 +129,7 @@ class BaseDataset(Dataset, ABC):
                 print(f"Using {len(self._requested_classes)} specified classes: {sorted(self._requested_classes)}")
             return sorted(self._requested_classes)
         if self.max_classes is not None and self.max_classes < len(all_classes):
-            rng_classes = np.random.RandomState(42)  # Fixed seed for class selection
+            rng_classes = np.random.RandomState(self.seed)
             selected = rng_classes.choice(all_classes, size=self.max_classes, replace=False).tolist()
             if self.verbose:
                 print(f"Using {self.max_classes}/{len(all_classes)} classes: {sorted(selected)}")
@@ -133,7 +172,8 @@ def create_dataloaders(
     shuffle: bool = True,
     seed: int = 42,
     stratified: bool = False,
-    verbose: bool = True
+    verbose: bool = True,
+    split: Optional[str] = None,
 ) -> Tuple[DataLoader, DataLoader, DataLoader]:
     """
     Split dataset and create train/val/test dataloaders.
@@ -150,13 +190,37 @@ def create_dataloaders(
         seed: Random seed for splitting
         stratified: Whether to use stratified splitting (ensures all classes in each split)
         verbose: Whether to print split information
+        split: Name of a leakage-free split provided by the dataset
+            (``dataset.splits[split]``, e.g. 'official' or 'recommended').
+            When None, a sample-level random/stratified split is made; it
+            warns if the dataset provides groups, since samples of one group
+            may then fall on both sides.
 
     Returns:
         Tuple of (train_loader, val_loader, test_loader)
     """
     total_size = len(dataset)
 
-    if stratified:
+    if split is not None:
+        splits = getattr(dataset, "splits", {}) or {}
+        if split not in splits:
+            raise ValueError(f"Unknown split {split!r}; available: {sorted(splits)}")
+        parts = splits[split]
+        train_ds, val_ds, test_ds = (
+            Subset(dataset, np.asarray(parts.get(k, []), dtype=int).tolist())
+            for k in ("train", "val", "test")
+        )
+        if verbose:
+            print(f"\nSplit '{split}': train {len(train_ds)} / val {len(val_ds)} / test {len(test_ds)}")
+    elif getattr(dataset, "groups", None) is not None or getattr(dataset, "splits", None):
+        warnings.warn(
+            "Sample-level split on a dataset that provides groups or named splits: "
+            "samples of one group may fall in train and test. Pass split='official' "
+            "or another name from dataset.splits.",
+            UserWarning, stacklevel=2,
+        )
+
+    if split is None and stratified:
         # Extract all labels from dataset
         all_labels = []
         for i in range(len(dataset)):
@@ -227,7 +291,7 @@ def create_dataloaders(
                 val_pct = 100 * val_count / len(val_ds)
                 test_pct = 100 * test_count / len(test_ds)
                 print(f"  {cls:<10} {train_count:>4} ({train_pct:>4.1f}%)   {val_count:>4} ({val_pct:>4.1f}%)   {test_count:>4} ({test_pct:>4.1f}%)")
-    else:
+    elif split is None:
         # Original non-stratified split
         test_size = int(total_size * test_ratio)
         val_size = int(total_size * val_ratio)

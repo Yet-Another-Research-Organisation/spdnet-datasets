@@ -68,4 +68,9 @@ tests/dataset_reports/
 uv.lock
 
 # Sphinx
-docs/_build/
+doc/_build/
+
+# Internal working notes and assistant files (not published)
+docs/
+CLAUDE.md
+.claude/

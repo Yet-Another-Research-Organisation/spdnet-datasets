@@ -31,7 +31,7 @@ jobs:
           cache: "pip"
           cache-dependency-path: |
             pyproject.toml
-            docs/requirements.txt
+            doc/requirements.txt
         env:
           CACHE_KEY_SUFFIX: ${{ github.run_id }}
 
@@ -42,13 +42,13 @@ jobs:
 
       - name: Build Sphinx documentation
         run: |
-          cd docs
+          cd doc
           make html
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: docs/_build/html
+          path: doc/_build/html
 
   deploy:
     name: Deploy to GitHub Pages

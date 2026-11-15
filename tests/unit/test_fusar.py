@@ -1,6 +1,5 @@
 """FUSAR-Ship loader: class filtering, capping, image format, split."""
 
-import os
 from pathlib import Path
 
 import numpy as np
@@ -9,6 +8,7 @@ import tifffile
 import torch
 
 from spdnet_datasets import DatasetManager
+from spdnet_datasets.core.config import get_data_root
 from spdnet_datasets.real.fusar import FUSARShipDataset
 
 # category -> {subcategory: number of chips}
@@ -87,14 +87,7 @@ def test_through_the_manager_with_stratified_split(fusar_dir):
         assert set(labels.tolist()) == {0, 1}
 
 
-FUSAR_ROOT = (
-    Path(
-        os.environ.get(
-            "SPDNET_DATA_ROOT", "/home/mgallet/Documents/Dataset/BATCHNORM_dataset"
-        )
-    )
-    / "FUSAR_Ship1.0"
-)
+FUSAR_ROOT = get_data_root() / "SAR" / "FUSAR_Ship1.0"
 
 
 @pytest.mark.skipif(not FUSAR_ROOT.exists(), reason="FUSAR-Ship data not available")
