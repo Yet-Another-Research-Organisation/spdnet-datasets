@@ -70,10 +70,16 @@ def build(name, kwargs, split, page, max_samples=600, seed=0):
     has_raw = "raw" in cls.OUTPUTS
     if "cov" not in cls.OUTPUTS:
         raise SystemExit(f"{name} has no covariance output; write its figures by hand")
-    ds.return_mean, ds.return_raw = True, has_raw
+    # mean only when served; raw for the four displayed samples only (memory)
+    ds.return_mean, ds.return_raw = "mean" in cls.OUTPUTS, False
     rng = np.random.default_rng(seed)
     idx = rng.choice(len(ds), size=min(max_samples, len(ds)), replace=False)
-    covs, means, raws, ys = _samples(ds, idx)
+    covs, means, _, ys = _samples(ds, idx)
+    raws = []
+    if has_raw:
+        ds.return_raw = True
+        raws = _samples(ds, idx[:4])[2]
+        ds.return_raw = False
     covs = np.stack(covs)
     p = covs.shape[-1]
     names = list(getattr(ds, "classes", [])) or [str(c) for c in np.unique(ys)]
@@ -89,20 +95,22 @@ def build(name, kwargs, split, page, max_samples=600, seed=0):
         for j in range(k):
             r = np.asarray(raws[j], dtype=float)
             img = r.mean(-1) if r.ndim == 3 else r.T  # band-mean image or (p, T) spectrogram
+            img = img.astype(np.float32)  # float32 keeps the HTML under 1 MB
             fig.add_trace(go.Heatmap(z=img, colorscale=SEQUENTIAL, showscale=False,
                                      hovertemplate="value %{z:.3g}<extra></extra>"), 1, j + 1)
         _layout(fig, "Examples of the preprocessed data (band mean / spectrogram)")
         figs["raw_samples"] = fig
 
     # class_means (8 classes at most: fixed categorical order, no cycling)
-    fig = go.Figure()
-    M = np.stack(means)
-    for c, color in zip(np.unique(ys[ys >= 0])[:8], SERIES, strict=False):
-        fig.add_scatter(y=M[ys == c].mean(0), mode="lines", name=names[c],
-                        line={"width": 2, "color": color})
-    _layout(fig, "Mean channel profile per class (first 8 classes)", xaxis_title="channel",
-            yaxis_title="mean")
-    figs["class_means"] = fig
+    if means:
+        fig = go.Figure()
+        M = np.stack(means)
+        for c, color in zip(np.unique(ys[ys >= 0])[:8], SERIES, strict=False):
+            fig.add_scatter(y=M[ys == c].mean(0), mode="lines", name=names[c],
+                            line={"width": 2, "color": color})
+        _layout(fig, "Mean channel profile per class (first 8 classes)",
+                xaxis_title="channel", yaxis_title="mean")
+        figs["class_means"] = fig
 
     # class_hist
     fig = go.Figure()
@@ -120,12 +128,12 @@ def build(name, kwargs, split, page, max_samples=600, seed=0):
     figs["class_hist"] = fig
 
     # cov_samples
-    k = min(4, len(covs))
+    k = min(4 if p <= 128 else 2, len(covs))  # fewer panels for large p (HTML size)
     fig = make_subplots(rows=1, cols=k, subplot_titles=[names[ys[j]] if ys[j] >= 0 else "?"
                                                         for j in range(k)])
     for j in range(k):
         d = np.sqrt(np.diag(covs[j]))
-        corr = covs[j] / np.outer(d, d)
+        corr = (covs[j] / np.outer(d, d)).astype(np.float32)
         fig.add_trace(go.Heatmap(z=corr, zmin=-1, zmax=1, colorscale=DIVERGING,
                                  showscale=j == k - 1,
                                  hovertemplate="(%{y}, %{x}) %{z:.2f}<extra></extra>"), 1, j + 1)
