@@ -85,7 +85,8 @@ def test_hdm05_split_partitions_samples(hdm05_dir, tmp_path):
     idx = np.concatenate([parts[k] for k in ("train", "val", "test")])
     assert sorted(idx.tolist()) == list(range(len(ds)))
     assert_no_leakage(ds.groups[parts["train"]], ds.groups[parts["test"]])
-    train = HDM05Dataset(hdm05_dir, cache_dir=tmp_path / "c", verbose=False, features="c31")
+    train = HDM05Dataset(hdm05_dir, subset="train", cache_dir=tmp_path / "c", verbose=False,
+                         features="c31")
     log_eig = np.log(np.linalg.eigvalsh(np.stack([train[i][0].numpy()
                                                   for i in range(len(train))])))
     assert abs(log_eig.mean()) < 1e-8

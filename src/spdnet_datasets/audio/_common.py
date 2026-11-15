@@ -215,8 +215,8 @@ class SequenceCovarianceDataset(BaseDataset):
         Name of the split in :attr:`full_splits` that defines ``subset`` and the
         training set used to fit the normalisation.
     subset : {"train", "val", "test", None}
-        Part of the split exposed by the dataset; ``None`` (or ``"all"``)
-        exposes every sample, and :attr:`splits` then indexes the dataset (use
+        Part of the split exposed by the dataset; ``None`` (default, or
+        ``"all"``) exposes every sample, and :attr:`splits` then indexes the dataset (use
         it with :func:`~spdnet_datasets.base.create_dataloaders`).
     fold : int
         Test fold (1-based) of the k-fold protocols.
@@ -247,7 +247,7 @@ class SequenceCovarianceDataset(BaseDataset):
     COARSE_MAP = None
     DOWNLOADABLE = False  # True: a missing ``data_dir`` is downloaded by the fetch
 
-    def __init__(self, data_dir=None, *, split="recommended", subset="train", fold=1,
+    def __init__(self, data_dir=None, *, split="recommended", subset=None, fold=1,
                  cache_dir=None, keep=None, force=False, verify="size", limit=None,
                  **kwargs):
         root = dataset_path(self.DOMAIN, self.NAME, data_dir)
