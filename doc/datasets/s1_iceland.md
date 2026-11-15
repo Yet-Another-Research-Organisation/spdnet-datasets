@@ -8,7 +8,7 @@
 * - Task(s)
   - fine classification (7 classes) · coarse (5 groups)
 * - Covariance
-  - 30×30 = VV and VH amplitude at 15 summer dates, n = valid pixels of a 32 × 32 sub-patch (≥ 922)
+  - 30×30 = VV and VH amplitude (vertical emission; vertical or horizontal reception) at 15 summer dates, n = valid pixels of a 32 × 32 sub-patch (≥ 922)
 * - Outputs
   - cov · mean (30,) · raw (32, 32, 30)
 * - Splits
@@ -28,8 +28,7 @@ defined. The Sentinel-1 data and the CLC+ labels are free Copernicus products.
 
 The S1 Iceland SAR Dataset contains Sentinel-1 (S1) time series over Iceland.
 The source images are IW SLC (interferometric wide swath, single look complex)
-products in dual polarisation, VV and VH: vertical emission, with vertical or
-horizontal reception. The series cover the summer (June to September) of two
+products in dual polarisation, VV and VH. The series cover the summer (June to September) of two
 years:
 
 - 2019: S1A and S1B, 6-day revisit;
@@ -49,7 +48,8 @@ Two products are ready for learning: segmentation (ascending orbit) and change
 Companion stores hold the γ⁰ amplitude, with radiometric terrain correction
 and thermal-noise removal.
 
-- Reference: LISTIC project, draft IGARSS paper. The dataset is not published.
+- Reference: LISTIC project, draft paper for IGARSS (International
+  Geoscience and Remote Sensing Symposium). The dataset is not published.
 - Local copy: `<root>/SAR/ICELAND_SAR`.
 
 ## Raw data
@@ -129,7 +129,8 @@ the validity rule above.
 
 **Normalisation.** The cache keeps unscaled covariances. At load time, the
 geometric scale of `core.normalize` is fitted on the training part. The median
-condition number of the SCM covariances is about 66.
+condition number of the SCM (sample covariance matrix) covariances is
+about 66.
 
 ```{raw} html
 <iframe src="../_static/figures/s1_iceland/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
@@ -161,7 +162,7 @@ The fiche gives no validation count.
 | Risk | Measure | Residual |
 |---|---|---|
 | Same pixels in two splits | windows never overlap across splits; 10 km blocks and years disjoint (checked) | none |
-| Spatial proximity between splits | none added: the dataset documentation announces a buffer of at least 5 km, but **this was not verified**. On the common 10 m grid, train and val patches are **adjacent** (0 px gap, no overlap), and train and test are 128 px = 1.28 km apart | validation is spatially correlated with training, so validation scores are optimistic; the test set is a domain shift (region, year, S1C, 2-day date offset) |
+| Spatial proximity between splits | none added. The dataset documentation announces a buffer of at least 5 km between splits; the measured positions (`r0`, `c0` on the common 10 m grid) show that it does not hold: train and val patches are **adjacent** (0 px gap, no overlap), and train and test are 128 px = 1.28 km apart | validation is spatially correlated with training, so validation scores are optimistic; the test set is a domain shift (region, year, S1C, 2-day date offset) |
 | Overlapping 256 px patches within one split | none | some training sub-patches overlap each other (no effect across splits) |
 | Normalisation fitted on test data | geometric scale fitted on the training part only | none |
 | Date selection using test labels | `select_dates` uses only dates (days of year) | none |

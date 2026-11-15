@@ -27,14 +27,17 @@ sources. It only checks the local copy against `MANIFEST_NAS.tsv`.
 ## Description and source
 
 AVIRIS (Airborne Visible/InfraRed Imaging Spectrometer) Classic is the
-NASA/JPL imaging spectrometer flown on ER-2 aircraft. It records 224 bands
+imaging spectrometer of NASA (National Aeronautics and Space Administration)
+and JPL (Jet Propulsion Laboratory), flown on ER-2 aircraft. It records 224 bands
 from 366 to 2 496 nm, about 9.7 nm apart, with pixels of 14.8 to 17 m
 depending on the flight line.
 
 The dataset holds windows of 600 m × 600 m in California, in EPSG:5070
-(CONUS Albers projection). Each window is resampled to 32 × 32 pixels of
+(EPSG: European Petroleum Survey Group code; 5070 = Albers equal-area
+projection of the contiguous United States). Each window is resampled to 32 × 32 pixels of
 18.75 m and followed at exactly 14 flight dates from 2008 to 2020. 70 % of
-the flight pairs fall in 2013–2015, during the HyspIRI preparatory campaign.
+the flight pairs fall in 2013–2015, during the preparatory campaign of HyspIRI (Hyperspectral Infrared
+Imager).
 The labels come from the USDA NASS Cropland Data Layer (CDL), the crop and
 land-cover map of the US Department of Agriculture's National Agricultural
 Statistics Service.
@@ -135,7 +138,7 @@ window over time, not one acquisition.
 **Normalisation.** The cache keeps unscaled covariances. At load time, the
 geometric scale of `core.normalize` is fitted on the training part of the
 chosen split. Neighbouring bands are strongly correlated, so the matrices are
-badly conditioned. The median condition number of the SCM covariances is
+badly conditioned. The median condition number of the SCM (sample covariance matrix) covariances is
 about 2·10⁷ for both versions, and `estimator="ledoit_wolf"` reduces it.
 
 FINE:
