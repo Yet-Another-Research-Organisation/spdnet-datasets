@@ -38,8 +38,10 @@ from ..core import (
     channel_mean,
     class_weights,
     dataset_path,
+    download,
     estimate_covariance,
     geometric_scale,
+    get_cache_dir,
     verify_local,
 )
 
@@ -68,6 +70,18 @@ def check_local(data_dir, verify, required=()):
         raise OSError(f"{len(bad)} file(s) of {data_dir} differ from MANIFEST_NAS.tsv, "
                       f"e.g. {bad[:5]}")
     return report
+
+
+def download_files(files, raw_dir):
+    """Download every ``url -> sha256`` of ``files`` into ``raw_dir`` (``raw_fn`` of a fetch).
+
+    Each file is named after the last component of its URL. A complete file is
+    not downloaded again (only re-hashed, see :func:`~spdnet_datasets.core.fetch.download`).
+    """
+    raw_dir = Path(raw_dir)
+    for url, sha256 in files.items():
+        download(url, raw_dir / url.rsplit("/", 1)[-1], checksum=sha256)
+    return raw_dir
 
 
 def write_processed(out_dir, features, index, excluded, p):
@@ -242,11 +256,19 @@ class SequenceCovarianceDataset(BaseDataset):
 
     DOMAIN = NAME = None
     COARSE_MAP = None
+    DOWNLOADABLE = False  # True: a missing ``data_dir`` is downloaded by the fetch
 
     def __init__(self, data_dir=None, *, split="recommended", subset="train", fold=1,
                  cache_dir=None, keep=None, force=False, verify="size", limit=None,
                  **kwargs):
-        super().__init__(data_dir=dataset_path(self.DOMAIN, self.NAME, data_dir), **kwargs)
+        root = dataset_path(self.DOMAIN, self.NAME, data_dir)
+        if root.exists() or not self.DOWNLOADABLE:
+            super().__init__(data_dir=root, **kwargs)
+        else:  # the fetch downloads the sources into the cache
+            cache = Path(cache_dir) if cache_dir else get_cache_dir()
+            cache.mkdir(parents=True, exist_ok=True)
+            super().__init__(data_dir=cache, **kwargs)
+            self.data_dir = root
         if subset == "all":
             subset = None
         if subset not in (None, "train", "val", "test"):

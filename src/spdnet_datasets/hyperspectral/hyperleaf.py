@@ -23,6 +23,11 @@ TS-LR cultivar 0.915 random vs 0.669 grouped).
 ``mode="image"`` keeps the former image mode: ``x`` is the image restricted to
 ``bands`` (default approximate R, G, B), standardised per channel, float32
 (C, 48, 352), for CNN backbones; no covariance is computed.
+
+Download (manual): Kaggle competition
+https://www.kaggle.com/competitions/hyperleaf2024 (Kaggle account and acceptance of
+the rules required). Download ``images/``, ``train.csv`` and ``test.csv`` and place
+it under ``data_dir`` (default ``<data root>/HYPERSPECTRAL/HyperLeaf2024``).
 """
 
 from pathlib import Path

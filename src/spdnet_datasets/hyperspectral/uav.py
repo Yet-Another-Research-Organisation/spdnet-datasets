@@ -27,6 +27,11 @@ Splits (``positions`` are per scene; scenes never share a block):
 - ``"official"``: windows lying inside a single patch take the official split
   of that patch; windows straddling two patches are left out;
 - ``"scene_transfer"`` (when both are loaded): train MJK_N, test MJK_S.
+
+Download (manual): ScienceDB, doi:10.57760/sciencedb.01898 (download from the web
+page, no stable direct URL or checksum registered). Extract the archive into
+``source/`` (layout above) and place it under ``data_dir`` (default ``<data
+root>/HYPERSPECTRAL/UAV-HSI-Crop``).
 """
 
 import re

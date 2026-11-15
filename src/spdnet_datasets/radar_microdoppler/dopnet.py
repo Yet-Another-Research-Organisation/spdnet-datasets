@@ -36,6 +36,10 @@ gesture equals a training one; persons are shared: intra-person split).
 files); ``"recommended"`` is ``person{fold}``. The band of step 3 is fitted on
 the training files, which include the held-out person of ``person<k>``.
 ``raw`` has a variable length ``T``: use ``batch_size=1`` or a custom collate.
+
+Download (manual): registration on https://dop-net.com. Download ``Training Data/``
+and ``Test Data/`` (``.mat`` files listed above) and place it under ``data_dir``
+(default ``<data root>/RADAR_DOPPLER/Dop-NET``).
 """
 
 import hashlib

@@ -97,6 +97,17 @@ The group of a sample is its patch; train, validation and test never share one.
 ``return_raw`` gives the standardised pixels of the parcel, an array ``(n, p)``
 float32 whose ``n`` varies from parcel to parcel (the default PyTorch collate needs
 ``batch_size=1`` or a custom ``collate_fn``).
+
+Download
+--------
+Zenodo record 5735646 (CC BY 4.0): one archive ``PASTIS-R.zip`` of 53.7 GB, whose
+Zenodo md5 (``4887513d6c2d2b07fa935d325bd53e09``) and sha256 (:data:`FILES`) were
+checked on the local copy. When ``data_dir`` holds no ``metadata.geojson``, the
+archive is downloaded once into ``<cache_dir>/pastis_r/downloads/``, checked,
+extracted there (about 73 GB; peak 127 GB with the archive) and deleted. The
+extracted folder is outside the ``keep`` policy (never deleted by the fetch, remove
+it by hand): every scenario and date setting has its own processed stage, and
+deleting the source would mean a new 53.7 GB download for each of them.
 """
 
 from __future__ import annotations
@@ -106,6 +117,7 @@ import datetime
 import itertools
 import json
 import shutil
+import zipfile
 from pathlib import Path
 
 import numpy as np
@@ -129,15 +141,16 @@ from ..core import (
     get_cache_dir,
     verify_local,
 )
-from ..core.fetch import Stage
+from ..core.fetch import Stage, download
 from ..manager import DatasetManager
 
 DOMAIN, NAME = "SITS", "PASTIS-R"
 CACHE_NAME = "pastis_r"
-# Local dataset (CC BY 4.0, Zenodo record 5735646, PASTIS-R.zip, 53.7 GB): no
-# automatic download is registered.
-ZENODO_URL = "https://zenodo.org/records/5735646"
-FILES: dict = {}
+ZENODO_URL = "https://zenodo.org/records/5735646/files/PASTIS-R.zip?download=1"
+ARCHIVE = "PASTIS-R.zip"
+FILES = {  # url -> sha256 (computed on the local copy, whose md5 equals Zenodo's)
+    ZENODO_URL: "96eb6e3567348465ecb98d072d9c9a913272b05f49b7e0cac679408e50a4eeb3",
+}
 
 S2_BANDS = ("B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B11", "B12")
 _B02, _B03, _B04, _B08 = 0, 1, 2, 6
@@ -358,6 +371,29 @@ def _resolve(data_dir):
     root = dataset_path(DOMAIN, NAME, data_dir)
     files = root if (root / "metadata.geojson").exists() else root / NAME
     return root, files
+
+
+def download_pastis_r(cache_dir=None) -> Path:
+    """Download and extract the Zenodo archive once; return the folder of ``metadata.geojson``.
+
+    The archive goes to ``<cache_dir>/pastis_r/downloads/``, is checked against
+    :data:`FILES`, extracted into a temporary folder renamed when complete (an
+    interrupted extraction is redone, never used) and then deleted.
+    """
+    dest = (Path(cache_dir) if cache_dir else get_cache_dir()) / CACHE_NAME / "downloads"
+    out = dest / NAME
+    if (out / "metadata.geojson").exists():
+        return out
+    archive = download(ZENODO_URL, dest / ARCHIVE, checksum=FILES[ZENODO_URL])
+    tmp = dest / "extract.part"
+    if tmp.exists():
+        shutil.rmtree(tmp)
+    with zipfile.ZipFile(archive) as z:
+        z.extractall(tmp)
+    (tmp / NAME).rename(out)
+    shutil.rmtree(tmp)
+    archive.unlink()
+    return out
 
 
 def _read_metadata(files_dir):
@@ -583,7 +619,8 @@ def fetch_pastis_r(data_dir=None, cache_dir=None, keep=None, estimator="scm", fo
     ----------
     data_dir : path, optional
         Dataset directory (holding ``metadata.geojson`` directly or in ``PASTIS-R/``);
-        default ``<data root>/SITS/PASTIS-R``. Read only.
+        default ``<data root>/SITS/PASTIS-R``. Read only. Without ``metadata.geojson``
+        the Zenodo archive is downloaded (:func:`download_pastis_r`).
     cache_dir : path, optional
         Default ``core.config.get_cache_dir()``.
     keep : {"keep_full", "keep_processed", "keep_covariance"}, optional
@@ -636,6 +673,8 @@ def fetch_pastis_r(data_dir=None, cache_dir=None, keep=None, estimator="scm", fo
     if date_index is not None:
         ref_date = None
     root, files_dir = _resolve(data_dir)
+    if not (files_dir / "metadata.geojson").exists():
+        root = files_dir = download_pastis_r(cache_dir)
     rel = files_dir.relative_to(root) if files_dir != root else Path(".")
     report = verify_local(root, verify=verify, required=[str(rel / "metadata.geojson")])
     if report.missing or report.wrong_size or report.wrong_md5:
@@ -720,7 +759,10 @@ class PastisRDataset(BaseDataset):
     def __init__(self, data_dir=None, *, scenario="A", split="official", subset=None,
                  cache_dir=None, **kwargs):
         self._fetch_kwargs = {k: kwargs.pop(k) for k in self._FETCH_KEYS if k in kwargs}
-        root, _ = _resolve(data_dir)
+        root, files_dir = _resolve(data_dir)
+        if not (files_dir / "metadata.geojson").exists():  # downloaded into the cache
+            root = Path(cache_dir) if cache_dir else get_cache_dir()
+            root.mkdir(parents=True, exist_ok=True)
         super().__init__(str(root), **kwargs)
         if subset not in (None, "train", "val", "test"):
             raise ValueError("subset must be None, 'train', 'val' or 'test'")

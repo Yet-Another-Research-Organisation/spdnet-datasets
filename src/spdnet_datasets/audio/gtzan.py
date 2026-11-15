@@ -9,6 +9,15 @@ Known defects (Sturm, 2013): repetitions, mislabelings, distortions. The 14
 pairs of exact duplicates measured by the atlas (:data:`DUPLICATES`) are
 removed (the second file of each pair), which leaves 985 excerpts.
 
+Download
+--------
+The local copy is the Hugging Face dataset ``sanchit-gandhi/gtzan`` (three
+parquet shards, 1.3 GB; the sha256 of :data:`FILES` are the Hugging Face LFS
+identifiers, equal to those of the local copy). When ``data_dir`` does not
+exist, the shards of the pinned revision :data:`HF_REVISION` are downloaded
+into ``<cache_dir>/gtzan/raw/`` and checked. The excerpts come from commercial
+recordings whose redistribution rights were never cleared: research use only.
+
 Covariances
 -----------
 One covariance per excerpt over its non-silent frames (``n`` around 2 580):
@@ -33,6 +42,7 @@ from ..manager import DatasetManager
 from ._common import (
     SequenceCovarianceDataset,
     check_local,
+    download_files,
     estimate_stage,
     evenly_spaced,
     folds_to_split,
@@ -42,7 +52,16 @@ from ._common import (
 from ._features import iter_parquet_rows, process_recordings
 
 DOMAIN, NAME = "AUDIO", "GTZAN"
-FILES = {}  # local copy; download registry filled by the fetch phase
+HF_REPO, HF_REVISION = "sanchit-gandhi/gtzan", "4bd857132cb0e731bef3ec68558e7acc0a85f144"
+_HF = f"https://huggingface.co/datasets/{HF_REPO}/resolve/{HF_REVISION}/data/"
+FILES = {  # url -> sha256 (Hugging Face LFS oid, identical to the local copy)
+    _HF + "train-00000-of-00003-abaaa5719027ce5c.parquet":
+        "e4030bb79bc745a3255d85a3b5da49d6733be9cb2af4cba030eec1621f75a50a",
+    _HF + "train-00001-of-00003-40e2de07ad428882.parquet":
+        "7e60e413743fbe7b6d4798161af05c676169a65f043dc15dc2146f63210f1dc8",
+    _HF + "train-00002-of-00003-6e2eb838540a06e5.parquet":
+        "03876df22ec942651bf0170ecae2ddbe23c465cb2ce63171c3b6de2a4beb5fe2",
+}
 N_FOLDS = 5
 GENRES = ("blues", "classical", "country", "disco", "hiphop", "jazz", "metal", "pop",
           "reggae", "rock")  # ClassLabel order of the Hugging Face export
@@ -73,6 +92,7 @@ def _index(root):
 
 
 def _process(source, out_dir, *, root, limit, features, n_mfcc, n_mels):
+    root = root if source is None else source  # downloaded shards
     index = _index(root)
     removed = {b for _, b in DUPLICATES}
     candidates = [i for i, (name, _) in enumerate(index) if name not in removed]
@@ -108,11 +128,15 @@ def fetch_gtzan(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
         ``covariance_path``.
     """
     root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify)
-    params = {"data_dir": str(root.resolve()), "features": features, "n_mfcc": n_mfcc,
-                  "n_mels": n_mels, "limit": limit, "estimator": estimator}
+    if root.is_dir():
+        check_local(root, verify)
+        raw_fn, source = None, str(root.resolve())
+    else:
+        raw_fn, source = partial(download_files, FILES), f"hf:{HF_REPO}@{HF_REVISION}"
+    params = {"data_dir": source, "features": features, "n_mfcc": n_mfcc,
+                  "n_mels": n_mels, "limit": limit}
     run = run_pipeline(
-        "gtzan", params=params,
+        "gtzan", params=params, covariance_params={"estimator": estimator}, raw_fn=raw_fn,
         process_fn=partial(_process, root=root, limit=limit, features=features,
                            n_mfcc=n_mfcc, n_mels=n_mels),
         covariance_fn=partial(estimate_stage, estimator=estimator),
@@ -128,6 +152,7 @@ class GTZANDataset(SequenceCovarianceDataset):
     """
 
     DOMAIN, NAME = DOMAIN, NAME
+    DOWNLOADABLE = True
 
     def __init__(self, data_dir=None, *, features="mfcc", n_mfcc=20, n_mels=64, **kwargs):
         self.feature_kwargs = {"features": features, "n_mfcc": n_mfcc, "n_mels": n_mels}

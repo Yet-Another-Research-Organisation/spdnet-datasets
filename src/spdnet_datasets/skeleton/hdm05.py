@@ -29,6 +29,13 @@ fold ``fold``, validation = the next fold, train = the others.
    identifier: segments of one take and one actor fall in train and test,
    which inflates the scores compared with a cross-actor protocol. The SPDNet
    literature uses 10 random 50/50 splits, which has the same bias.
+
+Download (manual): the motion database is published at
+http://resources.mpi-inf.mpg.de/HDM05/ (free for research, C3D/AMC files). The
+``{id}_{frames}_{class}.npy`` covariances read here are a preprocessed export whose
+construction is not published, so this package cannot rebuild them from the original
+files; copy the export and place it under ``data_dir`` (default ``<data
+root>/SKELETON/HDM05``).
 """
 
 import re

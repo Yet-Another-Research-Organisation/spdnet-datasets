@@ -28,6 +28,10 @@ Outputs: raw or mean only (``OUTPUTS = ("raw", "mean")``).
   slightly non-square) and, with ``standardize=True``, standardised per chip;
 - mean: per-channel mean of the ``log1p`` resized chip (before
   standardisation, which would make it zero).
+
+Download (manual): distributed by Fudan University (see the article and
+``ReadMe.txt``; copyright Fudan University, no direct URL or checksum registered). Copy the class folders and ``meta`` files and place it under
+``data_dir`` (default ``<data root>/SAR/FUSAR_Ship1.0``).
 """
 
 from pathlib import Path

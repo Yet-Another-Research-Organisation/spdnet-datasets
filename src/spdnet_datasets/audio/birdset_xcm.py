@@ -28,6 +28,14 @@ Splits
 species grouped by recordist (seed 0); test = fold ``fold``, validation = the
 next fold, train = the others. One recordist often records the same individual
 or site, hence the grouping. Empty recordist names form one group ``"NA"``.
+
+Download (manual): Hugging Face ``DBD-research-group/BirdSet`` (CC BY-NC 4.0 card,
+per-recording licences), configuration ``XCM`` (branch ``data``, folder ``XCM/``:
+audio tar shards and ``XCM_metadata.parquet``). The local ``xcm_<k>.parquet`` shards
+are a partial re-export that matches no
+published file (the published XCM audio is in tar shards), so no checksum is registered: export the wanted shards with the
+``datasets`` library (same columns) and place it under ``data_dir`` (default ``<data
+root>/AUDIO/BirdSet_XCM``).
 """
 
 import json

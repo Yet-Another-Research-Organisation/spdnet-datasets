@@ -29,6 +29,9 @@ Splits: ``"loco_<City>"`` (leave one city out; validation = 10 % of the
 training cities, stratified), groups = city. ``"recommended"`` = ``"loco_Houston"``.
 Patch positions are not provided: no spatial split within a city is possible
 (a random split would put neighbouring patches on both sides).
+
+Download (manual): IEEE DataPort (account required). Download ``complex_HHHV.zarr``
+and place it under ``data_dir`` (default ``<data root>/SAR/S1SLC_CVDL``).
 """
 
 import hashlib

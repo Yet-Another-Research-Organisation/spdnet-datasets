@@ -20,6 +20,12 @@ Splits:
   placenta is almost surely on both sides (leakage not measurable);
 - ``"dye_transfer"``: train red_blue images, test ICG images (the ICG images
   were taken after the red/blue injection on the same placentas).
+
+Download (manual): the source images are on Zenodo, record 8045940 (CC BY-NC-SA 4.0
+on Zenodo; md5 of every zip in the record metadata). The ``imagettes/`` windows
+read here are a LISTIC extraction (purity >= 0.9) that this package does not
+rebuild from the zips, so nothing is downloaded automatically: copy ``imagettes/``
+under ``data_dir`` (default ``<data root>/HYPERSPECTRAL/Hyperspectral_Placenta_Dataset``).
 """
 
 import json
@@ -44,7 +50,7 @@ from ._common import (
 )
 
 DOMAIN, NAME = "HYPERSPECTRAL", "Hyperspectral_Placenta_Dataset"
-FILES = {}  # Data in Brief 2023 (Zenodo / Mendeley): manual download
+FILES = {}  # Zenodo 8045940 holds the source zips, not the windows: manual copy
 WINDOWS = "imagettes/placenta_windows_data.npy"
 METADATA = "imagettes/placenta_windows_metadata.json"
 N_BANDS = 37

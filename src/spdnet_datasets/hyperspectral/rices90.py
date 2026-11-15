@@ -26,6 +26,10 @@ Splits (``groups`` = cube, i.e. variety and bundle):
   whose two bundles come from two sessions (17 varieties). For 73 varieties
   both bundles share their session, so variety and session are confounded:
   only this test is not.
+
+Download (manual): no public mirror identified (obtained from the authors). Copy the
+``Data-VIS-<session>`` folders and place it under ``data_dir`` (default ``<data
+root>/HYPERSPECTRAL/Rices_90``).
 """
 
 import os
