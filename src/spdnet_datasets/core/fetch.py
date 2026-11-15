@@ -30,6 +30,7 @@ import hashlib
 import json
 import shutil
 import urllib.error
+import urllib.parse
 import urllib.request
 import warnings
 from pathlib import Path
@@ -71,13 +72,44 @@ def sha256sum(path) -> str:
     return _hash_file(path, "sha256")
 
 
-def download(url, dest, checksum=None, algo="sha256", resume=True, timeout=60) -> Path:
+class _NoCrossHostAuth(urllib.request.HTTPRedirectHandler):
+    """Redirect handler that drops credentials when the host changes.
+
+    Kaggle and Hugging Face answer with a redirect to a storage host: the
+    ``Authorization`` header must not follow it (it would leak the token, and
+    signed storage URLs reject it).
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new is not None and urllib.parse.urlsplit(newurl).netloc != urllib.parse.urlsplit(
+                req.full_url).netloc:
+            for key in list(new.headers):
+                if key.lower() == "authorization":
+                    del new.headers[key]
+            new.unredirected_hdrs.pop("Authorization", None)
+        return new
+
+
+def _open(req, timeout):
+    if any(k.lower() == "authorization" for k, _ in req.header_items()):
+        opener = urllib.request.build_opener(_NoCrossHostAuth)
+        return opener.open(req, timeout=timeout)
+    return urllib.request.urlopen(req, timeout=timeout)
+
+
+def download(url, dest, checksum=None, algo="sha256", resume=True, timeout=60,
+             headers=None) -> Path:
     """Download ``url`` to ``dest`` once; verify ``checksum`` if given.
 
     The file is written to ``dest.part`` and renamed when complete, so an
     interrupted download is resumed (HTTP Range) or restarted, never mistaken
     for a finished one. A ``416`` answer to a resume means that ``.part`` is
     already complete: it is checked (``checksum``) and renamed.
+
+    ``headers`` (e.g. an ``Authorization`` header built by
+    :mod:`spdnet_datasets.core.access`) are sent with the request but never
+    forwarded to another host on redirects, and never logged.
     """
     dest = Path(dest)
     if dest.exists():
@@ -87,9 +119,12 @@ def download(url, dest, checksum=None, algo="sha256", resume=True, timeout=60) -
     dest.parent.mkdir(parents=True, exist_ok=True)
     part = dest.with_name(dest.name + ".part")
     start = part.stat().st_size if (resume and part.exists()) else 0
-    req = urllib.request.Request(url, headers={"Range": f"bytes={start}-"} if start else {})
+    hdrs = dict(headers or {})
+    if start:
+        hdrs["Range"] = f"bytes={start}-"
+    req = urllib.request.Request(url, headers=hdrs)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with _open(req, timeout) as resp:
             mode = "ab" if start and getattr(resp, "status", 200) == 206 else "wb"
             with open(part, mode) as out:
                 shutil.copyfileobj(resp, out, 1 << 20)

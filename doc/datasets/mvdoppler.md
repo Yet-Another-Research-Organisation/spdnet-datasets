@@ -38,6 +38,16 @@ of 0.64 s, i.e. a 50 % overlap.
 - Local copy: `<data root>/RADAR_DOPPLER/MVDoppler/Data/<pattern>_<ID>.h5` and
   `Labels_and_metadata/design_table.csv`.
 
+## Getting the data
+
+Manual access for the snapshots: download `Data/snapshots.zip` (about 25 GB) from
+the authors' [Google Drive](https://drive.google.com/drive/folders/1Mde8sfxKl8L0OwG4UVQR7IE5Tg-bSosR),
+then `fetch_mvdoppler(archive="~/Downloads/snapshots.zip")`. `design_table.csv`
+and `meta_data.json` are downloaded directly and checked (sha256).
+`fetch_mvdoppler(gdown=True)` tries the download with the optional `gdown`
+package (`pip install spdnet-datasets[gdrive]`; Drive quotas often refuse it).
+Licence ambiguous (CC BY 4.0 and CC BY-NC-ND in the Drive document).
+
 ## Raw data
 
 Each HDF5 (Hierarchical Data Format 5) file holds `radar_dat` of shape

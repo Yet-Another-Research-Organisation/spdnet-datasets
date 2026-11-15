@@ -48,6 +48,21 @@ cite the repository above if you publish results.
   (`gaofeng_windows_*.npy`). This loader does not use them: it recomputes
   15 × 15 windows from the scene.
 
+## Getting the data
+
+Manual. The authors' repository
+(<https://github.com/Bin-Zh/Three-dimensional-convolutional-neural-network-model-for-tree-species-classification-using-airborne->)
+links to a Baidu Pan folder (<https://pan.baidu.com/s/1MW8Wz3_I7xf_5isV8osS9A>,
+code `77ws`; Baidu account needed, licence not stated, no checksum). Its content
+was not compared with the local copy: if the scene cannot be obtained there,
+contact the maintainer of this package. Without a local copy, `fetch_gsoff()`
+opens the repository page and raises `ManualDownloadRequired`; then pass a zip or
+a folder holding `data/testarea2_new/sg_quac_test2.tif` and its `_gt.tif`:
+
+```python
+fetch_gsoff(archive="~/Downloads/gsoff")
+```
+
 ## Raw data
 
 The raw output is the 15 × 15 × 63 window that the covariance is computed on.

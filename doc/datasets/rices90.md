@@ -33,6 +33,19 @@ whose dates are not provided (only the session folders).
 - Licence: unknown (ask the authors). No public mirror was identified; the
   loader reads a local copy.
 
+## Getting the data
+
+Direct, no account: Zenodo record [3241923](https://zenodo.org/records/3241923)
+(CC BY 4.0). Without a local copy, `fetch_rices90()` downloads
+`RGB and VIS-NIR HSI Data for 90 Rice Seed Varieties.zip` (17.3 GB, md5 of the
+record checked) into `<cache>/Rices_90/downloads/` and extracts it (about 35 GB
+in total). The zip has the layout read here; the CRC-32 of `index.csv` and of
+sampled cubes equal the local copy.
+
+```python
+fetch_rices90(archive="~/Downloads/RGB and VIS-NIR HSI Data for 90 Rice Seed Varieties.zip")
+```
+
 ## Raw data
 
 The cubes are ENVI files (ENVI: Environment for Visualizing Images), stored

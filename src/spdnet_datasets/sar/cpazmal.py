@@ -12,6 +12,15 @@ hand): the processed stage depends on ``orbit``, ``n_dates``, ``block``..., and
 deleting the source after each run would download 1.5 GB again for every new
 combination.
 
+Download
+--------
+Direct, public Hugging Face repository (no token): ``dataset/CPAZMaL.hdf5`` of
+https://huggingface.co/datasets/musmb/CPAZMaL at revision ``642e8c0f…`` (1 509 579 244
+bytes, sha256 ``a3e58d77…`` = LFS identifier), licence Apache-2.0 (dataset card).
+A copy already downloaded is used in place, after its sha256 is checked::
+
+    fetch_cpazmal(archive="~/Downloads/CPAZMaL.hdf5")
+
 Sample unit
 -----------
 The annotated *parcels* are the 68 polygons of the source shapefiles (one per
@@ -66,7 +75,7 @@ from ..core.estimators import (
     channel_mean,
     estimate_covariance,
 )
-from ..core.fetch import Bunch, check_local, download, run_pipeline
+from ..core.fetch import Bunch, check_local, download, run_pipeline, sha256sum
 from ..core.normalize import apply_scale
 from ..manager import DatasetManager
 from ._common import (
@@ -193,7 +202,7 @@ def _covariances(proc_dir, out_dir, *, estimator):
 
 def fetch_cpazmal(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
                   verify="size", *, orbit="DSC", n_dates=20, scale="amplitude",
-                  max_mask_value=3, min_pixels=80, block=None):
+                  max_mask_value=3, min_pixels=80, block=None, archive=None):
     """Load (and cache) the CPAZMaL parcel covariances.
 
     Parameters
@@ -201,6 +210,9 @@ def fetch_cpazmal(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
     data_dir : path, optional
         Folder holding ``CPAZMaL.hdf5`` (default ``<root>/SAR/PAZ_S1_proc_v2``).
         If the file is absent, it is downloaded from Hugging Face into the cache.
+    archive : path, optional
+        ``CPAZMaL.hdf5`` already downloaded (or its folder), used in place
+        when ``data_dir`` has no copy; its sha256 is checked.
     cache_dir, keep, force
         See :func:`spdnet_datasets.core.fetch.run_pipeline`.
     estimator : {"scm", "ledoit_wolf", "tyler", "student"}
@@ -236,6 +248,12 @@ def fetch_cpazmal(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
     local = root / FILENAME
     if local.exists():
         check_local(root, verify=verify, required=(FILENAME,))
+        raw_fn = None
+    elif archive is not None:
+        local = Path(archive).expanduser()
+        local = local / FILENAME if local.is_dir() else local
+        if sha256sum(local) != FILES[HF_URL]:
+            raise OSError(f"Checksum mismatch for {local} (expected the file of revision {HF_REVISION})")
         raw_fn = None
     else:
         def raw_fn(raw_dir):
@@ -293,7 +311,7 @@ class CPAZMaLDataset(BaseDataset):
 
     def __init__(self, data_dir=None, *, split="recommended", cache_dir=None, keep=None,
                  orbit="DSC", n_dates=20, scale="amplitude", max_mask_value=3,
-                 min_pixels=80, block=None, **kwargs):
+                 min_pixels=80, block=None, archive=None, **kwargs):
         self._root = dataset_path(DOMAIN, NAME, data_dir)
         # the base class needs an existing folder: the cache when downloading
         base_dir = self._root if self._root.exists() else Path(cache_dir or get_cache_dir())
@@ -301,7 +319,7 @@ class CPAZMaLDataset(BaseDataset):
         self.split = split
         self._fetch_kwargs = {"cache_dir": cache_dir, "keep": keep, "orbit": orbit, "n_dates": n_dates,
                                   "scale": scale, "max_mask_value": max_mask_value,
-                                  "min_pixels": min_pixels, "block": block}
+                                  "min_pixels": min_pixels, "block": block, "archive": archive}
         super().__init__(data_dir=str(base_dir), **kwargs)
         self._load_data()
 

@@ -24,11 +24,23 @@ distance >= w + 1 from any pixel of another split). Windows of the buffer
 (645 in 15 x 15) are discarded and counted. Windows of the same split overlap
 (grid step 4 < 15): never split them at random.
 
-Download (manual): the scene is distributed after a form on
-http://park.itc.u-tokyo.ac.jp/sal/hyperdata (CC BY 3.0). The windows read here
-(``prepared_v2/chikusei_v2.h5``) are a LISTIC re-extraction from ``source/``
-(atlas), not a published file; copy both folders and place it under ``data_dir``
-(default ``<data root>/HYPERSPECTRAL/Chikusei``).
+Download
+--------
+Direct (no account). Without a local copy holding ``prepared_v2/chikusei_v2.h5``,
+``fetch_chikusei`` downloads ``Hyperspec_Chikusei_MATLAB.zip`` (1 437 816 076
+bytes) from the Space Application Laboratory of the University of Tokyo
+(https://www.sal.t.u-tokyo.ac.jp/hyperdata/) into
+``<cache_dir>/Chikusei/downloads/``. No checksum is published: the size of the zip
+is checked and the CRC-32 of every member while it is extracted. The v2 windows
+are then rebuilt from the scene (:func:`prepare_v2`, about 1.5 GB of memory) with
+the block assignment of the atlas extraction (:data:`BLOCK_SPLIT`), so they are
+identical to the local ``prepared_v2/chikusei_v2.h5`` (checked on BERTHA). Licence:
+Creative Commons (CC BY 3.0 on the mirrors); acknowledge the Space Application
+Laboratory and cite the report SAL-2016-05-27. Already downloaded::
+
+    fetch_chikusei(archive="~/Downloads/Hyperspec_Chikusei_MATLAB.zip")
+
+(the zip, or a folder holding the two ``.mat`` files).
 """
 
 from pathlib import Path
@@ -38,8 +50,9 @@ import pandas as pd
 
 from ..core.config import dataset_path
 from ..core.estimators import check_sample_size
-from ..core.fetch import Bunch, check_local, run_pipeline
+from ..core.fetch import Bunch, check_local, download, run_pipeline
 from ..manager import DatasetManager
+from ..utils.sources import check_size, downloads_dir, source_dir
 from ._common import (
     HSIDataset,
     band_index,
@@ -50,9 +63,21 @@ from ._common import (
 )
 
 DOMAIN, NAME = "HYPERSPECTRAL", "Chikusei"
-FILES = {}  # http://park.itc.u-tokyo.ac.jp/sal/hyperdata (form); local copy
-SOURCE = "source/HyperspecVNIR_Chikusei_20140729.mat"
+PAGE = "https://www.sal.t.u-tokyo.ac.jp/hyperdata/"
+ZIP, ZIP_SIZE = "Hyperspec_Chikusei_MATLAB.zip", 1_437_816_076
+URL = PAGE + ZIP
+FILES = {URL: None}  # no published checksum: size checked, member CRC-32 on extraction
+SCENE_FILE = "HyperspecVNIR_Chikusei_20140729.mat"
+GT_FILE = "HyperspecVNIR_Chikusei_20140729_Ground_Truth.mat"
+SOURCE = f"source/{SCENE_FILE}"
 PREPARED = "prepared_v2/chikusei_v2.h5"
+# Spatial split of the atlas v2 extraction (prepared_v2/summary_v2.json): squares of
+# BLOCK pixels, block id = (row // BLOCK) * BLOCK_COLS + col // BLOCK, code 0/1/2 =
+# train/val/test (best of 60 000 random assignments, seed 0).
+BLOCK, BLOCK_COLS, STRIDE = 320, 8, 4
+BLOCK_SPLIT = (0, 0, 2, 0, 0, 0, 2, 0, 1, 0, 2, 0, 0, 0, 0, 2, 2, 1, 0, 2, 0, 0, 1, 0, 1, 1, 0,
+               0, 2, 0, 0, 0, 1, 0, 1, 1, 2, 0, 0, 2, 0, 0, 2, 2, 0, 0, 0, 0, 1, 0, 2, 0, 0, 0,
+               0, 0, 0, 2, 0, 1, 0, 0, 0, 1)
 N_BANDS = 128
 SPLIT_NAMES = {0: "train", 1: "val", 2: "test"}
 
@@ -69,20 +94,105 @@ def read_scene_crop(mat_path, r0, r1, c0, c1, key="chikusei"):
         return np.transpose(f[key][:, c0:c1, r0:r1], (2, 1, 0))
 
 
+def prepare_v2(source, out, sizes=(15, 23)):
+    """Rebuild the v2 windows of ``prepared_v2/chikusei_v2.h5`` from the two ``.mat`` files.
+
+    Same rule as the atlas extraction: centres = labelled pixels on a
+    :data:`STRIDE`-pixel grid at least ``w // 2`` from the border, label = GT
+    of the centre, split of the centre's block (:data:`BLOCK_SPLIT`), kept when
+    the centre is at Chebyshev distance >= ``w + 1`` of any pixel of another
+    split (``split = -1`` otherwise). Only the datasets read by
+    :func:`fetch_chikusei` are written (``scene/class_names`` and, per size,
+    ``windows``, ``centers``, ``labels``, ``split``, ``block``, ``purity``,
+    ``n_valid``).
+    """
+    import h5py
+    from scipy import io as sio
+    from scipy import ndimage
+
+    source, out = Path(source), Path(out)
+    g = sio.loadmat(source / GT_FILE, squeeze_me=True, struct_as_record=False)["GT"]
+    gt = np.asarray(g.gt).astype(np.uint8)
+    names = [str(x) for x in g.classnames]
+    with h5py.File(source / SCENE_FILE, "r") as f:
+        cube = np.transpose(f["chikusei"][()], (2, 1, 0))  # (H, W, B), frame of gt
+    H, W, B = cube.shape
+    rr, cc = np.mgrid[0:H, 0:W]
+    block_map = ((rr // BLOCK) * BLOCK_COLS + cc // BLOCK).astype(np.int32)
+    split_map = np.asarray(BLOCK_SPLIT, dtype=np.int8)[block_map]
+    del rr, cc
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out.with_name(out.name + ".part")
+    with h5py.File(tmp, "w") as fh:
+        fh.create_dataset("scene/class_names", data=np.array(names, dtype=h5py.string_dtype()))
+        for w in sizes:
+            h = w // 2
+            r, c = np.nonzero(gt > 0)
+            m = ((r % STRIDE == 0) & (c % STRIDE == 0) & (r >= h) & (r < H - h)
+                 & (c >= h) & (c < W - h))
+            C = np.stack([r[m], c[m]], 1).astype(np.int32)
+            sp = split_map[C[:, 0], C[:, 1]]
+            keep = np.zeros(len(C), bool)
+            for s in range(3):
+                dt = ndimage.distance_transform_cdt(split_map == s, metric="chessboard")
+                keep |= (sp == s) & (dt[C[:, 0], C[:, 1]] >= w + 1)
+            y = gt[C[:, 0], C[:, 1]]
+            grp = fh.create_group(f"w{w}")
+            win = grp.create_dataset("windows", shape=(len(C), w, w, B), dtype=cube.dtype,
+                                     chunks=(1, w, w, B), compression="gzip", compression_opts=4)
+            purity = np.zeros(len(C), np.float32)
+            n_valid = np.zeros(len(C), np.int16)
+            for i, (r0, c0) in enumerate(C):
+                x = cube[r0 - h:r0 + h + 1, c0 - h:c0 + h + 1]
+                win[i] = x
+                purity[i] = (gt[r0 - h:r0 + h + 1, c0 - h:c0 + h + 1] == y[i]).mean()
+                n_valid[i] = x.reshape(-1, B).any(1).sum()
+            for key, val in {"centers": C, "labels": y,
+                             "split": np.where(keep, sp, -1).astype(np.int8),
+                             "block": block_map[C[:, 0], C[:, 1]], "purity": purity,
+                             "n_valid": n_valid}.items():
+                grp.create_dataset(key, data=val)
+    tmp.rename(out)
+    return out
+
+
+def _download_root(root, cache_dir, archive, verify):
+    """Folder with ``prepared_v2/chikusei_v2.h5`` built in the cache from the SAL zip."""
+    out = downloads_dir(NAME, cache_dir)
+    if (out / PREPARED).exists():
+        return out
+    src = source_dir(
+        NAME, root / "source", required=(SCENE_FILE, GT_FILE), page_url=PAGE,
+        expected=f"{ZIP} ({ZIP_SIZE} bytes)", cache_dir=cache_dir, archive=archive,
+        size=ZIP_SIZE, verify=verify,
+        download=lambda d: check_size(download(URL, d / ZIP), ZIP_SIZE))
+    prepare_v2(src, out / PREPARED)
+    return out
+
+
 def fetch_chikusei(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
-                   verify="size", *, window=15, band_step=2):
+                   verify="size", *, window=15, band_step=2, archive=None):
     """Covariances of the Chikusei v2 windows (15 x 15 or 23 x 23).
+
+    Parameters
+    ----------
+    archive : path, optional
+        ``Hyperspec_Chikusei_MATLAB.zip`` already downloaded, or a folder with
+        its two ``.mat`` files (see "Download" in the module docstring).
 
     Returns
     -------
     Bunch with ``covariances`` (B, p, p) unscaled, ``means``, ``labels``
     (class names), ``groups`` (320-pixel block), ``positions`` (top-left
     corners in the scene frame), ``meta``, ``info``, ``splits``
-    (``"spatial"`` = ``"recommended"``).
+    (``"spatial"`` = ``"recommended"``) and ``root`` (dataset folder, to pass
+    as ``data_dir`` to :class:`ChikuseiDataset`).
     """
     if window not in (15, 23):
         raise ValueError("window must be 15 or 23 (sizes of the v2 extraction)")
     root = dataset_path(DOMAIN, NAME, data_dir)
+    if not (root / PREPARED).exists():
+        root = _download_root(root, cache_dir, archive, verify)
     check_local(root, verify=verify, required=(PREPARED,))
     bands = band_index(N_BANDS, band_step)
     check_sample_size(window * window, len(bands))
@@ -139,7 +249,7 @@ def fetch_chikusei(data_dir=None, cache_dir=None, keep=None, estimator="scm", fo
         labels=meta["label"].to_numpy(), groups=meta["block"].to_numpy(),
         positions=meta[["row", "col"]].to_numpy(), window=window, meta=meta, info=out.info,
         splits={"spatial": spatial, "recommended": spatial}, bands=bands,
-        prepared_path=root / PREPARED, covariance_path=res.covariance_dir,
+        prepared_path=root / PREPARED, covariance_path=res.covariance_dir, root=root,
     )
 
 
@@ -178,4 +288,4 @@ class ChikuseiDataset(HSIDataset):
         return self._h5[f"w{self.bunch.window}/windows"][i][..., self.bunch.bands]
 
 
-__all__ = ["ChikuseiDataset", "fetch_chikusei", "read_scene_crop"]
+__all__ = ["ChikuseiDataset", "fetch_chikusei", "prepare_v2", "read_scene_crop"]

@@ -33,8 +33,21 @@ dimensions, the polarisation mode, the incidence angle and the pixel size
   dataset of Gaofen-3 for ship detection and recognition*, Science China
   Information Sciences 63, 140303, 2020, doi:10.1007/s11432-019-2772-5.
 - Fudan University holds the copyright (`ReadMe.txt`). The reuse conditions are
-  not stated in the folder. The data must be downloaded by hand and placed
-  under `<root>/SAR/FUSAR_Ship1.0`.
+  not stated in the folder. See
+  [Getting the data](#getting-the-data).
+
+## Getting the data
+
+Direct, no account: the Google Drive file `FUSAR_Ship1.0.zip` linked by
+<https://emwlab.fudan.edu.cn/resources/list.htm> (507 383 750 bytes, sha256
+`0e985e3c…` measured on 2026-11-15; its 5 246 files have the CRC-32 of the local
+copy). Without a local copy, `fetch_fusar_ship()` downloads it into
+`<cache>/FUSAR_Ship1.0/downloads/`. If Drive refuses (quota),
+`ManualDownloadRequired` gives the Drive and Baidu Pan (code `c6ea`) links.
+
+```python
+fetch_fusar_ship(archive="~/Downloads/FUSAR_Ship1.0.zip")
+```
 
 ## Raw data
 

@@ -51,16 +51,41 @@ Index: the list of chips of one protocol comes from ``MANIFEST_NAS.tsv``
 from a walk of the protocol folder only; it is cached as JSON in
 ``<cache_dir>/atrnet_star/index/``.
 
-Download (manual): Hugging Face ``waterdisappear/ATRNet-STAR`` is gated (login and
-acceptance of the terms of use required), so nothing is downloaded automatically.
-Download ``Amplitude_8bit/``, ``Slant_Range/`` and ``annotation_coco.zip`` and place
-it under ``data_dir`` (default ``<data root>/SAR/ATRNet-STAR``).
+Download
+--------
+Hugging Face, gated: https://huggingface.co/datasets/waterdisappear/ATRNet-STAR
+(CC BY-SA 4.0 on the card, code Apache-2.0). Accept the conditions on the page
+(automatic approval) and provide a read token (``HF_TOKEN``, ``huggingface-cli
+login`` or the keyring, see :mod:`spdnet_datasets.core.access`). Without a local
+copy, ``fetch_atrnet_star`` downloads only the archive of the requested protocol
+into ``<cache_dir>/atrnet_star/downloads/`` (:data:`HF_ARCHIVES`; volumes of 4.7 GB,
+sizes of the public file tree checked, the LFS checksums are hidden by the gate):
+
+- ``Slant_Range``: ``Slant_Range/Complex_Float_Quad/<protocol>.7z.001...`` (the
+  local ``Slant_Range`` matches ``Complex_Float_Quad``: same protocols, no
+  ``EOC_pol``, ``*_quad_*.mat`` chips with the four polarisations), e.g. 14.9 GB
+  for ``SOC_40classes``;
+- ``Amplitude_8bit``: one archive for every protocol (10.2 GB,
+  ``Ground_Range/Amplitude_8bit/Amplitude 8-bit data_...7z.001..003``).
+
+The volumes are extracted with the ``7z`` command or the optional ``py7zr``
+package (``pip install 'spdnet-datasets[archives]'``; with py7zr only the
+requested protocol of the amplitude archive is extracted) and the protocol folder
+is linked as ``downloads/root/<representation>/<protocol>``. The inner layout of
+the archives could not be checked without a token: the protocol folder is looked
+up by name. Already downloaded::
+
+    fetch_atrnet_star(archive="~/Downloads/SOC_40classes.7z.001")  # first volume
+
+(the first volume, the folder holding the volumes, an extracted folder or a copy
+with the local layout).
 """
 
 import csv
 import hashlib
 import json
 import os
+import urllib.parse
 from collections import Counter
 from pathlib import Path
 
@@ -69,14 +94,85 @@ import pandas as pd
 import torch
 
 from ..base import BaseDataset
+from ..core.access import hf_download
 from ..core.config import dataset_path, get_cache_dir
 from ..core.estimators import channel_mean
 from ..core.fetch import Bunch, verify_local
 from ..manager import DatasetManager
+from ..utils.sources import check_size, downloads_dir, extract_7z, find_root
 from ._common import finalize_labels
 
 DOMAIN, NAME = "SAR", "ATRNet-STAR"
-FILES = {}  # manual download (see the module docstring)
+HF_REPO = "waterdisappear/ATRNet-STAR"
+HF_PAGE = f"https://huggingface.co/datasets/{HF_REPO}"
+_VOL = 4_698_669_056
+# (representation, protocol or None = all) -> (path of the 7z without ".001", volume sizes),
+# from the public file tree of the repository (2026-11-15; LFS sha256 hidden by the gate)
+HF_ARCHIVES = {
+    ("Slant_Range", "SOC_40classes"): ("Slant_Range/Complex_Float_Quad/SOC_40classes.7z",
+                                       (_VOL,) * 3 + (761_653_877,)),
+    ("Slant_Range", "EOC_azimuth"): ("Slant_Range/Complex_Float_Quad/EOC_azimuth.7z",
+                                     (_VOL,) * 5 + (3_372_524_403,)),
+    ("Slant_Range", "EOC_band"): ("Slant_Range/Complex_Float_Quad/EOC_band.7z",
+                                  (_VOL, 3_784_725_627)),
+    ("Slant_Range", "EOC_depression"): ("Slant_Range/Complex_Float_Quad/EOC_depression.7z",
+                                        (_VOL,) * 5 + (2_819_608_948,)),
+    ("Slant_Range", "EOC_scene"): ("Slant_Range/Complex_Float_Quad/EOC_scene.7z",
+                                   (_VOL,) * 5 + (3_229_012_282,)),
+    ("Amplitude_8bit", None): ("Ground_Range/Amplitude_8bit/Amplitude 8-bit data_地距幅度8位数据.7z",
+                               (4_697_620_480, 4_697_620_480, 798_202_909)),
+}
+FILES = {}  # gated Hugging Face volumes: sizes in HF_ARCHIVES, no visible checksum
+
+
+def _hf_archive(representation, split):
+    return HF_ARCHIVES[(representation, None if representation == "Amplitude_8bit" else split)]
+
+
+def _protocol_dir(base, split):
+    """Folder of one protocol (``train/``, ``test*/``) inside an extracted archive."""
+    found = find_root(base, (f"{split}/train",), max_depth=5)
+    return found / split if found is not None else find_root(base, ("train",), max_depth=5)
+
+
+def _download_root(cache_dir, archive, representation, split):
+    """Folder with ``<representation>/<split>`` built in the cache from the 7z volumes."""
+    out = downloads_dir("atrnet_star", cache_dir)
+    layout = out / "root"
+    link = layout / representation / split
+    if link.exists():
+        return layout
+    name, sizes = _hf_archive(representation, split)
+    first = None
+    if archive is not None:
+        given = Path(archive).expanduser()
+        if not given.exists():
+            raise FileNotFoundError(f"{given} does not exist")
+        if given.is_dir() and (given / representation / split).is_dir():
+            return given  # copy with the local layout
+        if given.is_file():
+            first = given
+        elif (given / f"{Path(name).name}.001").exists():
+            first = given / f"{Path(name).name}.001"
+        else:
+            proto = _protocol_dir(given, split)
+            if proto is None:
+                raise FileNotFoundError(f"{given} holds no {split} folder nor {Path(name).name}.001")
+    else:
+        quoted = urllib.parse.quote(name)  # spaces and non-ASCII characters in the file name
+        vols = [check_size(hf_download(HF_REPO, f"{quoted}.{k:03d}", out / "hf", gated=True), size)
+                for k, size in enumerate(sizes, start=1)]
+        first = vols[0]
+    if first is not None:
+        tag = split if representation == "Slant_Range" else "all"
+        only = split if representation == "Amplitude_8bit" else None
+        ext = extract_7z(first, out / "extracted" / f"{representation}_{tag}", only=only)
+        proto = _protocol_dir(ext, split)
+        if proto is None:
+            raise FileNotFoundError(f"{first.name}: no {split} folder after extraction")
+    link.parent.mkdir(parents=True, exist_ok=True)
+    link.symlink_to(proto.resolve(), target_is_directory=True)
+    return layout
 PROTOCOLS = ("EOC_band", "EOC_azimuth", "EOC_scene", "EOC_pol", "EOC_depression",
              "SOC_40classes")
 REPRESENTATIONS = ("Slant_Range", "Amplitude_8bit")
@@ -135,15 +231,20 @@ def parse_name(name):
 
 
 def fetch_atrnet_star(data_dir=None, cache_dir=None, *, split="SOC_40classes",
-                      representation="Slant_Range", verify="size", val_size=0.1, seed=0):
+                      representation="Slant_Range", verify="size", val_size=0.1, seed=0,
+                      archive=None):
     """Index the chips of one ATRNet-STAR protocol.
 
     Parameters
     ----------
     data_dir : path, optional
-        Default ``<root>/SAR/ATRNet-STAR``.
+        Default ``<root>/SAR/ATRNet-STAR``; the protocol is downloaded into the
+        cache when absent (Hugging Face token needed).
     cache_dir : path, optional
-        Where the protocol index is cached.
+        Where the protocol index (and a download) is cached.
+    archive : path, optional
+        First ``.7z.001`` volume, folder of the volumes, extracted folder or
+        copy with the local layout (see "Download" in the module docstring).
     split : str
         Protocol, one of :data:`PROTOCOLS`.
     representation : {"Slant_Range", "Amplitude_8bit"}
@@ -166,6 +267,8 @@ def fetch_atrnet_star(data_dir=None, cache_dir=None, *, split="SOC_40classes",
     if split == "EOC_pol" and representation == "Slant_Range":
         raise ValueError("EOC_pol only exists in Amplitude_8bit")
     root = dataset_path(DOMAIN, NAME, data_dir)
+    if not (root / representation / split).is_dir():
+        root = _download_root(cache_dir, archive, representation, split)
     verify_local(root, verify=None, required=(f"{representation}/{split}",))
     rows = build_index(root, representation, split, cache_dir)
     from_manifest = (root / "MANIFEST_NAS.tsv").exists()

@@ -21,10 +21,20 @@ with a stratified K-fold (``"stratified"`` = ``"recommended"``; test = fold
 ``fold``, val = fold ``fold + 1``). Neighbouring patches of one plot may fall
 on both sides: the leakage cannot be measured (atlas fiche).
 
-Download (manual): Kaggle competition of the ICPR 2026 challenge
-(https://han-research.gitlab.io/Agvision/; Kaggle account and acceptance of the
-competition rules required). Download ``train/`` and ``val/`` and place it under
-``data_dir`` (default ``<data root>/HYPERSPECTRAL/Wheat_Disease_ICPR26``).
+Download
+--------
+Kaggle competition ``beyond-visible-spectrum-ai-for-agriculture-2026``
+(https://www.kaggle.com/competitions/beyond-visible-spectrum-ai-for-agriculture-2026;
+organisers: https://han-research.gitlab.io/Agvision/). Needs Kaggle credentials
+(``KAGGLE_USERNAME`` / ``KAGGLE_KEY`` or ``~/.kaggle/kaggle.json``, see
+:mod:`spdnet_datasets.core.access`) and the competition rules accepted on its page
+with the same account; licence: the competition rules. Without a local copy,
+``fetch_kaggle_wheat`` downloads the competition archive through the Kaggle API
+into ``<cache_dir>/Wheat_Disease_ICPR26/downloads/`` (no checksum published) and
+uses the folder holding ``train/HS`` (``data/`` in the archive). Already
+downloaded::
+
+    fetch_kaggle_wheat(archive="~/Downloads/beyond-visible-spectrum-ai-for-agriculture-2026.zip")
 """
 
 from pathlib import Path
@@ -32,10 +42,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from ..core.access import kaggle_download
 from ..core.config import dataset_path
 from ..core.estimators import check_sample_size
-from ..core.fetch import Bunch, check_local, run_pipeline
+from ..core.fetch import Bunch, run_pipeline
 from ..manager import DatasetManager
+from ..utils.sources import source_dir
 from ._common import (
     HSIDataset,
     covariance_stage,
@@ -47,7 +59,9 @@ from ._common import (
 )
 
 DOMAIN, NAME = "HYPERSPECTRAL", "Wheat_Disease_ICPR26"
-FILES = {}  # Kaggle competition data (account required): manual download
+COMPETITION = "beyond-visible-spectrum-ai-for-agriculture-2026"
+PAGE = f"https://www.kaggle.com/competitions/{COMPETITION}/data"
+FILES = {}  # Kaggle competition archive (credentials and accepted rules), no checksum
 CLASSES = ("Health", "Other", "Rust")
 
 
@@ -61,13 +75,16 @@ def read_patch(path, skip_first=8, skip_last=10):
 
 def fetch_kaggle_wheat(data_dir=None, cache_dir=None, keep=None, estimator="scm",
                        force=False, verify="size", *, part="train", skip_first=8,
-                       skip_last=10, n_splits=5, fold=0, seed=0):
+                       skip_last=10, n_splits=5, fold=0, seed=0, archive=None):
     """Patch covariances of the wheat disease dataset.
 
     Parameters
     ----------
     part : {"train", "val"}
         ``"val"`` is the unlabelled competition set (labels ``None``, no split).
+    archive : path, optional
+        Competition archive already downloaded, or its extracted folder (see
+        "Download" in the module docstring).
 
     Returns
     -------
@@ -77,8 +94,11 @@ def fetch_kaggle_wheat(data_dir=None, cache_dir=None, keep=None, estimator="scm"
     """
     if part not in ("train", "val"):
         raise ValueError("part must be 'train' or 'val'")
-    root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify=verify, required=(f"{part}/HS",))
+    root = source_dir(
+        NAME, dataset_path(DOMAIN, NAME, data_dir), required=(f"{part}/HS",), page_url=PAGE,
+        expected=f"the archive of the Kaggle competition {COMPETITION}", cache_dir=cache_dir,
+        archive=archive, verify=verify,
+        download=lambda d: kaggle_download(COMPETITION, d, competition=True))
     p = 125 - skip_first - skip_last
     check_sample_size(32 * 32, p)
     params = {"part": part, "skip_first": skip_first, "skip_last": skip_last,

@@ -100,14 +100,27 @@ float32 whose ``n`` varies from parcel to parcel (the default PyTorch collate ne
 
 Download
 --------
-Zenodo record 5735646 (CC BY 4.0): one archive ``PASTIS-R.zip`` of 53.7 GB, whose
-Zenodo md5 (``4887513d6c2d2b07fa935d325bd53e09``) and sha256 (:data:`FILES`) were
-checked on the local copy. When ``data_dir`` holds no ``metadata.geojson``, the
-archive is downloaded once into ``<cache_dir>/pastis_r/downloads/``, checked,
-extracted there (about 73 GB; peak 127 GB with the archive) and deleted. The
-extracted folder is outside the ``keep`` policy (never deleted by the fetch, remove
-it by hand): every scenario and date setting has its own processed stage, and
-deleting the source would mean a new 53.7 GB download for each of them.
+Access: direct (Zenodo record 5735646, doi:10.5281/zenodo.5735646, CC BY 4.0, no
+account): one archive ``PASTIS-R.zip`` of 53.7 GB, whose Zenodo md5
+(``4887513d6c2d2b07fa935d325bd53e09``) and sha256 (:data:`FILES`) were checked on
+the local copy. Resolution order:
+
+1. ``data_dir`` (default ``<data root>/SITS/PASTIS-R``) holds ``metadata.geojson``
+   (directly or in ``PASTIS-R/``): read in place;
+2. ``archive=`` given: the downloaded ``PASTIS-R.zip`` (checked, extracted into
+   ``<cache_dir>/pastis_r/downloads/archive/``, never deleted) or its extracted
+   folder (read in place);
+3. otherwise the archive is downloaded once into ``<cache_dir>/pastis_r/downloads/``,
+   checked, extracted there (about 73 GB; peak 127 GB with the archive) and deleted.
+
+The extracted folder is outside the ``keep`` policy (never deleted by the fetch,
+remove it by hand): every scenario and date setting has its own processed stage,
+and deleting the source would mean a new 53.7 GB download for each of them.
+Example: ``fetch_pastis_r(archive="~/Downloads/PASTIS-R.zip")``.
+
+PASTIS without radar (Sentinel-2 only, Zenodo record 5012942, ``PASTIS.zip``,
+28.8 GB, md5 ``cfc441bf18137ff0bbf4fad58828fb98``) has the same layout without the
+``DATA_S1A`` / ``DATA_S1D`` folders; it is not registered here.
 """
 
 from __future__ import annotations
@@ -148,6 +161,7 @@ DOMAIN, NAME = "SITS", "PASTIS-R"
 CACHE_NAME = "pastis_r"
 ZENODO_URL = "https://zenodo.org/records/5735646/files/PASTIS-R.zip?download=1"
 ARCHIVE = "PASTIS-R.zip"
+ZENODO_PAGE = "https://zenodo.org/records/5735646"
 FILES = {  # url -> sha256 (computed on the local copy, whose md5 equals Zenodo's)
     ZENODO_URL: "96eb6e3567348465ecb98d072d9c9a913272b05f49b7e0cac679408e50a4eeb3",
 }
@@ -373,26 +387,39 @@ def _resolve(data_dir):
     return root, files
 
 
-def download_pastis_r(cache_dir=None) -> Path:
+def download_pastis_r(cache_dir=None, archive=None) -> Path:
     """Download and extract the Zenodo archive once; return the folder of ``metadata.geojson``.
 
     The archive goes to ``<cache_dir>/pastis_r/downloads/``, is checked against
     :data:`FILES`, extracted into a temporary folder renamed when complete (an
-    interrupted extraction is redone, never used) and then deleted.
+    interrupted extraction is redone, never used) and then deleted. A
+    user-provided ``archive`` (zip or extracted folder) is checked and extracted
+    into ``downloads/archive/`` (see :func:`~spdnet_datasets.core.access.manual_source`)
+    and never deleted.
     """
     dest = (Path(cache_dir) if cache_dir else get_cache_dir()) / CACHE_NAME / "downloads"
+    if archive is not None:
+        from ..core.access import manual_source
+
+        root = manual_source(NAME, page_url=ZENODO_PAGE, expected=ARCHIVE,
+                             dest_dir=dest / "archive", archive=archive,
+                             checksum=FILES[ZENODO_URL])
+        found = [d for d in (root, root / NAME) if (d / "metadata.geojson").exists()]
+        if not found:
+            raise FileNotFoundError(f"No metadata.geojson in {root} or {root / NAME}")
+        return found[0]
     out = dest / NAME
     if (out / "metadata.geojson").exists():
         return out
-    archive = download(ZENODO_URL, dest / ARCHIVE, checksum=FILES[ZENODO_URL])
+    zipped = download(ZENODO_URL, dest / ARCHIVE, checksum=FILES[ZENODO_URL])
     tmp = dest / "extract.part"
     if tmp.exists():
         shutil.rmtree(tmp)
-    with zipfile.ZipFile(archive) as z:
+    with zipfile.ZipFile(zipped) as z:
         z.extractall(tmp)
     (tmp / NAME).rename(out)
     shutil.rmtree(tmp)
-    archive.unlink()
+    zipped.unlink()
     return out
 
 
@@ -612,7 +639,7 @@ def fetch_pastis_r(data_dir=None, cache_dir=None, keep=None, estimator="scm", fo
                    max_span_days=DEFAULTS["max_span_days"],
                    max_cloud_fraction=DEFAULTS["max_cloud_fraction"],
                    cloud_b02=DEFAULTS["cloud_b02"], s1_domain=DEFAULTS["s1_domain"],
-                   min_pixels=None, patches=None) -> Bunch:
+                   min_pixels=None, patches=None, archive=None) -> Bunch:
     """Parcel covariances of PASTIS-R for one scenario (see the module docstring).
 
     Parameters
@@ -620,7 +647,8 @@ def fetch_pastis_r(data_dir=None, cache_dir=None, keep=None, estimator="scm", fo
     data_dir : path, optional
         Dataset directory (holding ``metadata.geojson`` directly or in ``PASTIS-R/``);
         default ``<data root>/SITS/PASTIS-R``. Read only. Without ``metadata.geojson``
-        the Zenodo archive is downloaded (:func:`download_pastis_r`).
+        ``archive`` is used, or the Zenodo archive is downloaded
+        (:func:`download_pastis_r`).
     cache_dir : path, optional
         Default ``core.config.get_cache_dir()``.
     keep : {"keep_full", "keep_processed", "keep_covariance"}, optional
@@ -648,6 +676,8 @@ def fetch_pastis_r(data_dir=None, cache_dir=None, keep=None, estimator="scm", fo
     patches : iterable of int, optional
         Restrict to these patch identifiers (quick runs); the homogeneity median is
         then computed on them only.
+    archive : path, optional
+        Downloaded ``PASTIS-R.zip`` or its extracted folder (see "Download").
 
     Returns
     -------
@@ -674,7 +704,7 @@ def fetch_pastis_r(data_dir=None, cache_dir=None, keep=None, estimator="scm", fo
         ref_date = None
     root, files_dir = _resolve(data_dir)
     if not (files_dir / "metadata.geojson").exists():
-        root = files_dir = download_pastis_r(cache_dir)
+        root = files_dir = download_pastis_r(cache_dir, archive)
     rel = files_dir.relative_to(root) if files_dir != root else Path(".")
     report = verify_local(root, verify=verify, required=[str(rel / "metadata.geojson")])
     if report.missing or report.wrong_size or report.wrong_md5:
@@ -754,7 +784,7 @@ class PastisRDataset(BaseDataset):
     OUTPUTS = ("cov", "mean", "raw")
     _FETCH_KEYS = ("ref_date", "date_index", "date_window", "max_gap_days", "gap_tolerance",
                    "max_span_days", "max_cloud_fraction", "cloud_b02", "s1_domain",
-                   "min_pixels", "patches", "keep", "force", "verify")
+                   "min_pixels", "patches", "keep", "force", "verify", "archive")
 
     def __init__(self, data_dir=None, *, scenario="A", split="official", subset=None,
                  cache_dir=None, **kwargs):
