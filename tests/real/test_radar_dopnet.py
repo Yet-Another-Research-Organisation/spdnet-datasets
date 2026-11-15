@@ -23,9 +23,14 @@ PER_PERSON = {"A": (56, 98, 64, 105), "B": (112, 116, 72, 105), "C": (85, 132, 8
 CELLS = ("Wave", "Pinch", "Swipe", "Click")
 
 
+@pytest.fixture(autouse=True)
+def _data():
+    skip_if_missing(ROOT / "Training Data")
+
+
 @pytest.fixture(scope="module")
 def gestures():
-    skip_if_missing(ROOT / "Training Data")
+    skip_if_missing(ROOT / "Training Data")  # module scope: runs before the autouse skip
     return [(name, person, source, signal_md5(s), s.shape) for s, name, person, source, _
             in iter_gestures(ROOT)]
 

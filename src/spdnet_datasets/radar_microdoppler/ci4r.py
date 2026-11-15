@@ -24,8 +24,10 @@ Defaults: 77 GHz ``band=0.5, p=64`` (SCM, all SPD but one sample with a
 constant bin, rejected and counted); xethru ``band=0.2, p=32`` with the
 Ledoit-Wolf estimator: most xethru pixels sit on a constant background colour,
 so many bins never vary and the SCM is singular for 23 % of the recordings
-(85 % with a 50 % band). ``estimator="scm"`` on xethru rejects those samples
-(count in ``info["rejected_constant_channel"]``).
+(85 % with a 50 % band). With ``estimator="scm"`` on xethru, the samples with
+a constant bin are rejected first (count in ``info["rejected_constant_channel"]``),
+but other recordings have varying yet collinear bins and the fetch raises
+:class:`~spdnet_datasets.core.NotSPDError`: keep Ledoit-Wolf for xethru.
 
 Splits and leakage
 ------------------
