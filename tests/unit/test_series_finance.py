@@ -1,6 +1,7 @@
 """Covariance series of financial returns: tokens, labels, purge between time blocks, next-covariance target."""
 
 import numpy as np
+import pytest
 
 from spdnet_datasets.estimator.covariance import EstimateCovariance
 from spdnet_datasets.real.series_finance import log_coordinates, volatility_series
@@ -68,3 +69,26 @@ def test_relative_series_are_centred():
     coordinates = log_coordinates(data)
     assert np.linalg.norm(coordinates.mean(1), axis=-1).max() < 0.1 * np.linalg.norm(coordinates, axis=-1).mean()
     assert (np.linalg.eigvalsh(data) > 0).all() and np.isfinite(targets).all()
+
+
+def test_missing_market_values_are_dropped_not_labelled_high():  # finding 5
+    x, _ = returns()
+    block = blocks(len(x))
+    market = x.mean(1)
+    market[1000:1010] = np.nan
+    with pytest.warns(UserWarning, match="missing market values"):
+        data, labels, _, extra = volatility_series(x, market, block, 40, 20, 5, 10)
+    assert np.isfinite(extra["volatility"]).all() and set(labels.tolist()) <= {0, 1, 2}
+    full, *_ = volatility_series(x, x.mean(1), block, 40, 20, 5, 10)
+    assert 0 < len(full) - len(data) <= 45  # samples whose span or horizon covers the 10 missing days
+
+
+def test_finance_root_from_environment(monkeypatch, tmp_path):
+    from spdnet_datasets.real.series_finance import french_series
+
+    monkeypatch.delenv("SPDNET_FRENCH_ROOT", raising=False)
+    with pytest.raises(ValueError, match="SPDNET_FRENCH_ROOT"):
+        french_series()
+    monkeypatch.setenv("SPDNET_FRENCH_ROOT", str(tmp_path))
+    with pytest.raises(FileNotFoundError):
+        french_series()

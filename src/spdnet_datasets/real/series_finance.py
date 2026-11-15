@@ -19,22 +19,33 @@ sample whose horizon leaves its block is dropped (purge), so no label straddles 
 - Binance: hourly log returns (%) of the USDT spot pairs with complete hourly klines over the whole period, the
   ``p`` largest by quote volume (nested); market = equal-weighted mean of all the retained pairs.
 
-Dates, windows and labels do not depend on p: only the number of assets changes.
+Dates, windows and labels do not depend on p: only the number of assets changes. Samples whose label cannot be
+computed (missing market returns, e.g. NaN in the French factors) are dropped, with a warning giving their count.
+
+Data location (not part of the LISTIC dataset tree): pass ``root``, or set ``SPDNET_FRENCH_ROOT`` (folder of the
+Kenneth French CSV files) / ``SPDNET_BINANCE_ROOT`` (folder of the Binance 1 h kline zip files).
 """
 
 import glob
 import io
 import os
+import warnings
 
 import numpy as np
 
-from ..estimator.covariance import EstimateCovariance
+from .series import covariance
 
-FRENCH_ROOT = "/home/mgallet/Documents/SPDnet/neurips/cache/raw/french"
-BINANCE_ROOT = "/home/mgallet/Documents/SPDnet/neurips/cache/raw/binance/1h"
 FRENCH_FILES = {10: "10_Industry_Portfolios_Daily.csv", 17: "17_Industry_Portfolios_Daily.csv",
                 30: "30_Industry_Portfolios_Daily.csv", 48: "48_Industry_Portfolios_Daily.csv"}
 VOLATILITY_REGIMES = ["basse", "moyenne", "haute"]
+
+
+def _finance_root(root: str | None, variable: str) -> str:
+    """``root``, else the environment variable ``variable``; raises ``ValueError`` when neither is set."""
+    root = root or os.environ.get(variable)
+    if not root:
+        raise ValueError(f"pass root= or set the environment variable {variable}")
+    return root
 
 
 def read_french(path: str):
@@ -50,11 +61,12 @@ def read_french(path: str):
     return table.replace([-99.99, -999], np.nan)
 
 
-def read_binance(root: str = BINANCE_ROOT, start: str = "2021-01-01", end: str = "2026-10-01", max_gap: int = 24):
+def read_binance(root: str | None = None, start: str = "2021-01-01", end: str = "2026-10-01", max_gap: int = 24):
     """Hourly log returns (%) of the pairs with a file for every month and no gap longer than ``max_gap`` hours
     (shorter gaps: price carried forward, zero return), and their total quote volume."""
     import pandas as pd
 
+    root = _finance_root(root, "SPDNET_BINANCE_ROOT")
     grid = pd.date_range(start, end, freq="h", inclusive="left")
     months = len(pd.period_range(start, pd.Timestamp(end) - pd.Timedelta(hours=1), freq="M"))
     closes, volumes = {}, {}
@@ -96,19 +108,24 @@ def volatility_series(
     thresholds) of std(market[d + 1 : d + 1 + horizon]) / std(market[d - span + 1 : d + 1]), span = window + (T - 1)
     stride (the steps covered by the series); or, with ``next_covariance``, the log-Euclidean coordinates of the
     covariance of returns[d + 1 : d + 1 + window] (then horizon = window). ``stride`` must be a multiple of
-    ``every``, so each window is estimated once.
+    ``every``, so each window is estimated once. Samples whose volatility ratio is not finite (missing market
+    values) are dropped with a warning.
     """
     assert stride % every == 0 and (horizon == window or not next_covariance)
-    estimator = EstimateCovariance("ledoit_wolf", remove_mean=True, exclude_zero=False)
     span = window + (n_tokens - 1) * stride
     ends = np.arange(span - 1, len(returns) - horizon, every)
     ends = ends[block[ends] == block[ends + horizon]]  # purge: the label stays in the block of the sample
+    volatility = np.array([market[d + 1:d + 1 + horizon].std() / market[d - span + 1:d + 1].std() for d in ends])
+    finite = np.isfinite(volatility)
+    if not finite.all():
+        warnings.warn(f"{(~finite).sum()} samples with missing market values dropped", UserWarning, stacklevel=2)
+        ends, volatility = ends[finite], volatility[finite]
     lags = (np.arange(n_tokens) - n_tokens + 1) * stride
     windows = np.unique(ends[:, None] + lags)
     p = returns.shape[1]
 
     def estimate(last: np.ndarray) -> np.ndarray:
-        covariances = np.stack([estimator(returns[e - window + 1:e + 1]) for e in last])
+        covariances = np.stack([covariance(returns[e - window + 1:e + 1], load=0.0) for e in last])
         if correlation:
             scale = 1 / np.sqrt(np.diagonal(covariances, axis1=-2, axis2=-1))
             covariances = covariances * scale[:, :, None] * scale[:, None, :]
@@ -116,7 +133,6 @@ def volatility_series(
 
     data = estimate(windows)[np.searchsorted(windows, ends[:, None] + lags)]
     split = block[ends]
-    volatility = np.array([market[d + 1:d + 1 + horizon].std() / market[d - span + 1:d + 1].std() for d in ends])
     target = estimate(ends + window) if next_covariance else None
     if relative:
         eigenvalues, eigenvectors = np.linalg.eigh(data)
@@ -146,7 +162,7 @@ def log_coordinates(covariances: np.ndarray) -> np.ndarray:
 
 def french_series(
     p: int = 30,
-    root: str = FRENCH_ROOT,
+    root: str | None = None,
     start: str = "1969-07-01",
     blocks: tuple[str, str] = ("2000-01-01", "2008-01-01"),
     window: int = 200,
@@ -158,7 +174,8 @@ def french_series(
     relative: bool = False,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
     """Daily US equity portfolios from ``start`` (all the files complete); train 1974-1999, validation 2000-2007,
-    test 2008-2026 (2008 and 2020 crises)."""
+    test 2008-2026 (2008 and 2020 crises). ``root``: folder of the CSV files (default ``$SPDNET_FRENCH_ROOT``)."""
+    root = _finance_root(root, "SPDNET_FRENCH_ROOT")
     returns = read_french(os.path.join(root, FRENCH_FILES[p]))
     factors = read_french(os.path.join(root, "F-F_Research_Data_Factors_daily.csv"))
     returns = returns[returns.index >= start]
@@ -173,7 +190,7 @@ def french_series(
 
 def binance_series(
     p: int = 50,
-    root: str = BINANCE_ROOT,
+    root: str | None = None,
     blocks: tuple[str, str] = ("2024-01-01", "2025-01-01"),
     n_market: int = 100,
     window: int = 200,
