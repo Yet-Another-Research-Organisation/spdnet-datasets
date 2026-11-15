@@ -49,6 +49,7 @@ the layout it expects ({doc}`guide/datasets`).
 | {doc}`guide/tasks` | fine / coarse classification, regression, dropping and merging classes, balancing |
 | {doc}`guide/fetch` | `fetch_*` functions, cache stages, checksums, the `keep` option |
 | {doc}`guide/splits` | leakage-free splits and the checks behind them |
+| {doc}`datasets/index` | one page per dataset, with interactive figures |
 | {doc}`guide/loading` | the configuration keys, how splits are made, what a batch contains |
 | {doc}`guide/datasets` | the catalogue of loaders, their options and expected directory layouts |
 | {doc}`guide/adding` | registering a new dataset |
@@ -70,6 +71,13 @@ guide/datasets
 guide/adding
 guide/synthetic
 guide/covariance
+```
+
+```{toctree}
+:hidden:
+:caption: Datasets
+
+datasets/index
 ```
 
 ```{toctree}
