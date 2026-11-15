@@ -102,9 +102,9 @@ fetch_s1slc_cvdl(archive="~/Downloads/S1SLC_CVDL.rar")    # checks and extracts 
 ```
 
 The archive is checked (size, checksum when the source publishes one) and
-extracted into the cache (`raw/`, or `<name>/downloads/` for the hyperspectral
-and SAR datasets, which keeps the sources outside the `keep` policy); paths that
-would escape the cache folder are rejected. A `.7z` archive needs the `7z`
+extracted into `<cache>/<name>/downloads/`, which is kept outside the `keep`
+policy so that a new preprocessing parameter never downloads the sources again;
+paths that would escape the cache folder are rejected. A `.7z` archive needs the `7z`
 command or the optional `py7zr` package (`pip install 'spdnet-datasets[archives]'`),
 a `.rar` archive the `unrar`, `7z` or `bsdtar` command. When the data come from
 the cache, the Bunch returned by the fetch holds `root`: pass it as `data_dir`
