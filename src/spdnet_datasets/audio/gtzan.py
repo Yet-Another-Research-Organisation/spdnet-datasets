@@ -11,12 +11,23 @@ removed (the second file of each pair), which leaves 985 excerpts.
 
 Download
 --------
-The local copy is the Hugging Face dataset ``sanchit-gandhi/gtzan`` (three
-parquet shards, 1.3 GB; the sha256 of :data:`FILES` are the Hugging Face LFS
-identifiers, equal to those of the local copy). When ``data_dir`` does not
-exist, the shards of the pinned revision :data:`HF_REVISION` are downloaded
-into ``<cache_dir>/gtzan/raw/`` and checked. The excerpts come from commercial
-recordings whose redistribution rights were never cleared: research use only.
+Access: direct (public Hugging Face repository, no account). The local copy is
+the Hugging Face dataset ``sanchit-gandhi/gtzan``: three parquet shards (1.3 GB)
+of the pinned revision :data:`HF_REVISION`, whose sha256 (:data:`FILES`) are the
+Hugging Face LFS identifiers, equal to those of the local copy. The original
+server (opihi.cs.uvic.ca) no longer answers; ``marsyas/gtzan`` re-hosts the
+original ``genres.tar.gz`` (WAV files, another layout, not read here). No
+explicit licence: the excerpts come from commercial recordings whose
+redistribution rights were never cleared, research use only. Resolution order:
+
+1. ``data_dir`` (default ``<data root>/AUDIO/GTZAN``) exists: read in place;
+2. ``archive=`` given: a folder, zip or tar holding the shards, extracted into
+   ``<cache_dir>/gtzan/downloads/archive/`` (shards named as in :data:`FILES` are
+   checked);
+3. otherwise the shards are downloaded into ``<cache_dir>/gtzan/raw/`` and
+   checked.
+
+Example: ``fetch_gtzan(archive="~/Downloads/gtzan/")``.
 
 Covariances
 -----------
@@ -42,9 +53,11 @@ from ..manager import DatasetManager
 from ._common import (
     SequenceCovarianceDataset,
     download_files,
+    downloads_dir,
     estimate_stage,
     evenly_spaced,
     folds_to_split,
+    ingest_archive,
     kfold_assignment,
     load_result,
 )
@@ -61,6 +74,7 @@ FILES = {  # url -> sha256 (Hugging Face LFS oid, identical to the local copy)
     _HF + "train-00002-of-00003-6e2eb838540a06e5.parquet":
         "03876df22ec942651bf0170ecae2ddbe23c465cb2ce63171c3b6de2a4beb5fe2",
 }
+HF_PAGE = f"https://huggingface.co/datasets/{HF_REPO}/tree/{HF_REVISION}/data"
 N_FOLDS = 5
 GENRES = ("blues", "classical", "country", "disco", "hiphop", "jazz", "metal", "pop",
           "reggae", "rock")  # ClassLabel order of the Hugging Face export
@@ -112,12 +126,13 @@ def gtzan_splits(meta, labels, groups, fold=1, seed=0):
 
 
 def fetch_gtzan(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
-                verify="size", features="mfcc", n_mfcc=20, n_mels=64, limit=None, fold=1):
+                verify="size", features="mfcc", n_mfcc=20, n_mels=64, limit=None, fold=1,
+                archive=None):
     """Covariances of the GTZAN excerpts (exact duplicates removed).
 
     Parameters are those of :func:`spdnet_datasets.audio.esc50.fetch_esc50`
     (``data_dir`` default ``<data root>/AUDIO/GTZAN``; ``fold`` selects the test
-    fold of the stratified split).
+    fold of the stratified split; ``archive`` holds the parquet shards).
 
     Returns
     -------
@@ -129,6 +144,12 @@ def fetch_gtzan(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
     root = dataset_path(DOMAIN, NAME, data_dir)
     if root.is_dir():
         check_local(root, verify=verify)
+        raw_fn, source = None, str(root.resolve())
+    elif archive is not None:
+        root = ingest_archive(NAME, archive, downloads_dir(cache_dir, "gtzan") / "archive",
+                              "*.parquet",
+                              page_url=HF_PAGE, expected="the three parquet shards of FILES",
+                              files=FILES)
         raw_fn, source = None, str(root.resolve())
     else:
         raw_fn, source = partial(download_files, FILES), f"hf:{HF_REPO}@{HF_REVISION}"

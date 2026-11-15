@@ -31,8 +31,8 @@ pixels.
   Chikusei", Space Application Laboratory, University of Tokyo, technical
   report SAL-2016-05-27, May 2016. This citation comes from the `Readme.txt`
   of the dataset and was not re-verified.
-- Source: <http://park.itc.u-tokyo.ac.jp/sal/hyperdata> (download through a
-  form). Licence: CC BY 3.0, with an acknowledgement of the Space Application
+- Source: <https://www.sal.t.u-tokyo.ac.jp/hyperdata/> (formerly
+  park.itc.u-tokyo.ac.jp/sal/hyperdata). Licence: CC BY 3.0, with an acknowledgement of the Space Application
   Laboratory and a citation of the report.
 - Local copy: `source/HyperspecVNIR_Chikusei_20140729.mat` (MATLAB v7.3 /
   HDF5, Hierarchical Data Format 5) with its GT, and `prepared_v2/chikusei_v2.h5`, the atlas
@@ -46,6 +46,22 @@ windows of 16 × 16) had been cut from the non-transposed array, and their
 labels had been read in the other frame: 718 of the 760 windows were
 mislabelled. They are no longer used. A real-data test checks that a v2 window
 equals the transposed source scene.
+```
+
+## Getting the data
+
+Direct, no account. Without a local copy, `fetch_chikusei()` downloads
+`Hyperspec_Chikusei_MATLAB.zip` (1.44 GB) from
+<https://www.sal.t.u-tokyo.ac.jp/hyperdata/> into
+`<cache>/Chikusei/downloads/`. No checksum is published: the size of the zip and
+the CRC-32 of its members are checked. The v2 windows are then rebuilt from the
+scene with the block assignment of the atlas extraction (`prepare_v2`); on BERTHA
+the rebuilt windows, labels, splits and blocks are identical to the local
+`prepared_v2/chikusei_v2.h5`. Licence: Creative Commons (CC BY 3.0 on the
+mirrors), with the acknowledgement and citation above.
+
+```python
+fetch_chikusei(archive="~/Downloads/Hyperspec_Chikusei_MATLAB.zip")  # already downloaded
 ```
 
 ## Raw data

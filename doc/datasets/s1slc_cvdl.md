@@ -35,6 +35,21 @@ land-cover labels. The dataset was built for complex-valued deep learning
   `<root>/SAR/S1SLC_CVDL/complex_HHHV.zarr`. Reading it requires
   `pip install 'spdnet-datasets[sar]'`.
 
+## Getting the data
+
+Manual: [IEEE DataPort](https://ieee-dataport.org/open-access/s1slccvdl-complex-valued-annotated-single-look-complex-sentinel-1-sar-dataset-complex)
+(doi:10.21227/nm4g-yd98, CC BY 4.0, free IEEE account, temporary download links).
+The file is `S1SLC_CVDL.rar` (12.24 GB, no checksum published). Without a local
+copy, `fetch_s1slc_cvdl()` opens the page and raises `ManualDownloadRequired`;
+then pass the `.rar` (extracted with the `unrar`, `7z` or `bsdtar` command; Python
+has no RAR decoder) or the extracted folder. The city `.npy` files are converted
+into `<cache>/S1SLC_CVDL/downloads/complex_HHHV.zarr` (`npy_to_zarr`, port of the
+local conversion script, checked on synthetic data only).
+
+```python
+fetch_s1slc_cvdl(archive="~/Downloads/S1SLC_CVDL.rar")
+```
+
 ## Raw data
 
 ```text

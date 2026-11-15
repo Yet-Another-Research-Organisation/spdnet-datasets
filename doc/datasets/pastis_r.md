@@ -41,7 +41,15 @@ provides the crop types.
 
 The loader reads a local copy laid out as `<root>/SITS/PASTIS-R/PASTIS-R/`
 (`DATA_S2`, `DATA_S1A`, `DATA_S1D`, `ANNOTATIONS`, `metadata.geojson`). The local
-copy is checked against `MANIFEST_NAS.tsv`. Nothing is downloaded.
+copy is checked against `MANIFEST_NAS.tsv` (otherwise, see *Getting the data*).
+
+## Getting the data
+
+Direct access, no account: Zenodo record 5735646 (CC BY 4.0). Without a local copy,
+`fetch_pastis_r()` downloads `PASTIS-R.zip` (53.7 GB), checks its sha256 and
+extracts it into `<cache>/pastis_r/downloads/`; `fetch_pastis_r(archive=...)` uses
+a downloaded zip (checked, kept) or its extracted folder. PASTIS without radar
+(Zenodo 5012942, 28.8 GB) is not registered.
 
 ## Raw data
 
