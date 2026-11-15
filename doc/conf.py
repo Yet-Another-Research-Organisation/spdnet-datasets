@@ -1,6 +1,7 @@
 """Sphinx configuration for spdnet-datasets."""
 
 import os
+import re
 import sys
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError
@@ -27,8 +28,28 @@ extensions = [
     "sphinx.ext.mathjax",
     "myst_parser",
     "sphinx_copybutton",
+    "sphinx_design",
+    "sphinx_gallery.gen_gallery",
     "catalogue",  # _ext/catalogue.py: table of the registered datasets
 ]
+
+# Example gallery (../examples). Only the tutorials run at build time: they use
+# synthetic data. The dataset examples read $SPDNET_DATA_ROOT, which the CI does
+# not have; they are rendered without execution and embed the Plotly figures of
+# the dataset pages. No Binder / Colab / JupyterLite links: the data are private.
+sphinx_gallery_conf = {
+    "examples_dirs": ["../examples"],
+    "gallery_dirs": ["auto_examples"],
+    "filename_pattern": re.escape(os.sep) + "tutorials" + re.escape(os.sep) + "plot_",
+    "subsection_order": ["../examples/tutorials", "../examples/datasets", "*"],
+    "within_subsection_order": "FileNameSortKey",
+    "download_all_examples": True,
+    "remove_config_comments": True,
+    "image_scrapers": ("matplotlib",),
+    "reference_url": {"spdnet_datasets": None},
+    "abort_on_example_error": True,
+    "show_memory": False,
+}
 myst_enable_extensions = ["colon_fence", "deflist", "dollarmath", "amsmath"]
 myst_heading_anchors = 3
 

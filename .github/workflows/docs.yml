@@ -39,8 +39,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[docs]"
+          # Tyler / Student-t estimators run by the covariance tutorial (not on PyPI)
+          pip install "yetanotherspdnet @ git+https://github.com/Yet-Another-Research-Organisation/yetanotherspdnet"
 
       - name: Build Sphinx documentation
+        env:
+          # no dataset in the CI: only the tutorials (synthetic data) are executed
+          SPDNET_DATA_ROOT: /nonexistent
         run: |
           cd doc
           make html
