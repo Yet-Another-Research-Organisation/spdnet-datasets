@@ -32,7 +32,7 @@ extensions = [
 myst_enable_extensions = ["colon_fence", "deflist", "dollarmath", "amsmath"]
 myst_heading_anchors = 3
 
-# API reference: hand-written pages with autodoc (see docs/reference/)
+# API reference: hand-written pages with autodoc (see doc/reference/)
 autoclass_content = "both"
 autodoc_member_order = "bysource"
 autodoc_typehints = "description"
@@ -64,7 +64,7 @@ html_css_files = ["custom.css"]
 html_theme_options = {
     "source_repository": "https://github.com/Yet-Another-Research-Organisation/spdnet-datasets",
     "source_branch": "main",
-    "source_directory": "docs/",
+    "source_directory": "doc/",
     "light_css_variables": {
         "color-brand-primary": "#3a4a8c",
         "color-brand-content": "#3a4a8c",

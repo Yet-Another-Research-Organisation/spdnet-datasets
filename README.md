@@ -2,7 +2,7 @@
 
 A public shared infrastructure package for SPDNet research, providing dataset loaders, covariance estimators, and synthetic data generators.
 
-Documentation: build it with `pip install -e ".[docs]" && make -C docs html` (published on GitHub Pages at each release).
+Documentation: build it with `pip install -e ".[docs]" && make -C doc html` (published on GitHub Pages at each release).
 
 ## Overview
 

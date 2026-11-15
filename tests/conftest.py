@@ -1,7 +1,7 @@
 """Shared fixtures for spdnet-datasets tests.
 
-Real-dataset tests use the actual data under DATA_ROOT (see CLAUDE.md's
-`/DATA` convention) and are skipped automatically when a dataset's
+Real-dataset tests use the actual data under DATA_ROOT (the `/DATA`
+convention) and are skipped automatically when a dataset's
 directory isn't present, rather than mocking the on-disk layout.
 """
 
