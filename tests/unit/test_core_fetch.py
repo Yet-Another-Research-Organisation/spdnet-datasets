@@ -173,3 +173,12 @@ def test_bunch_attribute_access():
     assert b.covariances == 1 and b["labels"] == 2
     with pytest.raises(AttributeError):
         _ = b.missing
+
+
+def test_covariance_params_do_not_redo_preprocessing(tmp_path):
+    p = _Pipeline()
+    for est in ("scm", "tyler", "scm"):
+        F.run_pipeline("toy", params={"w": 15}, covariance_params={"estimator": est},
+                       raw_fn=p.raw, process_fn=p.process, covariance_fn=p.cov,
+                       cache_dir=tmp_path, keep="keep_full")
+    assert p.n == {"raw": 1, "process": 1, "cov": 2}

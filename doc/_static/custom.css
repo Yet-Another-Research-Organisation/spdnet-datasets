@@ -4,3 +4,10 @@
 dl.py.class > dt, dl.py.function > dt { font-size: 0.95em; }
 .dataset-catalogue table { font-size: 0.9em; }
 .dataset-catalogue table td:nth-child(3) { min-width: 16em; }
+
+/* Plotly figures embedded as static HTML (doc/tools/make_figures.py) */
+iframe.plotly-figure {
+  width: 100%;
+  height: 460px;
+  border: 0;
+}

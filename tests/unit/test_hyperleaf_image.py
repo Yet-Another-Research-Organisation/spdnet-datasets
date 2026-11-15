@@ -6,7 +6,7 @@ import pytest
 import tifffile
 import torch
 
-from spdnet_datasets.real.hyperleaf import HyperLeafDataset
+from spdnet_datasets.hyperspectral.hyperleaf import HyperLeafDataset
 
 N_BANDS, H, W = HyperLeafDataset.N_BANDS, 6, 8
 CULTIVARS = HyperLeafDataset.CULTIVAR_NAMES
@@ -14,12 +14,11 @@ CULTIVARS = HyperLeafDataset.CULTIVAR_NAMES
 
 @pytest.fixture
 def hyperleaf_dir(tmp_path):
-    """Four images; band b of image i is filled with i * 1000 + b plus noise."""
+    """Twenty images; band b of image i is filled with i * 1000 + b plus noise."""
     rng = np.random.default_rng(0)
     (tmp_path / "images").mkdir()
-    (tmp_path / "cov").mkdir()
     rows = []
-    for i in range(4):
+    for i in range(20):
         image_id = f"{i:05d}"
         cube = (i * 1000 + np.arange(N_BANDS))[:, None, None] + rng.integers(
             0, 50, (N_BANDS, H, W)
@@ -27,7 +26,6 @@ def hyperleaf_dir(tmp_path):
         tifffile.imwrite(
             tmp_path / "images" / f"{image_id}.tiff", cube.astype(np.uint16)
         )
-        torch.save(torch.eye(N_BANDS), tmp_path / "cov" / f"{image_id}.pt")
         onehot = [int(c == i % 4) for c in range(4)]
         rows.append([image_id, 0.0, *onehot])
     pd.DataFrame(rows, columns=["ImageId", "Fertilizer", *CULTIVARS]).to_csv(
@@ -78,11 +76,15 @@ def test_unknown_mode(hyperleaf_dir):
         HyperLeafDataset(data_dir=str(hyperleaf_dir), mode="rgb")
 
 
-def test_cov_mode_unchanged(hyperleaf_dir):
-    ds = HyperLeafDataset(data_dir=str(hyperleaf_dir), mode="cov", verbose=False)
-    x, _ = ds[0]
-    assert ds.bands is None
-    assert x.shape == (N_BANDS, N_BANDS) and x.dtype == torch.float64
+def test_image_mode_skips_covariances(hyperleaf_dir, tmp_path):
+    """6 x 8 images are far too small for a 204 x 204 covariance: image mode never
+    estimates one, and the split is grouped."""
+    ds = HyperLeafDataset(data_dir=str(hyperleaf_dir), mode="image", verbose=False,
+                          cache_dir=tmp_path / "cache")
+    assert ds.bunch.covariances is None and not (tmp_path / "cache").exists()
+    assert set(ds.splits["recommended"]) == {"train", "val", "test"}
+    with pytest.raises(ValueError):
+        HyperLeafDataset(data_dir=str(hyperleaf_dir), mode="image", return_mean=True)
 
 
 def test_hdm05_loads_float64(tmp_path):

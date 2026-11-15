@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
-from spdnet_datasets.real.uav import UAVDataset
+from spdnet_datasets.real.uav import UAVLegacyDataset as UAVDataset
 from tests.conftest import DATA_ROOT, skip_if_missing
 
 # The prepared windows (MJK_N_W15_T80, ...) were not moved to the canonical
