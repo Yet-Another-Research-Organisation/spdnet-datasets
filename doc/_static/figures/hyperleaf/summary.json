@@ -1,0 +1,35 @@
+{
+ "name": "hyperleaf",
+ "kwargs": {
+  "verbose": false
+ },
+ "split": "by_plot",
+ "p": 204,
+ "n_samples": 1590,
+ "classes": [
+  "Heerup",
+  "Kvium",
+  "Rembrandt",
+  "Sheriff"
+ ],
+ "counts": {
+  "train": [
+   290,
+   200,
+   250,
+   220
+  ],
+  "val": [
+   80,
+   40,
+   90,
+   100
+  ],
+  "test": [
+   40,
+   110,
+   90,
+   80
+  ]
+ }
+}
