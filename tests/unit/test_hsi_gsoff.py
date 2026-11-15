@@ -68,3 +68,25 @@ def test_dataset_class_selection(gsoff_dir, tmp_path):
                       classes=["code 2"])
     assert ds.classes == ["code 2"] and {ds[i][1] for i in range(len(ds))} == {0}
     assert all(idx.max() < len(ds) for idx in ds.splits["recommended"].values() if len(idx))
+
+
+def test_keep_covariance_disables_raw(gsoff_dir, tmp_path):
+    ds = GSOFFDataset(gsoff_dir, cache_dir=tmp_path / "cache", block=30, verbose=False,
+                      keep="keep_covariance", return_raw=True)
+    with pytest.raises(ValueError, match="processed stage"):
+        ds[0]
+
+
+@pytest.mark.parametrize("estimator", ["ledoit_wolf", "scm"])
+def test_estimators_and_balance(gsoff_dir, tmp_path, estimator):
+    from spdnet_datasets.base import create_dataloaders
+
+    ds = GSOFFDataset(gsoff_dir, cache_dir=tmp_path / "cache", block=30, verbose=False,
+                      estimator=estimator, balance="undersample")
+    train = ds.splits["recommended"]["train"]
+    counts = np.bincount(ds.labels[train])
+    assert counts.min() == counts.max()
+    tr, va, te = create_dataloaders(ds, batch_size=8, num_workers=0, split="recommended",
+                                    verbose=False)
+    x, y = next(iter(tr))
+    assert x.shape[1:] == (63, 63)
