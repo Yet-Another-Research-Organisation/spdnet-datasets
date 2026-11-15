@@ -39,6 +39,9 @@ autodoc_typehints = "description"
 autodoc_typehints_description_target = "documented_params"
 autodoc_default_options = {"exclude-members": "__init__, __new__"}
 add_module_names = False
+# Optional or heavy dependencies are not installed in the documentation build
+autodoc_mock_imports = ["yetanotherspdnet", "h5py", "zarr", "pyarrow", "soundfile",
+                        "rasterio", "geopandas", "spectral", "tifffile", "moabb"]
 python_maximum_signature_line_length = 88
 autosummary_generate = False
 
