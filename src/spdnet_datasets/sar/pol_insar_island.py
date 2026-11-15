@@ -2,8 +2,8 @@
 
 Reference: Hochstuhl S. et al., *Pol-InSAR-Island - A benchmark dataset for
 multi-frequency Pol-InSAR data land cover classification*, ISPRS Open Journal
-of Photogrammetry and Remote Sensing, 2023 (KIT RADAR4KIT). Manual download
-(BagIt archive of KIT); the data must be under ``<root>/SAR/Pol-InSAR-Island``.
+of Photogrammetry and Remote Sensing, 2023 (KIT RADAR4KIT). Downloaded from
+RADAR4KIT when absent from ``<root>/SAR/Pol-InSAR-Island`` (see "Download").
 
 Data: two flight paths (``FP1``, ``FP2``), each with the 6 x 6 Pol-InSAR
 coherency matrix T6 of every 1 m pixel per band (``data/<FP>/<band>/T6``:
@@ -55,14 +55,27 @@ Splits
   256 x 256 px checkerboard: neighbouring cells sit on both sides and the
   scores are optimistic (atlas: +0.03 to +0.08 of balanced accuracy).
 
-Download (manual): KITopenData / RADAR4KIT, doi:10.35097/1700 (CC BY-NC-SA 4.0): the
-BagIt archive holds ``data/dataset/Pol-InSAR-Island_updated.zip`` (md5
-``3d10bb4afa2eb4ece3da546df0f741fb`` in ``manifest-md5.txt``); no stable direct URL
-was found. Extract the inner zip and place it under ``data_dir`` (default ``<data
-root>/SAR/Pol-InSAR-Island``).
+Download
+--------
+Direct (RADAR4KIT, doi:10.35097/1700, version 2, CC BY-NC-SA 4.0, no account; the
+RADAR4KIT terms of use apply). The dataset page
+https://radar.kit.edu/radar/en/dataset/IAzBEMXnbTndvIZG gives the archive URL
+(``schema:contentUrl``, :data:`TAR_URL`), its size (5 567 475 200 bytes) and md5
+(``9ba66a216b1ae441a5d4ef91e30a4aa8``). Without a local copy,
+``fetch_pol_insar_island`` downloads this BagIt ``tar`` into
+``<cache_dir>/Pol-InSAR-Island/downloads/``, checks its md5, extracts it, checks the
+md5 of the inner ``data/dataset/Pol-InSAR-Island_updated.zip``
+(``3d10bb4afa2eb4ece3da546df0f741fb``, ``manifest-md5.txt`` of the bag) and extracts
+it (the intermediate copy of the inner zip is then deleted). Already downloaded::
+
+    fetch_pol_insar_island(archive="~/Downloads/10.35097-1700.tar")
+
+(the ``tar``, the inner zip, or an extracted folder).
 """
 
 import re
+import shutil
+import tarfile
 import warnings
 from pathlib import Path
 
@@ -71,6 +84,7 @@ import pandas as pd
 import torch
 
 from ..base import BaseDataset
+from ..core.access import extract_archive
 from ..core.config import dataset_path
 from ..core.estimators import (
     InsufficientSamplesError,
@@ -79,9 +93,10 @@ from ..core.estimators import (
     check_spd,
     estimate_covariance,
 )
-from ..core.fetch import Bunch, check_local, run_pipeline
+from ..core.fetch import Bunch, check_local, download, md5sum, run_pipeline
 from ..core.normalize import apply_scale
 from ..manager import DatasetManager
+from ..utils.sources import check_size, downloads_dir, find_root
 from ._common import (
     check_split_groups,
     finalize_labels,
@@ -90,7 +105,64 @@ from ._common import (
 )
 
 DOMAIN, NAME = "SAR", "Pol-InSAR-Island"
-FILES = {}  # manual download (KIT BagIt archive)
+TAR_URL = "https://www.radar-service.eu/radar-backend/archives/IAzBEMXnbTndvIZG/versions/1/content"
+TAR, TAR_MD5, TAR_SIZE = "10.35097-1700.tar", "9ba66a216b1ae441a5d4ef91e30a4aa8", 5_567_475_200
+INNER, INNER_MD5 = "data/dataset/Pol-InSAR-Island_updated.zip", "3d10bb4afa2eb4ece3da546df0f741fb"
+FILES = {TAR_URL: TAR_MD5}
+REQUIRED = ("label/FP1/label_train.bin",)
+
+
+def _is_zip(path):
+    # zipfile.is_zipfile() also accepts a tar ending with a zip member (the BagIt tar)
+    with open(path, "rb") as f:
+        return f.read(4) == b"PK\x03\x04"
+
+
+def _download_root(cache_dir, archive):
+    """Dataset folder from the RADAR4KIT tar (downloaded or given), its inner zip or a folder."""
+    out = downloads_dir(NAME, cache_dir)
+    if archive is None:
+        found = find_root(out, REQUIRED)
+        if found is not None:
+            return found
+        path = download(TAR_URL, out / TAR, checksum=TAR_MD5, algo="md5")
+    else:
+        path = Path(archive).expanduser()
+        if not path.exists():
+            raise FileNotFoundError(f"{path} does not exist")
+        if path.is_file() and not _is_zip(path):
+            check_size(path, TAR_SIZE)
+            if md5sum(path) != TAR_MD5:
+                raise OSError(f"Checksum mismatch for {path}")
+    bag = None
+    if path.is_file() and not _is_zip(path) and tarfile.is_tarfile(path):
+        # only the inner zip is taken from the tar (core extract_archive would see a zip)
+        bag = out / "bag"
+        bag.mkdir(parents=True, exist_ok=True)
+        with tarfile.open(path) as t:
+            member = next((m for m in t.getmembers() if m.name.endswith(INNER)), None)
+            if member is None:
+                raise FileNotFoundError(f"{path} holds no {INNER}")
+            part = bag / (Path(INNER).name + ".part")
+            with t.extractfile(member) as src, open(part, "wb") as dst:
+                shutil.copyfileobj(src, dst, 1 << 20)
+        path = part.rename(bag / Path(INNER).name)
+    if path.is_dir():
+        found = find_root(path, REQUIRED)
+        if found is not None:
+            return found
+        bag_root = find_root(path, (INNER,))
+        if bag_root is None:
+            raise FileNotFoundError(f"{path} holds neither {REQUIRED[0]} nor {INNER}")
+        path = bag_root / INNER
+    if md5sum(path) != INNER_MD5:
+        raise OSError(f"Checksum mismatch for {path}")
+    found = find_root(extract_archive(path, out / "dataset"), REQUIRED)
+    if found is None:
+        raise FileNotFoundError(f"{path} holds no {REQUIRED[0]}")
+    if bag is not None:
+        shutil.rmtree(bag)  # intermediate copy of the inner zip (5.6 GB)
+    return found
 CLASSES = ("tidal flat", "water", "coastal shrub", "dense high vegetation", "white dune",
            "peat bog", "grey dune", "couch grass", "upper saltmarsh", "lower saltmarsh", "sand",
            "settlement")
@@ -282,13 +354,18 @@ def make_splits(meta, *, cell=32, n_splits=5, seed=0):
 
 def fetch_pol_insar_island(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
                            verify="size", *, representation="logpower", bands=("L", "S"),
-                           cells="union", cell=32, purity=0.75, min_labelled=None, block=512):
+                           cells="union", cell=32, purity=0.75, min_labelled=None, block=512,
+                           archive=None):
     """Load (and cache) the Pol-InSAR-Island cell covariances.
 
     Parameters
     ----------
     data_dir : path, optional
-        Default ``<root>/SAR/Pol-InSAR-Island``.
+        Default ``<root>/SAR/Pol-InSAR-Island``; downloaded into the cache when
+        absent.
+    archive : path, optional
+        RADAR4KIT ``tar`` already downloaded, its inner zip or an extracted folder
+        (see "Download" in the module docstring).
     cache_dir, keep, force
         See :func:`spdnet_datasets.core.fetch.run_pipeline`.
     estimator : str
@@ -310,7 +387,8 @@ def fetch_pol_insar_island(data_dir=None, cache_dir=None, keep=None, estimator="
     -------
     Bunch with ``covariances`` (unscaled), ``means``, ``labels``, ``groups``
     (512 m blocks), ``meta``, ``splits``, ``rejected`` (cells whose estimate
-    failed the ``n >= 2p`` or SPD check, DataFrame) and ``processed_dir``.
+    failed the ``n >= 2p`` or SPD check, DataFrame), ``processed_dir`` and
+    ``root`` (dataset folder, to pass as ``data_dir`` to the dataset class).
     """
     if representation not in ("logpower", "t6"):
         raise ValueError("representation must be 'logpower' or 't6'")
@@ -324,7 +402,9 @@ def fetch_pol_insar_island(data_dir=None, cache_dir=None, keep=None, estimator="
     if min_labelled is None:
         min_labelled = cell * cell // (2 if cells == "union" else 4)
     root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify=verify, required=("label/FP1/label_train.bin",))
+    if not (root / REQUIRED[0]).exists():
+        root = _download_root(cache_dir, archive)
+    check_local(root, verify=verify, required=REQUIRED)
     opts = {"cell": cell, "purity": purity, "min_labelled": min_labelled, "block": block, "bands": bands, "cells": cells,
             "representation": representation}
     params = dict(opts, estimator=estimator, source=str(root.resolve()))
@@ -339,7 +419,7 @@ def fetch_pol_insar_island(data_dir=None, cache_dir=None, keep=None, estimator="
                  rejected=pd.read_csv(cdir / "rejected.csv"),
                  labels=meta["label"].to_numpy(str), groups=meta["block"].to_numpy(str), meta=meta,
                  splits=make_splits(meta, cell=cell), processed_dir=res.processed_dir,
-                 covariance_dir=cdir)
+                 covariance_dir=cdir, root=root)
 
 
 @DatasetManager.register_dataset("pol_insar_island")

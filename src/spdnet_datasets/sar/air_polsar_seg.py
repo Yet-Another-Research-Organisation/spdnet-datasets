@@ -32,9 +32,22 @@ Outputs: raw or mean only (``OUTPUTS = ("raw", "mean")``): raw = ``(cell,
 cell, 4)`` float32 ``log10(1 + A)`` of HH, HV, VH, VV (4.9 % of the amplitudes
 are 0 and some saturate at 65535); mean = per-channel mean of the raw cell.
 
-Download (manual): links of the authors (see the article in the folder; no
-direct URL or checksum registered). Download ``train_set/`` and ``test_set/`` and place
-it under ``data_dir`` (default ``<data root>/SAR/AIR-PolSAR-Seg``).
+Download
+--------
+Direct (Google Drive file of the authors, no account). Links of
+https://github.com/AICyberTeam/AIR-PolSAR-Seg: Google Drive folder
+https://drive.google.com/drive/folders/1sGrmLmknhQ28nvasKbCqKvVj6rY2fCqL
+(``Raw_AIR-PolarSAR-Seg.zip``, id ``1XG3ohTHTnl2V-GCv630AQOfxbKsiFjWl``) and Baidu Pan
+https://pan.baidu.com/s/1PWsEwtdNKCdghthBnhb8XQ (code ``ni88``). No licence stated
+(ownership: Aerospace Information Research Institute, CAS). Without a local copy,
+``fetch_air_polsar_seg`` downloads the Drive file (639 472 477 bytes, sha256
+``d62e4391…`` measured on 2026-11-15; it holds ``train_set/`` and ``test_set/``, whose
+2 502 files have the CRC-32 of the local copy) into
+``<cache_dir>/air_polsar_seg/downloads/`` and extracts it. If Drive refuses the
+download (quota), the page is opened and
+:class:`~spdnet_datasets.core.access.ManualDownloadRequired` is raised; then::
+
+    fetch_air_polsar_seg(archive="~/Downloads/Raw_AIR-PolarSAR-Seg.zip")
 """
 
 from collections import Counter, deque
@@ -45,13 +58,31 @@ import pandas as pd
 import torch
 
 from ..base import BaseDataset
+from ..core.access import manual_source
 from ..core.config import dataset_path
-from ..core.fetch import Bunch, check_local, run_pipeline
+from ..core.fetch import Bunch, download, run_pipeline
 from ..manager import DatasetManager
+from ..utils.sources import source_dir
 from ._common import check_split_groups, finalize_labels, group_kfold_splits
 
 DOMAIN, NAME = "SAR", "AIR-PolSAR-Seg"
-FILES = {}  # manual download
+PAGE = "https://github.com/AICyberTeam/AIR-PolSAR-Seg"
+ZIP, ZIP_SIZE = "Raw_AIR-PolarSAR-Seg.zip", 639_472_477
+ZIP_SHA256 = "d62e4391af33c3c1601b801dd5f2f07f98609eb5fb181b2d5efade3db25920be"
+URL = ("https://drive.usercontent.google.com/download?id=1XG3ohTHTnl2V-GCv630AQOfxbKsiFjWl"
+       "&export=download&confirm=t")
+FILES = {URL: ZIP_SHA256}
+EXPECTED = (f"{ZIP} ({ZIP_SIZE} bytes) from the Google Drive folder "
+            "https://drive.google.com/drive/folders/1sGrmLmknhQ28nvasKbCqKvVj6rY2fCqL or "
+            "Baidu Pan (https://pan.baidu.com/s/1PWsEwtdNKCdghthBnhb8XQ, code ni88)")
+
+
+def _download(dest_dir):
+    try:
+        return download(URL, dest_dir / ZIP, checksum=ZIP_SHA256)
+    except OSError as exc:  # quota page instead of the file, network error...
+        manual_source("AIR-PolSAR-Seg", page_url=PAGE, expected=f"{EXPECTED} (automatic "
+                      f"download failed: {exc})", dest_dir=dest_dir)
 POLS = ("HH", "HV", "VH", "VV")
 COLOURS = {(255, 255, 0): "housing", (0, 0, 255): "industrial", (0, 255, 0): "natural",
            (255, 0, 0): "land use", (0, 255, 255): "water", (255, 255, 255): "other"}
@@ -214,8 +245,15 @@ def _guard(meta, keep, ref, gap):
 
 
 def fetch_air_polsar_seg(data_dir=None, cache_dir=None, keep=None, force=False, verify="size", *,
-                         cell=32, purity=0.75, min_annotated=0.9, macro=1024, seed=0):
+                         cell=32, purity=0.75, min_annotated=0.9, macro=1024, seed=0,
+                         archive=None):
     """Rebuild the AIR-PolSAR-Seg mosaic and cut it into cells (cached).
+
+    Parameters
+    ----------
+    archive : path, optional
+        ``Raw_AIR-PolarSAR-Seg.zip`` already downloaded, or its extracted folder
+        (see "Download" in the module docstring).
 
     Returns
     -------
@@ -224,8 +262,10 @@ def fetch_air_polsar_seg(data_dir=None, cache_dir=None, keep=None, force=False, 
     labelled differently by two overlapping patches), ``splits`` and
     ``processed_dir`` (``cells.npy``, uint16 amplitudes ``(N, cell, cell, 4)``).
     """
-    root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify=verify, required=("train_set", "test_set"))
+    root = source_dir("air_polsar_seg", dataset_path(DOMAIN, NAME, data_dir),
+                      required=("train_set", "test_set"), page_url=PAGE, expected=EXPECTED,
+                      cache_dir=cache_dir, archive=archive, checksum=ZIP_SHA256,
+                      algo="sha256", size=ZIP_SIZE, verify=verify, download=_download)
     opts = {"cell": cell, "purity": purity, "min_annotated": min_annotated, "macro": macro}
     params = dict(opts, source=str(root.resolve()), version=3)  # bump when the processing changes
 

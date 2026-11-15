@@ -28,6 +28,10 @@ MODULES = [
     "sar.fusar_ship", "sar.mstar",
 ]
 DOWNLOADABLE = {"audio.esc50", "audio.gtzan", "sits.pastis_r", "sar.cpazmal"}
+# hyperspectral / SAR direct sources: md5 (Zenodo, RADAR4KIT), sha256, or None (size only)
+DOWNLOADABLE |= {"hyperspectral.chikusei", "hyperspectral.placenta", "hyperspectral.rices90",
+                 "sar.pol_insar_island", "sar.air_polsar_seg", "sar.fusar_ship"}
+CREDENTIALS = {"hyperspectral.kaggle_wheat", "hyperspectral.hyperleaf", "sar.atrnet_star"}
 
 
 @pytest.mark.parametrize("name", MODULES)
@@ -36,10 +40,11 @@ def test_registry_format(name):
     assert isinstance(mod.FILES, dict)
     assert bool(mod.FILES) == (name in DOWNLOADABLE)
     for url, sha in mod.FILES.items():
-        assert url.startswith("https://") and re.fullmatch(r"[0-9a-f]{64}", sha)
+        assert url.startswith("https://")
+        assert sha is None or re.fullmatch(r"[0-9a-f]{64}|[0-9a-f]{32}", sha)
         assert "/resolve/main/" not in url  # Hugging Face revisions are pinned
-    if not mod.FILES:
-        assert "Download (manual)" in mod.__doc__
+    if not mod.FILES and name not in CREDENTIALS:
+        assert "Download (manual)" in mod.__doc__ or "Download\n--------\nManual" in mod.__doc__
 
 
 def _register(monkeypatch, mod, folder, names, serve):

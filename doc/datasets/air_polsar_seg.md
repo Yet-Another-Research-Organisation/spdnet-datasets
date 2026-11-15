@@ -33,8 +33,21 @@ and 150 test patches.
   (JSTARS) 15, 3830–3841, 2022, doi:10.1109/JSTARS.2022.3170326. The PDF is in
   the dataset folder.
 - Data: <https://github.com/AICyberTeam/AIR-PolSAR-Seg>. The licence is not
-  stated; the dataset is described as "open to the community". The data must
-  be downloaded by hand and placed under `<root>/SAR/AIR-PolSAR-Seg`.
+  stated; the dataset is described as "open to the community". See
+  [Getting the data](#getting-the-data).
+
+## Getting the data
+
+Direct, no account: the Google Drive file `Raw_AIR-PolarSAR-Seg.zip` of the
+authors (639 472 477 bytes, sha256 `d62e4391…` measured on 2026-11-15; its
+2 502 files have the CRC-32 of the local copy). Without a local copy,
+`fetch_air_polsar_seg()` downloads it into `<cache>/air_polsar_seg/downloads/`.
+If Drive refuses (quota), the page is opened and `ManualDownloadRequired` gives
+the Drive folder and the Baidu Pan link (code `ni88`).
+
+```python
+fetch_air_polsar_seg(archive="~/Downloads/Raw_AIR-PolarSAR-Seg.zip")
+```
 
 ## Raw data
 

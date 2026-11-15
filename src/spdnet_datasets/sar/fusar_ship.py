@@ -29,9 +29,20 @@ Outputs: raw or mean only (``OUTPUTS = ("raw", "mean")``).
 - mean: per-channel mean of the ``log1p`` resized chip (before
   standardisation, which would make it zero).
 
-Download (manual): distributed by Fudan University (see the article and
-``ReadMe.txt``; copyright Fudan University, no direct URL or checksum registered). Copy the class folders and ``meta`` files and place it under
-``data_dir`` (default ``<data root>/SAR/FUSAR_Ship1.0``).
+Download
+--------
+Direct (Google Drive file of the authors, no account). Links of the Fudan
+University page https://emwlab.fudan.edu.cn/resources/list.htm: Google Drive
+``FUSAR_Ship1.0.zip`` (id ``1SOEMud9oUq69gxbfcBkOvtUkZ3LWEpZJ``) and Baidu Pan
+https://pan.baidu.com/s/1JlaRUeFKq37flIjXZtQ0YQ (code ``c6ea``). Copyright Fudan
+University 2020, no open licence: cite Hou et al. (2020). Without a local copy,
+``fetch_fusar_ship`` downloads the Drive file (507 383 750 bytes, sha256
+``0e985e3c…`` measured on 2026-11-15; its 5 246 files have the CRC-32 of the local
+copy) into ``<cache_dir>/FUSAR_Ship1.0/downloads/`` and extracts it. If Drive refuses
+the download (quota), the page is opened and
+:class:`~spdnet_datasets.core.access.ManualDownloadRequired` is raised; then::
+
+    fetch_fusar_ship(archive="~/Downloads/FUSAR_Ship1.0.zip")
 """
 
 from pathlib import Path
@@ -42,13 +53,31 @@ import torch
 import torch.nn.functional as F
 
 from ..base import BaseDataset
+from ..core.access import manual_source
 from ..core.config import dataset_path
-from ..core.fetch import Bunch, check_local
+from ..core.fetch import Bunch, download
 from ..manager import DatasetManager
+from ..utils.sources import source_dir
 from ._common import check_split_groups, finalize_labels, group_kfold_splits
 
 DOMAIN, NAME = "SAR", "FUSAR_Ship1.0"
-FILES = {}  # manual download
+PAGE = "https://emwlab.fudan.edu.cn/resources/list.htm"
+ZIP, ZIP_SIZE = "FUSAR_Ship1.0.zip", 507_383_750
+ZIP_SHA256 = "0e985e3cd74c858eca41410699a769c1e9b2e81b16a50442338bdc62f23e412e"
+URL = ("https://drive.usercontent.google.com/download?id=1SOEMud9oUq69gxbfcBkOvtUkZ3LWEpZJ"
+       "&export=download&confirm=t")
+FILES = {URL: ZIP_SHA256}
+EXPECTED = (f"{ZIP} ({ZIP_SIZE} bytes) from Google Drive "
+            "(https://drive.google.com/file/d/1SOEMud9oUq69gxbfcBkOvtUkZ3LWEpZJ) or Baidu Pan "
+            "(https://pan.baidu.com/s/1JlaRUeFKq37flIjXZtQ0YQ, code c6ea)")
+
+
+def _download(dest_dir):
+    try:
+        return download(URL, dest_dir / ZIP, checksum=ZIP_SHA256)
+    except OSError as exc:  # quota page instead of the file, network error...
+        manual_source(NAME, page_url=PAGE, expected=f"{EXPECTED} (automatic download "
+                      f"failed: {exc})", dest_dir=dest_dir)
 
 
 def mmsi_groups(chip_ids, meta_csv):
@@ -73,8 +102,16 @@ def mmsi_groups(chip_ids, meta_csv):
 
 
 def fetch_fusar_ship(data_dir=None, *, class_level="basic", min_samples_per_class=30,
-                     exclude_classes=(), verify="size", seed=0):
+                     exclude_classes=(), verify="size", seed=0, cache_dir=None, archive=None):
     """Index the FUSAR-Ship chips.
+
+    Parameters
+    ----------
+    cache_dir : path, optional
+        Where the archive is downloaded and extracted.
+    archive : path, optional
+        ``FUSAR_Ship1.0.zip`` already downloaded, or its extracted folder (see
+        "Download" in the module docstring).
 
     Returns
     -------
@@ -83,8 +120,10 @@ def fetch_fusar_ship(data_dir=None, *, class_level="basic", min_samples_per_clas
     """
     if class_level not in ("basic", "fine"):
         raise ValueError(f"class_level must be 'basic' or 'fine', got {class_level}")
-    root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify=verify)
+    root = source_dir(NAME, dataset_path(DOMAIN, NAME, data_dir), required=("Cargo",),
+                      page_url=PAGE, expected=EXPECTED, cache_dir=cache_dir, archive=archive,
+                      checksum=ZIP_SHA256, algo="sha256", size=ZIP_SIZE, verify=verify,
+                      download=_download)
     rows = []
     for path in sorted(root.glob("*/*/*.tif*")):
         cat, sub = path.relative_to(root).parts[:2]

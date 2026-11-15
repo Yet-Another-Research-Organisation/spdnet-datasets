@@ -30,8 +30,24 @@ training cities, stratified), groups = city. ``"recommended"`` = ``"loco_Houston
 Patch positions are not provided: no spatial split within a city is possible
 (a random split would put neighbouring patches on both sides).
 
-Download (manual): IEEE DataPort (account required). Download ``complex_HHHV.zarr``
-and place it under ``data_dir`` (default ``<data root>/SAR/S1SLC_CVDL``).
+Download
+--------
+Manual (IEEE DataPort, open access but a free IEEE account is required; the
+download links are temporary signed URLs):
+https://ieee-dataport.org/open-access/s1slccvdl-complex-valued-annotated-single-look-complex-sentinel-1-sar-dataset-complex
+(doi:10.21227/nm4g-yd98, CC BY 4.0). The file is ``S1SLC_CVDL.rar`` (12.24 GB, no
+checksum published; the page calls it ``S1SCL_CVDL.zip``). It holds one folder per
+city with ``HH_Complex_Patches.npy``, ``HV_Complex_Patches.npy`` and ``Labels.npy``;
+the zarr store read here is a conversion of them (:func:`npy_to_zarr`, port of the
+local ``extract_real_imag_dataset.py``; checked on synthetic data only, the local
+copy has no ``.npy``). Without a local copy, ``fetch_s1slc_cvdl()`` opens the page
+and raises :class:`~spdnet_datasets.core.access.ManualDownloadRequired`; then::
+
+    fetch_s1slc_cvdl(archive="~/Downloads/S1SLC_CVDL.rar")   # or the extracted folder
+
+A ``.rar`` needs the ``unrar``, ``7z`` or ``bsdtar`` command (Python has no RAR
+decoder); without one, extract it by hand and pass the folder. The store is
+written into ``<cache_dir>/S1SLC_CVDL/downloads/complex_HHHV.zarr`` (about 22 GB).
 """
 
 import hashlib
@@ -43,15 +59,20 @@ import pandas as pd
 import torch
 
 from ..base import BaseDataset
+from ..core.access import extract_archive, manual_source
 from ..core.config import dataset_path, get_cache_dir
 from ..core.fetch import Bunch, check_local
 from ..manager import DatasetManager
+from ..utils.sources import downloads_dir, extract_rar, find_root
 from ._common import finalize_labels
 
 DOMAIN, NAME = "SAR", "S1SLC_CVDL"
-FILES = {}  # manual download
+PAGE = ("https://ieee-dataport.org/open-access/s1slccvdl-complex-valued-annotated-single-"
+        "look-complex-sentinel-1-sar-dataset-complex")
+FILES = {}  # manual (IEEE account, temporary signed URLs), no checksum published
 STORE = "complex_HHHV.zarr"
 CITIES = ("Houston", "Chicago", "Sao Paulo")
+NPY = ("HH_Complex_Patches.npy", "HV_Complex_Patches.npy", "Labels.npy")
 
 
 def _open(root):
@@ -62,17 +83,89 @@ def _open(root):
     return zarr.open_group(str(Path(root) / STORE), mode="r")
 
 
-def fetch_s1slc_cvdl(data_dir=None, *, verify="size", val_size=0.1, seed=0):
+def npy_to_zarr(src, store, chunk=100):
+    """Write the zarr store read by :func:`fetch_s1slc_cvdl` from the DataPort ``.npy`` files.
+
+    ``src`` holds one folder per city with :data:`NPY`; each city becomes a
+    group with ``data`` (N, 100, 100, 4) float32 = [Re HH, Im HH, Re HV, Im HV]
+    and ``labels`` (N,) int32, chunks of ``chunk`` patches (as the local
+    conversion ``extract_real_imag_dataset.py``).
+    """
+    import shutil
+
+    import zarr
+
+    src, store = Path(src), Path(store)
+    tmp = store.with_name(store.name + ".part")
+    if tmp.exists():
+        shutil.rmtree(tmp)
+    root = zarr.open_group(str(tmp), mode="w")
+    for city in sorted(p.name for p in src.iterdir() if p.is_dir()):
+        if not all((src / city / f).exists() for f in NPY):
+            continue
+        hh, hv = (np.load(src / city / f, mmap_mode="r") for f in NPY[:2])
+        labels = np.atleast_1d(np.load(src / city / NPY[2])).ravel().astype(np.int32)
+        if hh.shape != hv.shape or len(hh) != len(labels):
+            raise ValueError(f"{city}: HH {hh.shape}, HV {hv.shape}, {len(labels)} labels")
+        g = root.create_group(city)
+        data = g.create_array("data", shape=(len(hh), *hh.shape[1:], 4), dtype=np.float32,
+                              chunks=(chunk, *hh.shape[1:], 4), fill_value=0)
+        g.create_array("labels", shape=labels.shape, dtype=np.int32, chunks=(chunk,),
+                       fill_value=0)[:] = labels
+        for i in range(0, len(hh), chunk):
+            a, b = hh[i:i + chunk], hv[i:i + chunk]
+            data[i:i + chunk] = np.stack([a.real, a.imag, b.real, b.imag], -1).astype(np.float32)
+    tmp.rename(store)
+    return store
+
+
+def _download_root(cache_dir, archive):
+    """Folder holding the zarr store converted in the cache from the DataPort archive."""
+    out = downloads_dir(NAME, cache_dir)
+    if (out / STORE).exists():
+        return out
+    if archive is None:
+        manual_source(NAME, page_url=PAGE, dest_dir=out,
+                      expected="S1SLC_CVDL.rar (12.24 GB; free IEEE account)")
+    path = Path(archive).expanduser()
+    if path.is_dir() and (path / STORE).exists():
+        return path
+    if path.is_file():
+        stem = path.name.rsplit(".", 1)[0]
+        path = (extract_rar(path, out / stem) if path.suffix.lower() == ".rar"
+                else extract_archive(path, out / stem))
+    elif not path.exists():
+        raise FileNotFoundError(f"{path} does not exist")
+    src = find_root(path, (f"{CITIES[0]}/{NPY[0]}",))
+    if src is None:
+        raise FileNotFoundError(f"{archive} holds no <City>/{NPY[0]} folder")
+    npy_to_zarr(src, out / STORE)
+    return out
+
+
+def fetch_s1slc_cvdl(data_dir=None, *, verify="size", val_size=0.1, seed=0, cache_dir=None,
+                     archive=None):
     """Index the S1SLC_CVDL patches.
+
+    Parameters
+    ----------
+    cache_dir : path, optional
+        Where an archive is extracted and converted.
+    archive : path, optional
+        ``S1SLC_CVDL.rar`` (or another archive, or a folder) holding the city
+        ``.npy`` files, or a folder holding ``complex_HHHV.zarr`` (see
+        "Download" in the module docstring).
 
     Returns
     -------
-    Bunch with ``meta`` (``city``, ``index`` in the city array, ``label``) and
-    ``splits`` (``"loco_<City>"``, ``"recommended"``).
+    Bunch with ``meta`` (``city``, ``index`` in the city array, ``label``),
+    ``splits`` (``"loco_<City>"``, ``"recommended"``) and ``root``.
     """
     from sklearn.model_selection import train_test_split
 
     root = dataset_path(DOMAIN, NAME, data_dir)
+    if not (root / STORE).exists():
+        root = _download_root(cache_dir, archive)
     check_local(root, verify=verify, required=(STORE,))
     z = _open(root)
     frames = []

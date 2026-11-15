@@ -38,8 +38,20 @@ matrix T6, with official labels in 12 classes.
   Journal of Photogrammetry and Remote Sensing, 2023.
 - Data: KITopenData, version 2, doi:10.35097/1700,
   <https://radar.kit.edu/radar/en/dataset/IAzBEMXnbTndvIZG>. Licence:
-  CC BY-NC-SA 4.0. Download the BagIt archive by hand and place it under
-  `<root>/SAR/Pol-InSAR-Island`.
+  CC BY-NC-SA 4.0. See [Getting the data](#getting-the-data).
+
+## Getting the data
+
+Direct, no account (RADAR4KIT terms of use). The archive URL, size
+(5 567 475 200 bytes) and md5 (`9ba66a216b1ae441a5d4ef91e30a4aa8`) are those of
+the dataset page. Without a local copy, `fetch_pol_insar_island()` downloads the
+BagIt `tar` into `<cache>/Pol-InSAR-Island/downloads/`, checks it, extracts the
+inner `data/dataset/Pol-InSAR-Island_updated.zip` (md5 of the bag manifest
+checked) and reads its content.
+
+```python
+fetch_pol_insar_island(archive="~/Downloads/10.35097-1700.tar")  # or the inner zip, or a folder
+```
 
 ## Raw data
 

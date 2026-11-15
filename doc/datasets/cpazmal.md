@@ -47,6 +47,19 @@ coordinates).
   according to that page. The PAZ images fall under a Hisdesat/INTA licence,
   so check it before any redistribution.
 
+## Getting the data
+
+Direct, no account: `dataset/CPAZMaL.hdf5` of the public Hugging Face repository
+[`musmb/CPAZMaL`](https://huggingface.co/datasets/musmb/CPAZMaL), pinned revision
+`642e8c0f…` (1.5 GB, sha256 = LFS identifier, equal to the local copy;
+Apache-2.0). Without a local copy it is downloaded once into
+`<cache>/cpazmal/downloads/<revision>/`. A file already downloaded is used in
+place after its sha256 is checked:
+
+```python
+fetch_cpazmal(archive="~/Downloads/CPAZMaL.hdf5")
+```
+
 ## Raw data
 
 ```text
