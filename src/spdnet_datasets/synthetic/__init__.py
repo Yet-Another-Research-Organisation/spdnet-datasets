@@ -20,6 +20,13 @@ from .data_generator import (
     shuffle_data,
 )
 from .dataset import SimulationDataset, create_dataloaders
+from .series import (
+    SeriesConfig,
+    SeriesData,
+    generate_series,
+    sample_wishart,
+    validate_series,
+)
 
 __all__ = [
     # Configuration
@@ -44,4 +51,11 @@ __all__ = [
     # Dataset
     'SimulationDataset',
     'create_dataloaders',
+
+    # Covariance series
+    'SeriesConfig',
+    'SeriesData',
+    'generate_series',
+    'sample_wishart',
+    'validate_series',
 ]
