@@ -115,6 +115,18 @@ def test_esc50_official_folds_without_leakage(esc50_dir, tmp_path):
     assert len(_esc(esc50_dir, tmp_path, subset="test", fold=3)) == len(parts["test"])
 
 
+def test_subset_attributes_are_aligned(esc50_dir, tmp_path):
+    from spdnet_datasets.base import create_dataloaders
+
+    ds = _esc(esc50_dir, tmp_path, subset="train", fold=2)
+    assert len(ds.groups) == len(ds.labels) == len(ds.meta) == len(ds) == 23
+    assert set(ds.meta["fold"]) == {1, 4, 5}
+    assert [ds[i][1] for i in range(len(ds))] == ds.labels.tolist()
+    assert ds.splits == {} and set(ds.full_splits) == {"official", "recommended"}
+    with pytest.raises(ValueError, match="Unknown split"):
+        create_dataloaders(ds, num_workers=0, split="recommended", verbose=False)
+
+
 def test_esc50_tasks(esc50_dir, tmp_path):
     coarse = _esc(esc50_dir, tmp_path, task="coarse", subset=None)
     assert coarse.classes == ["animals", "natural_soundscapes", "urban"]

@@ -209,7 +209,7 @@ class SequenceCovarianceDataset(BaseDataset):
     data_dir : path, optional
         Read-only copy of the dataset (default ``<data root>/<DOMAIN>/<NAME>``).
     split : str
-        Name of the split in :attr:`splits` that defines ``subset`` and the
+        Name of the split in :attr:`full_splits` that defines ``subset`` and the
         training set used to fit the normalisation.
     subset : {"train", "val", "test", None}
         Part of the split exposed by the dataset; ``None`` (or ``"all"``)
@@ -228,8 +228,10 @@ class SequenceCovarianceDataset(BaseDataset):
 
     Notes
     -----
-    - Splits are computed after the class selection; their indices refer to
-      the full selection (``subset=None``).
+    - Splits are computed after the class selection, on the whole selection
+      (:attr:`full_splits`). With ``subset=None`` they index the dataset and
+      are exposed as :attr:`splits`; with a subset, :attr:`splits` is empty and
+      :attr:`labels`, :attr:`groups` and :attr:`meta` describe the subset.
     - ``balance="undersample" | "oversample"`` resamples the training indices
       of the selected split only; ``"weights"`` sets :attr:`class_weights`
       (computed on the training set).
@@ -250,8 +252,8 @@ class SequenceCovarianceDataset(BaseDataset):
         if subset not in (None, "train", "val", "test"):
             raise ValueError(f"subset must be 'train', 'val', 'test' or None, got {subset!r}")
         self.split, self.subset, self.fold = split, subset, fold
-        self.fetch_kwargs = {"cache_dir": cache_dir, "keep": keep, "force": force, "verify": verify,
-                                 "limit": limit, "estimator": self.estimator}
+        self.fetch_kwargs = {"cache_dir": cache_dir, "keep": keep, "force": force,
+                             "verify": verify, "limit": limit, "estimator": self.estimator}
         self._load_data()
 
     # -- to implement -----------------------------------------------------
@@ -277,41 +279,49 @@ class SequenceCovarianceDataset(BaseDataset):
         if len(idx) == 0:
             raise ValueError("No sample left after the class selection")
 
-        self.meta = b.meta.iloc[idx].reset_index(drop=True)
-        self.labels = np.array([self.class_to_idx[c] for c in task_class[idx]], dtype=np.int64)
-        self.groups = np.asarray(b.groups)[idx]
+        meta = b.meta.iloc[idx].reset_index(drop=True)
+        labels = np.array([self.class_to_idx[c] for c in task_class[idx]], dtype=np.int64)
+        groups = np.asarray(b.groups)[idx]
+        self._labels_all = labels
         self._covs = b.covariances[idx]
         self._means = b.means[idx]
-        self._rows = self.meta["row"].to_numpy() if "row" in self.meta else None
+        self._rows = meta["row"].to_numpy() if "row" in meta else None
         self._processed = b.processed_path
         if self.return_raw and (self._processed is None or self._rows is None):
             raise ValueError("return_raw=True needs the preprocessed sequences: fetch with "
                              "keep='keep_processed' or 'keep_full'")
-        self.samples_all = [{"id": i, "class_name": self.classes[c]}
-                            for i, c in zip(self.meta["id"], self.labels, strict=True)]
 
         try:
-            self.splits = self._make_splits(self.meta, self.labels, self.groups)
+            self.full_splits = self._make_splits(meta, labels, groups)
         except ValueError as exc:  # too few samples per class or group for the folds
             warnings.warn(f"No split available for this selection: {exc}", UserWarning,
                           stacklevel=3)
-            self.splits = {}
-        parts = self.splits.get(self.split)
+            self.full_splits = {}
+        parts = self.full_splits.get(self.split)
         if parts is None and (self.subset is not None or self.normalize):
-            raise ValueError(f"Unknown split {self.split!r}; available: {sorted(self.splits)}")
+            raise ValueError(f"Unknown split {self.split!r}; "
+                             f"available: {sorted(self.full_splits)}")
         self.class_weights = None
         if parts is not None and self.balance is not None:
             train = parts["train"]
             if self.balance == "weights":
-                self.class_weights = class_weights(self.labels[train])
+                self.class_weights = class_weights(labels[train])
             else:
-                parts["train"] = train[balance_indices(self.labels[train], self.balance,
+                parts["train"] = train[balance_indices(labels[train], self.balance,
                                                        seed=self.seed)]
         self.scale = (geometric_scale(self._covs[parts["train"]])
                       if self.normalize and len(parts["train"]) else 1.0)
-        self._index = (np.arange(len(self.labels)) if self.subset is None
+
+        # Public attributes are aligned with the exposed samples; ``splits``
+        # indexes them only when the whole selection is exposed.
+        self._index = (np.arange(len(labels)) if self.subset is None
                        else np.asarray(parts[self.subset], dtype=int))
-        self.samples = [self.samples_all[j] for j in self._index]
+        self.labels = labels[self._index]
+        self.groups = groups[self._index]
+        self.meta = meta.iloc[self._index].reset_index(drop=True)
+        self.splits = self.full_splits if self.subset is None else {}
+        self.samples = [{"id": i, "class_name": self.classes[c]}
+                        for i, c in zip(self.meta["id"], self.labels, strict=True)]
         if self.verbose:
             print(f"{type(self).__name__}: {len(self._index)} samples "
                   f"({self.subset or 'all'}, split {self.split!r}), {len(self.classes)} "
@@ -342,7 +352,7 @@ class SequenceCovarianceDataset(BaseDataset):
         x = self._pack(cov, mean, raw)
         if self.transform is not None:
             x = self.transform(x)
-        return x, int(self.labels[j])
+        return x, int(self._labels_all[j])
 
 
 __all__ = ["CSV", "SequenceCovarianceDataset", "check_local", "estimate_stage",
