@@ -27,6 +27,7 @@ from .real import (
     Rices90Dataset,
     UAVDataset,
 )
+from .sits import PastisRDataset, fetch_pastis_r
 
 __version__ = "0.1.0"
 
@@ -54,4 +55,8 @@ __all__ = [
     'CI4RDataset',
     'DopNetDataset',
     'MVDopplerDataset',
+
+    # SITS
+    'PastisRDataset',
+    'fetch_pastis_r',
 ]
