@@ -7,13 +7,15 @@ Covariance series from the UEA multivariate archive (EEG, R22): one covariance o
   same for every training seed) is the validation split. The archive carries no subject identifier: MotorImagery,
   FingerMovements and SelfRegulationSCP1 come from a single subject each (BCI competition recordings), so the
   protocol is trial-independent, with train and test trials from different sessions / days, not subject-independent.
+- n >= 2p: FingerMovements (windows of 20 steps, 28 channels) does not satisfy it; it raises
+  :class:`spdnet_datasets.core.InsufficientSamplesError` unless ``allow_small_n=True`` (documented derogation:
+  Ledoit-Wolf shrinkage keeps the tokens SPD).
 """
 
 import numpy as np
 
-from .series_breizhcrops import _ledoit_wolf
+from .series import covariance, data_root
 
-UEA_ROOT = "/DATA/DATASET/TIMESERIES/UEA_MTS_2018/Multivariate_ts"
 UEA_SHAPES = {  # name: (window, step, T)
     "MotorImagery": (250, 250, 12),  # 3 000 steps, 64 channels: n/p = 3.9
     "FingerMovements": (20, 4, 8),  # 50 steps, 28 channels: n/p = 0.71, windows overlap by 80 %; shrinkage does the rest
@@ -36,9 +38,12 @@ def read_ts(path: str, classes: list[str]) -> tuple[np.ndarray, np.ndarray]:
     return np.array(x), np.array(y)
 
 
-def uea_series(name: str, root: str = UEA_ROOT, channel_step: int = 1) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
+def uea_series(name: str, root: str | None = None, channel_step: int = 1,
+               allow_small_n: bool = False) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
     """(N, T, p, p) covariances per time window, labels, samples per window, {"split": 0 train / 1 val / 2 test}.
-    ``channel_step``: keep every k-th channel (reduced variant, p = 64 -> 32)."""
+    ``channel_step``: keep every k-th channel (reduced variant, p = 64 -> 32). ``allow_small_n``: accept windows
+    with fewer than 2p samples (FingerMovements)."""
+    root = data_root(root, "TIMESERIES", "UEA_MTS_2018", "Multivariate_ts")
     window, step, T = UEA_SHAPES[name]
     classes = UEA_CLASSES[name]
     x_train, y_train = read_ts(f"{root}/{name}/{name}_TRAIN.ts", classes)
@@ -53,14 +58,13 @@ def uea_series(name: str, root: str = UEA_ROOT, channel_step: int = 1) -> tuple[
     split = np.concatenate([np.where(val, 1, 0), np.full(len(y_test), 2)])
     fit = x[split == 0]  # per-channel scaling from the training trials only
     x = (x - fit.mean((0, 2))[None, :, None]) / fit.std((0, 2))[None, :, None]
-    data = np.stack([np.stack([_ledoit_wolf(trial[:, t * step:t * step + window].T - trial[:, t * step:t * step + window].T.mean(0))
+    data = np.stack([np.stack([covariance(trial[:, t * step:t * step + window].T, allow_small_n=allow_small_n)
                                for t in range(T)]) for trial in x])
     return data, y, np.full(len(y), window), {"split": split}
 
 
 
 
-PTBXL_ROOT = "/DATA/DATASET/BIOSIGNAL/PTB-XL"
 PTBXL_CLASSES = ["NORM", "MI", "STTC", "CD", "HYP"]  # diagnostic superclasses
 
 
@@ -78,7 +82,7 @@ def read_wfdb16(path: str) -> np.ndarray:
     return (raw - np.array(baseline)) / np.array(gain)
 
 
-def ptbxl_series(root: str = PTBXL_ROOT, window: int = 100, T: int = 10) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
+def ptbxl_series(root: str | None = None, window: int = 100, T: int = 10) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
     """PTB-XL 100 Hz, 12 leads: (N, T = 10, 12, 12) Ledoit-Wolf covariances of non-overlapping 1 s windows, labels
     0..4 (NORM, MI, STTC, CD, HYP), samples per window, {"split": 0 train / 1 val / 2 test}.
     Single-label records only (exactly one diagnostic superclass in ``scp_codes``); official ``strat_fold``: 1-8 train,
@@ -87,6 +91,7 @@ def ptbxl_series(root: str = PTBXL_ROOT, window: int = 100, T: int = 10) -> tupl
 
     import pandas as pd
 
+    root = data_root(root, "BIOSIGNAL", "PTB-XL")
     db = pd.read_csv(f"{root}/ptbxl_database.csv", index_col="ecg_id")
     scp = pd.read_csv(f"{root}/scp_statements.csv", index_col=0)
     superclass = scp[scp.diagnostic == 1].diagnostic_class.to_dict()
@@ -94,13 +99,13 @@ def ptbxl_series(root: str = PTBXL_ROOT, window: int = 100, T: int = 10) -> tupl
     for ecg_id, codes in db.scp_codes.items():
         classes = {superclass[c] for c in ast.literal_eval(codes) if c in superclass}
         if len(classes) == 1:
-            ids.append(ecg_id); y.append(PTBXL_CLASSES.index(classes.pop()))
+            ids.append(ecg_id)
+            y.append(PTBXL_CLASSES.index(classes.pop()))
     y = np.array(y)
     fold = db.loc[ids, "strat_fold"].to_numpy()
     split = np.where(fold <= 8, 0, np.where(fold == 9, 1, 2))
     x = np.stack([read_wfdb16(f"{root}/{db.loc[i, 'filename_lr']}")[:window * T].T for i in ids])  # (N, 12, 1000)
     fit = x[split == 0]
     x = (x - fit.mean((0, 2))[None, :, None]) / fit.std((0, 2))[None, :, None]
-    data = np.stack([np.stack([_ledoit_wolf(r[:, t * window:(t + 1) * window].T - r[:, t * window:(t + 1) * window].T.mean(0))
-                               for t in range(T)]) for r in x])
+    data = np.stack([np.stack([covariance(r[:, t * window:(t + 1) * window].T) for t in range(T)]) for r in x])
     return data, y, np.full(len(y), window), {"split": split}

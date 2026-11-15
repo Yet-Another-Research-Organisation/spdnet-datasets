@@ -5,6 +5,9 @@ of mean parcel reflectances, Brittany 2017, 9 crop classes (class mapping of the
 - Token = Ledoit-Wolf covariance of the 4 bands B2, B3, B4, B8 (visible + near infrared) over the cloud-free dates
   (CLD = 0) of one calendar quarter: T = 4 positions identified by the season. A quarter with fewer than
   ``min_dates`` clear dates is an identity token (masked, E8); parcels without any valid quarter are dropped.
+  n >= 2p would need 8 clear dates per quarter, which keeps about 15 % of the parcels (67 of 463 in a sample of
+  the training region): the default ``min_dates = 3`` is a documented derogation and needs ``allow_small_n=True``
+  (otherwise :class:`spdnet_datasets.core.InsufficientSamplesError` is raised before reading anything).
 - ``pooled`` (baseline B3, no series): one covariance over all the clear dates of the year, (N, 1, 4, 4).
 - Official regional split (paper): frh01 + frh02 train, frh03 validation, frh04 test (distinct departments, a real
   spatial shift), each capped by a stratified subsample drawn once (seed 0): ``caps`` = (train, val, test).
@@ -13,7 +16,9 @@ of mean parcel reflectances, Brittany 2017, 9 crop classes (class mapping of the
 import numpy as np
 import pandas as pd
 
-ROOT = "/DATA/BreizhCrops/L2A_h5"
+from ..core.estimators import check_sample_size
+from .series import covariance, data_root
+
 BREIZHCROPS_CLASSES = ["barley", "wheat", "rapeseed", "corn", "sunflower", "orchards", "nuts", "permanent meadows",
                        "temporary meadows"]
 CODES = {"ORH": 0, "ORP": 0, "BTH": 1, "BTP": 1, "CZH": 2, "CZP": 2, "MID": 3, "MIE": 3, "MIS": 3, "TRN": 4,
@@ -30,22 +35,18 @@ def _cap_stratified(labels: np.ndarray, cap: int, rng: np.random.Generator) -> n
     classes, counts = np.unique(labels, return_counts=True)
     quotas = np.maximum(1, np.floor(cap * counts / len(labels))).astype(int)
     return np.sort(np.concatenate([rng.choice(np.flatnonzero(labels == c), q, replace=False)
-                                   for c, q in zip(classes, quotas)]))
+                                   for c, q in zip(classes, quotas, strict=True)]))
 
 
-def _ledoit_wolf(x: np.ndarray, load: float = 1e-6) -> np.ndarray:
-    from sklearn.covariance import ledoit_wolf
-
-    covariance = ledoit_wolf(x)[0]
-    return covariance + load * np.trace(covariance) / len(covariance) * np.eye(len(covariance))
-
-
-def breizhcrops_series(root: str = ROOT, caps: tuple[int, int, int] = (20000, 5000, 10000), min_dates: int = 3,
-                       pooled: bool = False) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
+def breizhcrops_series(root: str | None = None, caps: tuple[int, int, int] = (20000, 5000, 10000), min_dates: int = 3,
+                       pooled: bool = False, allow_small_n: bool = False) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
     """(N, 4, 4, 4) quarterly covariances (or (N, 1, 4, 4) pooled), labels 0..8, clear dates per token (median over
     the valid quarters; all of them when pooled), {"split": 0 train / 1 val / 2 test}."""
     import h5py
 
+    if not allow_small_n:
+        check_sample_size(min_dates, len(BANDS))
+    root = data_root(root, "SITS", "BreizhCrops", "L2A_h5")
     rng = np.random.default_rng(0)
     data, labels, n_obs, split = [], [], [], []
     for role in range(3):
@@ -64,13 +65,16 @@ def breizhcrops_series(root: str = ROOT, caps: tuple[int, int, int] = (20000, 50
             if not valid:  # no valid token: dropped from both versions (same samples with and without series)
                 continue
             if pooled:
-                series = _ledoit_wolf(x)[None]
+                series = covariance(x, allow_small_n=allow_small_n)[None]
             else:
                 series = np.tile(np.eye(4), (4, 1, 1))
                 for q in valid:
-                    series[q] = _ledoit_wolf(x[quarter == q])
+                    series[q] = covariance(x[quarter == q], allow_small_n=allow_small_n)
             per_token = len(x) if pooled else np.median([(quarter == q).sum() for q in valid])
-            data.append(series); labels.append(y[i]); n_obs.append(per_token); split.append(role)
+            data.append(series)
+            labels.append(y[i])
+            n_obs.append(per_token)
+            split.append(role)
         for f in files.values():
             f.close()
     return np.stack(data), np.array(labels), np.array(n_obs), {"split": np.array(split)}

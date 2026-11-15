@@ -6,10 +6,18 @@ import os
 import numpy as np
 import pytest
 
-from spdnet_datasets.real.series_audio import AUDIO_ROOT, _series_job
-from spdnet_datasets.real.series_breizhcrops import ROOT as BREIZHCROPS, breizhcrops_series
-from spdnet_datasets.real.series_mvdoppler import ROOT as MVDOPPLER, mvdoppler_series
-from spdnet_datasets.real.series_pastis_fusion import ROOT as PASTIS, pastis_fusion_series
+from spdnet_datasets.core import InsufficientSamplesError
+from spdnet_datasets.core.config import dataset_path, get_data_root
+from spdnet_datasets.real.series_audio import _series_job
+from spdnet_datasets.real.series_breizhcrops import breizhcrops_series
+from spdnet_datasets.real.series_mvdoppler import mvdoppler_series
+from spdnet_datasets.real.series_pastis_fusion import pastis_fusion_series
+
+AUDIO_ROOT = str(get_data_root() / "AUDIO")
+BREIZHCROPS = str(dataset_path("SITS", "BreizhCrops") / "L2A_h5")
+MVDOPPLER = str(dataset_path("RADAR_DOPPLER", "MVDoppler"))
+PASTIS = str(dataset_path("SITS", "PASTIS-R") / "PASTIS-R")
+pytestmark = pytest.mark.real_data
 
 
 def _check(series, pooled, T, p):
@@ -26,7 +34,10 @@ def _check(series, pooled, T, p):
 @pytest.mark.skipif(not os.path.isdir(BREIZHCROPS), reason="BreizhCrops not available")
 def test_breizhcrops_quarters():
     caps = (60, 20, 30)
-    _check(breizhcrops_series(caps=caps), breizhcrops_series(caps=caps, pooled=True), 4, 4)
+    with pytest.raises(InsufficientSamplesError):  # 3 clear dates per quarter for p = 4: derogation
+        breizhcrops_series(caps=caps)
+    _check(breizhcrops_series(caps=caps, allow_small_n=True),
+           breizhcrops_series(caps=caps, pooled=True, allow_small_n=True), 4, 4)
 
 
 @pytest.mark.skipif(not os.path.isdir(MVDOPPLER), reason="MVDoppler not available")

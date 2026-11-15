@@ -6,9 +6,9 @@ of ``window_s`` seconds (step = half a window). Positions are time windows: they
 (a sound event can fall in any window).
 
 - ``pooled`` (baseline B3, no series): one covariance over the frames of the valid windows instead.
-- Clips without any valid window are dropped. Windows whose samples are more than half exact zeros (padding silence, 216 ESC-50 clips are mostly silent) or
-  whose covariance has a null trace become identity tokens (masked, E8); series are padded with the identity up to
-  ``t_max``.
+- Clips without any valid window are dropped. Windows whose samples are more than half exact zeros (padding silence, 216 ESC-50 clips are mostly silent),
+  whose covariance has a null trace, or truncated to fewer than 2p = 40 frames (clips shorter than a window)
+  become identity tokens (masked, E8); series are padded with the identity up to ``t_max``.
 - ESC-50: 2 000 clips of 5 s, 50 classes, 1 s windows (T = 8, n = 86 frames, n/p = 4.3); groups = source
   recording (``src_file``, the official folds never split one).
 - GTZAN: 999 excerpts of 30 s, 10 genres, 3 s windows (T = 19, n = 258 frames, n/p = 13); groups = exact
@@ -26,9 +26,8 @@ from multiprocessing import Pool
 
 import numpy as np
 from scipy.fft import dct
-from sklearn.covariance import ledoit_wolf
 
-AUDIO_ROOT = "/DATA/DATASET/AUDIO"
+from .series import covariance, data_root
 
 
 def _mel_filters(sr: int, n_fft: int, n_mels: int = 64, fmin: float = 50.0) -> np.ndarray:
@@ -77,35 +76,58 @@ def mfcc_window_series(x: np.ndarray, sr: int, window_s: float, t_max: int, pool
         if t == t_max:
             break
         samples = x[start * hop:(start + w - 1) * hop + n_fft]
-        covariance = ledoit_wolf(mfcc[start:start + w])[0]
-        trace = np.trace(covariance) / 20
-        if (samples == 0).mean() <= 0.5 and trace > 0:
-            series[t] = covariance + 1e-6 * trace * np.eye(20)
+        if (samples == 0).mean() > 0.5 or len(mfcc[start:start + w]) < 2 * 20:
+            continue  # silent window, or a truncated one below 2p frames: identity token
+        token = covariance(mfcc[start:start + w], spd=False)
+        if np.trace(token) > 0:
+            series[t] = token
             frames[start:start + w] = True
     if pooled:
         if not frames.any():
             return np.eye(20)[None]
-        covariance = ledoit_wolf(mfcc[frames])[0]
-        return (covariance + 1e-6 * np.trace(covariance) / 20 * np.eye(20))[None]
+        return covariance(mfcc[frames])[None]
     return series
 
 
-def _series_job(args: tuple) -> np.ndarray:
-    blob, crop, window_s, t_max, pooled, sr_target = args
+def _fingerprint(x: np.ndarray) -> str:
+    """md5 of the decoded signal rounded to 1e-4: identical for the exact duplicates of GTZAN."""
+    return hashlib.md5(np.round(x, 4).tobytes()).hexdigest()
+
+
+def _series_job(args: tuple):
+    """(blob, crop, window_s, t_max, pooled, sr_target[, fingerprint, mel, allow_small_n]) -> series, or
+    (series, fingerprint of the decoded signal) when ``fingerprint``: each clip is decoded once."""
+    blob, crop, window_s, t_max, pooled, sr_target, fingerprint, mel, allow_small_n = (*args, False, False, False)[:9]
     x, sr = _decode(blob) if crop is None else _decode(blob, *crop)
+    signature = _fingerprint(x) if fingerprint else None
     if sr_target is not None and sr != sr_target:  # UrbanSound8K: rates of 8 to 96 kHz, tied to the source recording
         from math import gcd
+
         from scipy.signal import resample_poly
 
         x, sr = resample_poly(x, sr_target // gcd(sr, sr_target), sr // gcd(sr, sr_target)), sr_target
-    return mfcc_window_series(x, sr, window_s, t_max, pooled)
+    if mel:
+        from .series_large_p import _mel_window_series
+
+        series = _mel_window_series(x, sr, window_s, t_max, allow_small_n)
+    else:
+        series = mfcc_window_series(x, sr, window_s, t_max, pooled)
+    return (series, signature) if fingerprint else series
 
 
 def _build(blobs: list, crops: list, window_s: float, t_max: int, jobs: int, pooled: bool = False,
-           sr_target: int | None = None) -> np.ndarray:
-    with Pool(jobs) as pool:
-        args = [(b, c, window_s, t_max, pooled, sr_target) for b, c in zip(blobs, crops)]
-        return np.stack(pool.map(_series_job, args, chunksize=8))
+           sr_target: int | None = None, fingerprint: bool = False, mel: bool = False, allow_small_n: bool = False):
+    """Series of every clip (``jobs`` processes; in this process when ``jobs <= 1``); with ``fingerprint``, also
+    the list of the decoded-signal fingerprints."""
+    args = [(b, c, window_s, t_max, pooled, sr_target, fingerprint, mel, allow_small_n) for b, c in zip(blobs, crops, strict=True)]
+    if jobs <= 1:
+        out = [_series_job(a) for a in args]
+    else:
+        with Pool(jobs) as pool:
+            out = pool.map(_series_job, args, chunksize=8)
+    if fingerprint:
+        return np.stack([s for s, _ in out]), [f for _, f in out]
+    return np.stack(out)
 
 
 def _drop_silent(data: np.ndarray, *arrays: np.ndarray) -> tuple:
@@ -114,10 +136,12 @@ def _drop_silent(data: np.ndarray, *arrays: np.ndarray) -> tuple:
     return (data[keep], *(np.asarray(a)[keep] for a in arrays))
 
 
-def esc50_series(root: str = f"{AUDIO_ROOT}/ESC-50", window_s: float = 1.0, t_max: int = 8, jobs: int = 3, pooled: bool = False):
+def esc50_series(root: str | None = None, window_s: float = 1.0, t_max: int = 8, jobs: int = 3, pooled: bool = False):
     """(2000, 8, 20, 20) covariances, labels 0..49, frames per window, groups = source recording."""
     import pyarrow as pa
     import pyarrow.parquet as pq
+
+    root = data_root(root, "AUDIO", "ESC-50")
 
     table = pa.concat_tables([pq.read_table(f) for f in sorted(glob.glob(f"{root}/*.parquet"))])
     blobs = [a["bytes"] for a in table.column("audio").to_pylist()]
@@ -126,31 +150,35 @@ def esc50_series(root: str = f"{AUDIO_ROOT}/ESC-50", window_s: float = 1.0, t_ma
     return _drop_silent(data, table.column("target").to_numpy(), np.full(len(blobs), 86), groups)
 
 
-def gtzan_series(root: str = f"{AUDIO_ROOT}/GTZAN", window_s: float = 3.0, t_max: int = 19, jobs: int = 3, pooled: bool = False):
-    """(999, 19, 20, 20) covariances, genres 0..9, frames per window, groups = exact duplicates merged."""
+def gtzan_series(root: str | None = None, window_s: float = 3.0, t_max: int = 19, jobs: int = 3, pooled: bool = False):
+    """(999, 19, 20, 20) covariances, genres 0..9, frames per window, groups = exact duplicates merged (each clip
+    is decoded once: the fingerprint comes from the same decoding as the series)."""
     import pyarrow as pa
     import pyarrow.parquet as pq
 
+    root = data_root(root, "AUDIO", "GTZAN")
     table = pa.concat_tables([pq.read_table(f) for f in sorted(glob.glob(f"{root}/*.parquet"))])
     blobs = [a["bytes"] for a in table.column("audio").to_pylist()]
-    data = _build(blobs, [None] * len(blobs), window_s, t_max, jobs, pooled)
-    fingerprints = [hashlib.md5(np.round(_decode(b)[0], 4).tobytes()).hexdigest() for b in blobs]
+    data, fingerprints = _build(blobs, [None] * len(blobs), window_s, t_max, jobs, pooled, fingerprint=True)
     groups = np.unique(fingerprints, return_inverse=True)[1]
     return _drop_silent(data, table.column("genre").to_numpy(), np.full(len(blobs), 258), groups)
 
 
-def birdset_series(root: str = f"{AUDIO_ROOT}/BirdSet_XCM", window_s: float = 1.0, t_max: int = 8,
+def birdset_series(root: str | None = None, window_s: float = 1.0, t_max: int = 8,
                    min_recordings: int = 10, jobs: int = 3, pooled: bool = False):
     """(N, 8, 20, 20) covariances of a 5 s crop centred on the first detected event, species 0..C-1 with at least
     ``min_recordings`` recordings, frames per window, groups = recordist."""
     import pyarrow.parquet as pq
 
+    root = data_root(root, "AUDIO", "BirdSet_XCM")
     blobs, crops, species, recordists = [], [], [], []
     for f in sorted(glob.glob(f"{root}/xcm_*.parquet")):
         table = pq.read_table(f, columns=["audio", "ebird_code", "detected_events", "recordist"])
-        for audio, code, events, recordist in zip(*(table.column(c).to_pylist() for c in table.column_names)):
+        for audio, code, events, recordist in zip(*(table.column(c).to_pylist() for c in table.column_names), strict=True):
             start = max(0.0, (events[0][0] + events[0][1]) / 2 - 2.5) if events else 0.0
-            blobs.append(audio["bytes"]); crops.append((start, 5.0)); species.append(code)
+            blobs.append(audio["bytes"])
+            crops.append((start, 5.0))
+            species.append(code)
             recordists.append(recordist or "NA")
     codes, counts = np.unique(species, return_counts=True)
     kept = np.isin(species, codes[counts >= min_recordings])
@@ -161,15 +189,16 @@ def birdset_series(root: str = f"{AUDIO_ROOT}/BirdSet_XCM", window_s: float = 1.
     return _drop_silent(data, labels, np.full(len(index), 62), groups)
 
 
-def urbansound8k_series(root: str = f"{AUDIO_ROOT}/UrbanSound8K", window_s: float = 1.0, t_max: int = 6, jobs: int = 3,
+def urbansound8k_series(root: str | None = None, window_s: float = 1.0, t_max: int = 6, jobs: int = 3,
                         pooled: bool = False):
     """(8732, 6, 20, 20) covariances of the urban sound slices (<= 4 s, Salamon et al. 2014), resampled to 22.05 kHz,
     classes 0..9, frames per window, groups = source recording (``fsID``: slices of one Freesound recording, never
     split by the official folds). A slice shorter than a window gives one token over its frames."""
     import pandas as pd
 
+    root = data_root(root, "AUDIO", "UrbanSound8K")
     table = pd.read_csv(f"{root}/metadata/UrbanSound8K.csv")
-    blobs = [open(f"{root}/audio/fold{fold}/{name}", "rb").read() for name, fold in zip(table.slice_file_name, table.fold)]
+    blobs = [open(f"{root}/audio/fold{fold}/{name}", "rb").read() for name, fold in zip(table.slice_file_name, table.fold, strict=True)]
     data = _build(blobs, [None] * len(blobs), window_s, t_max, jobs, pooled, sr_target=22050)
     groups = np.unique(table.fsID.to_numpy(), return_inverse=True)[1]
     return _drop_silent(data, table.classID.to_numpy(), np.full(len(blobs), 86), groups)

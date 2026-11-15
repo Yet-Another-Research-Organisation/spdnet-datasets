@@ -11,18 +11,23 @@ True time series (tokens are instants / time windows):
   instead of the 20 MFCC.
 - :func:`mvdoppler_window_series`: MVDoppler snapshots of ``mvdoppler_series`` (same files, caps, split), but the
   64 central Doppler bins are kept without averaging (p = 64) over the same windows of 64 frames (n/p = 1).
+
+These series break the n >= 2p rule by design (ESC-50 log-mel: 86 frames for p = 64; MVDoppler: 64 frames for
+p = 64; NTU: a quarter of the sequence for p = 45 or 75; GTZAN log-mel, 258 frames, does satisfy it). They raise
+:class:`spdnet_datasets.core.InsufficientSamplesError` unless called with ``allow_small_n=True``, a documented
+derogation: Ledoit-Wolf shrinkage keeps the tokens SPD, but they are poorly conditioned estimates.
 """
 
 import glob
-import hashlib
 
 import numpy as np
 import pandas as pd
-from sklearn.covariance import ledoit_wolf
 
-from .series_audio import AUDIO_ROOT, _decode, _drop_silent, _mel_filters
-from .series_breizhcrops import _cap_stratified, _ledoit_wolf
-from .series_mvdoppler import FOLDS, MVDOPPLER_CLASSES, ROOT, _readable  # noqa: F401
+from ..core.estimators import check_sample_size
+from .series import covariance, data_root
+from .series_audio import _drop_silent, _mel_filters
+from .series_breizhcrops import _cap_stratified
+from .series_mvdoppler import DOMAIN, FOLDS, MVDOPPLER_CLASSES, NAME, _readable
 from .series_ntu import ntu_skeletons
 
 NTU_JOINTS_15 = (0, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14, 16, 17, 18)
@@ -30,8 +35,10 @@ NTU_JOINTS_15 = (0, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14, 16, 17, 18)
 hand tips or thumbs), 0-based indices of the 25 NTU joints."""
 
 
-def ntu_window_series(joints: tuple[int, ...] | None = None, n_windows: int = 8, **kwargs):
-    """(n, n_windows, 3 J, 3 J) covariances, labels, frames per window, {"split", "subject", "camera"}."""
+def ntu_window_series(joints: tuple[int, ...] | None = None, n_windows: int = 8, allow_small_n: bool = False,
+                      **kwargs):
+    """(n, n_windows, 3 J, 3 J) covariances, labels, frames per window, {"split", "subject", "camera"}.
+    ``allow_small_n=True`` is required (frames per window < 2p, see the module docstring)."""
     skeletons, labels, extra = ntu_skeletons(centre=False, **kwargs)
     data, n_obs = [], []
     for x in skeletons:
@@ -39,12 +46,12 @@ def ntu_window_series(joints: tuple[int, ...] | None = None, n_windows: int = 8,
         x = x.reshape(len(x), -1)
         width = max(len(x) // 4, 3)
         starts = np.round(np.linspace(0, len(x) - width, n_windows)).astype(int)
-        data.append(np.stack([_ledoit_wolf(x[s:s + width]) for s in starts]))
+        data.append(np.stack([covariance(x[s:s + width], allow_small_n=allow_small_n) for s in starts]))
         n_obs.append(width)
     return np.stack(data), labels, np.array(n_obs), extra
 
 
-def _mel_window_series(x: np.ndarray, sr: int, window_s: float, t_max: int) -> np.ndarray:
+def _mel_window_series(x: np.ndarray, sr: int, window_s: float, t_max: int, allow_small_n: bool = False) -> np.ndarray:
     n_fft = int(2 ** round(np.log2(0.046 * sr)))
     hop = n_fft // 4
     if len(x) < n_fft:
@@ -60,37 +67,36 @@ def _mel_window_series(x: np.ndarray, sr: int, window_s: float, t_max: int) -> n
         if t == t_max:
             break
         samples = x[start * hop:(start + w - 1) * hop + n_fft]
-        covariance = ledoit_wolf(db[start:start + w])[0]
-        trace = np.trace(covariance) / 64
-        if (samples == 0).mean() <= 0.5 and trace > 0:
-            series[t] = covariance + 1e-6 * trace * np.eye(64)
+        frames = db[start:start + w]
+        if (samples == 0).mean() > 0.5 or (not allow_small_n and len(frames) < 2 * 64):
+            continue  # silent window, or a truncated one below 2p frames: identity token
+        token = covariance(frames, allow_small_n=allow_small_n, spd=False)
+        if np.trace(token) > 0:
+            series[t] = token
     return series
 
 
-def _job(args: tuple) -> np.ndarray:
-    blob, window_s, t_max = args
-    x, sr = _decode(blob)
-    return _mel_window_series(x, sr, window_s, t_max)
-
-
-def audio_mel_series(dataset: str, jobs: int = 3):
+def audio_mel_series(dataset: str, jobs: int = 3, root: str | None = None, allow_small_n: bool = False):
     """dataset "esc50" or "gtzan": (N, T, 64, 64) covariances of the log-mel bands, labels, frames per window, groups
-    (identical to ``esc50_series`` / ``gtzan_series``)."""
-    from multiprocessing import Pool
-
+    (identical to ``esc50_series`` / ``gtzan_series``). ESC-50 has 86 frames per window for p = 64 and needs
+    ``allow_small_n=True``; GTZAN (258 frames) does not."""
     import pyarrow as pa
     import pyarrow.parquet as pq
 
-    root, window_s, t_max, label_column, n_frames = {
-        "esc50": (f"{AUDIO_ROOT}/ESC-50", 1.0, 8, "target", 86), "gtzan": (f"{AUDIO_ROOT}/GTZAN", 3.0, 19, "genre", 258)}[dataset]
+    from .series_audio import _build
+
+    name, window_s, t_max, label_column, n_frames = {
+        "esc50": ("ESC-50", 1.0, 8, "target", 86), "gtzan": ("GTZAN", 3.0, 19, "genre", 258)}[dataset]
+    if not allow_small_n:
+        check_sample_size(n_frames, 64)
+    root = data_root(root, "AUDIO", name)
     table = pa.concat_tables([pq.read_table(f) for f in sorted(glob.glob(f"{root}/*.parquet"))])
     blobs = [a["bytes"] for a in table.column("audio").to_pylist()]
-    with Pool(jobs) as pool:
-        data = np.stack(pool.map(_job, [(b, window_s, t_max) for b in blobs], chunksize=8))
+    data, fingerprints = _build(blobs, [None] * len(blobs), window_s, t_max, jobs, fingerprint=True, mel=True,
+                                allow_small_n=allow_small_n)
     if dataset == "esc50":
         groups = np.unique(table.column("src_file").to_numpy(), return_inverse=True)[1]
     else:
-        fingerprints = [hashlib.md5(np.round(_decode(b)[0], 4).tobytes()).hexdigest() for b in blobs]
         groups = np.unique(fingerprints, return_inverse=True)[1]
     return _drop_silent(data, table.column(label_column).to_numpy(), np.full(len(blobs), n_frames), groups)
 
@@ -100,15 +106,20 @@ def _doppler_job(path: str) -> np.ndarray:
 
     with h5py.File(path, "r") as f:
         x = np.log(np.clip(f["radar_dat"][32:96, :, 0], 1e-12, None)).astype(np.float64).T  # (256 frames, 64 bins)
-    return np.stack([_ledoit_wolf(x[s:s + 64]) for s in range(0, 256 - 64 + 1, 32)])
+    return np.stack([covariance(x[s:s + 64], allow_small_n=True) for s in range(0, 256 - 64 + 1, 32)])
 
 
-def mvdoppler_window_series(root: str = ROOT, caps: tuple[int, int, int] = (20000, 5000, 10000), stride: int = 3,
-                           jobs: int = 3):
+def mvdoppler_window_series(root: str | None = None, caps: tuple[int, int, int] = (20000, 5000, 10000), stride: int = 3,
+                            jobs: int = 3, allow_small_n: bool = False):
     """(N, 7, 64, 64) covariances (view x, 64 Doppler bins, windows of 64 frames step 32). The files, labels and split are
     those of ``mvdoppler_series``, of which one snapshot out of ``stride`` is kept (35 000 x 7 x 64 x 64 float64 is
-    8 GB); ``parent_index`` = row in the ``mvdoppler`` cache."""
+    8 GB); ``parent_index`` = row in the ``mvdoppler`` cache. 64 frames for p = 64: ``allow_small_n=True`` is
+    required."""
     from multiprocessing import Pool
+
+    if not allow_small_n:
+        check_sample_size(64, 64)
+    root = data_root(root, DOMAIN, NAME)
 
     design = pd.read_csv(f"{root}/Labels_and_metadata/design_table.csv")
     design = design[[_readable(f"{root}/Data/{name}.h5") for name in design.fname]]
@@ -119,7 +130,8 @@ def mvdoppler_window_series(root: str = ROOT, caps: tuple[int, int, int] = (2000
         y = rows.pattern.map(MVDOPPLER_CLASSES.index).to_numpy()
         keep = _cap_stratified(y, caps[role], rng)
         paths += [f"{root}/Data/{name}.h5" for name in rows.fname[keep]]
-        labels.append(y[keep]); split.append(np.full(len(keep), role))
+        labels.append(y[keep])
+        split.append(np.full(len(keep), role))
     keep = np.arange(0, len(paths), stride)
     with Pool(jobs) as pool:
         data = np.stack(pool.map(_doppler_job, [paths[i] for i in keep], chunksize=64))
