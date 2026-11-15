@@ -10,6 +10,7 @@ import re
 
 import numpy as np
 
+from ..core.estimators import check_sample_size
 from .series import covariance, data_root, resolve_fit_mask
 
 POLINSAR_CLASSES = ["tidal flat", "water", "coastal shrub", "dense high vegetation", "white dune", "peat bog", "grey dune",
@@ -62,7 +63,8 @@ def polinsar_island_series(root: str | None = None, cell: int = 32, patch: int =
     Cells: non-overlapping, official train and test labels merged, kept when at least half the pixels are labelled and
     the majority class holds ``purity`` of them (definition of the atlas). Each band is divided by its mean power over
     the tokens of the ``fit_mask`` cells (one scalar per band, no label used), and tokens get a relative ridge of
-    1e-6."""
+    1e-6. Each token averages patch^2 pixels for a 12 x 12 matrix: n >= 2p is checked."""
+    check_sample_size(patch * patch, 12)
     root = data_root(root, "SAR", "Pol-InSAR-Island")
     side = cell // patch
     data, labels, groups = [], [], []

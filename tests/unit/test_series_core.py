@@ -401,3 +401,23 @@ def test_polinsar_normalisation_is_fitted_on_the_training_cells(tmp_path, builde
     assert data.shape[0] == 8 and sorted(labels) == list(range(8)) and is_spd(data)
     np.testing.assert_allclose(moved[fit], data[fit], rtol=1e-6)
     assert not np.allclose(moved[~fit], data[~fit])
+
+
+def test_synthetic_imports_without_yetanotherspdnet(monkeypatch):
+    import importlib
+    import sys
+
+    for name in [m for m in sys.modules if m.startswith("yetanotherspdnet")] + ["yetanotherspdnet"]:
+        monkeypatch.setitem(sys.modules, name, None)  # import yetanotherspdnet... -> ImportError
+    for name in [m for m in sys.modules if m.startswith("spdnet_datasets.synthetic")]:
+        monkeypatch.delitem(sys.modules, name)
+    synthetic = importlib.import_module("spdnet_datasets.synthetic")
+    with pytest.raises(ImportError, match="spdnet-datasets\\[synthetic\\]"):
+        _ = synthetic.generate_series
+
+
+def test_polinsar_island_checks_pixels_per_token(tmp_path):
+    from spdnet_datasets.real.series_sar import polinsar_island_series
+
+    with pytest.raises(InsufficientSamplesError):
+        polinsar_island_series(str(tmp_path), cell=8, patch=4)  # 16 pixels per 12 x 12 token

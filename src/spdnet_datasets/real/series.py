@@ -325,6 +325,7 @@ def ci4r_series(
         covariances, mean = sliding_covariances(pooled, width, step, "ledoit_wolf", return_mean=True, spd=False)
         constant = np.trace(covariances, axis1=-2, axis2=-1) <= 0
         covariances[constant] = np.eye(n_bands)
+        check_spd(covariances)
         n_constant += int(constant.sum())
         data.append(covariances)
         means.append(mean)
