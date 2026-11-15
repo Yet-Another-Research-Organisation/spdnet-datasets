@@ -234,6 +234,8 @@ class MOABBCovariances(BaseDataset):
         self.classes, self.labels = np.unique(np.load(d / "labels.npy"), return_inverse=True)
         self.classes = self.classes.tolist()
         self.class_to_idx = {c: i for i, c in enumerate(self.classes)}
+        # one entry per trial, as read by base.create_dataloaders (verbose split report)
+        self.samples = [{"class_name": self.classes[k]} for k in self.labels]
         self.subjects = self.metadata["subject"].to_numpy()
         self.sessions = self.metadata["session"].to_numpy()
         self.groups = (self.metadata["subject"].astype(str) + "-"

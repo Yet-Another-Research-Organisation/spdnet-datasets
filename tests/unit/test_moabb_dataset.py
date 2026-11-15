@@ -210,3 +210,12 @@ def test_create_dataloaders_uses_moabb_split(cache):
     x, y = next(iter(tr))
     assert tuple(x.shape) == (8, N_CH, N_CH)
 
+
+def test_create_dataloaders_without_split(cache):
+    from spdnet_datasets.base import create_dataloaders
+
+    ds = _make(cache)
+    assert len(ds.samples) == len(ds) and ds.samples[0]["class_name"] in ds.classes
+    with pytest.warns(UserWarning, match="Sample-level split"):
+        tr, va, te = create_dataloaders(ds, num_workers=0)
+    assert len(tr.dataset) + len(va.dataset) + len(te.dataset) == len(ds)
