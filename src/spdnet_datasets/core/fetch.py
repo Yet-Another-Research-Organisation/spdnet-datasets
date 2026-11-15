@@ -169,7 +169,7 @@ class Stage:
 
 
 def run_pipeline(name, *, params, process_fn, covariance_fn, raw_fn=None, cache_dir=None,
-                 keep=None, force=False):
+                 keep=None, force=False, covariance_params=None):
     """Run the staged pipeline of one dataset.
 
     Parameters
@@ -177,7 +177,11 @@ def run_pipeline(name, *, params, process_fn, covariance_fn, raw_fn=None, cache_
     name : str
         Cache sub-directory of the dataset.
     params : dict
-        All parameters that change the result (hashed into the stage paths).
+        Parameters of the preprocessing (hashed into both stage paths).
+    covariance_params : dict, optional
+        Parameters that only change the covariances (estimator, split used to
+        standardise...). They are hashed into the covariance stage only, so
+        changing them does not redo the preprocessing.
     raw_fn : callable(raw_dir) -> Path, optional
         Downloads the sources into ``raw_dir`` and returns the source directory.
         ``None`` for local datasets: ``process_fn`` reads the read-only copy.
@@ -201,7 +205,7 @@ def run_pipeline(name, *, params, process_fn, covariance_fn, raw_fn=None, cache_
     raw_dir = cache_dir / name / "raw"
     source = None
     proc = Stage(cache_dir, name, "processed", params)
-    cov = Stage(cache_dir, name, "covariance", params)
+    cov = Stage(cache_dir, name, "covariance", {**params, **(covariance_params or {})})
 
     if force or not cov.done():
         if force or not proc.done():

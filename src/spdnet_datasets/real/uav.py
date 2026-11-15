@@ -1,9 +1,18 @@
 """
+Deprecated: legacy UAV-HSI-Crop loader of the prepared ``*_W15_T80`` windows.
+
+The prepared windows do not follow the official patch grid (atlas fiche:
+23-41 % of them straddle two non-neighbouring patches). Use
+:class:`spdnet_datasets.hyperspectral.uav.UAVDataset` (registered as ``"uav"``),
+which rebuilds the windows from ``source/``. The legacy class is kept as
+``UAVLegacyDataset`` (registered as ``"uav_legacy"``).
+
 UAV-HSI-Crop Dataset - Hyperspectral imagery from UAV for crop classification.
 Supports classification task with multiple crop types.
 Dataset from https://www.scidb.cn/en/detail?dataSetId=6de15e4ec9b74dacab12e29cb557f041
 """
 
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -14,8 +23,8 @@ from spdnet_datasets.estimator import EstimateCovariance
 from spdnet_datasets.manager import DatasetManager
 
 
-@DatasetManager.register_dataset('uav')
-class UAVDataset(BaseDataset):
+@DatasetManager.register_dataset('uav_legacy')
+class UAVLegacyDataset(BaseDataset):
     """
     UAV-HSI-Crop hyperspectral dataset for classification.
 
@@ -76,6 +85,11 @@ class UAVDataset(BaseDataset):
             )
 
         # Initialize base
+        warnings.warn(
+            "UAVLegacyDataset reads the non-official prepared windows; use "
+            "spdnet_datasets.hyperspectral.uav.UAVDataset",
+            DeprecationWarning, stacklevel=2,
+        )
         super().__init__(data_dir=data_dir, **kwargs)
 
         # Load data
@@ -385,3 +399,9 @@ class UAVDataset(BaseDataset):
     def __len__(self) -> int:
         """Return dataset length."""
         return len(self.samples)
+
+
+# New loader (official grid), re-exported under its former import path.
+from ..hyperspectral.uav import UAVDataset, fetch_uav  # noqa: E402
+
+__all__ = ["UAVDataset", "UAVLegacyDataset", "fetch_uav"]

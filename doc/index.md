@@ -1,7 +1,7 @@
 # spdnet-datasets
 
 **spdnet-datasets** loads the datasets used in SPDNet research as batches of
-SPD matrices (covariances) ready for
+symmetric positive definite (SPD) matrices, mostly covariance matrices, ready for
 [yetanotherspdnet](https://github.com/Yet-Another-Research-Organisation/yetanotherspdnet),
 and generates synthetic SPD datasets for controlled experiments.
 
@@ -44,6 +44,12 @@ the layout it expects ({doc}`guide/datasets`).
 
 | Page | For |
 |---|---|
+| {doc}`guide/principles` | what a sample is, the `n ≥ 2p` rule, estimators, package layout |
+| {doc}`guide/outputs` | covariances, means and raw data; normalisation |
+| {doc}`guide/tasks` | fine / coarse classification, regression, dropping and merging classes, balancing |
+| {doc}`guide/fetch` | `fetch_*` functions, cache stages, checksums, the `keep` option |
+| {doc}`guide/splits` | leakage-free splits and the checks behind them |
+| {doc}`datasets/index` | one page per dataset, with interactive figures |
 | {doc}`guide/loading` | the configuration keys, how splits are made, what a batch contains |
 | {doc}`guide/datasets` | the catalogue of loaders, their options and expected directory layouts |
 | {doc}`guide/adding` | registering a new dataset |
@@ -56,12 +62,24 @@ the layout it expects ({doc}`guide/datasets`).
 :hidden:
 :caption: Guide
 
+guide/principles
+guide/outputs
+guide/tasks
+guide/fetch
+guide/splits
 guide/loading
 guide/datasets
 guide/adding
 guide/synthetic
 guide/covariance
 guide/moabb
+```
+
+```{toctree}
+:hidden:
+:caption: Datasets
+
+datasets/index
 ```
 
 ```{toctree}
