@@ -27,20 +27,32 @@ Splits (``groups`` = cube, i.e. variety and bundle):
   both bundles share their session, so variety and session are confounded:
   only this test is not.
 
-Download (manual): no public mirror identified (obtained from the authors). Copy the
-``Data-VIS-<session>`` folders and place it under ``data_dir`` (default ``<data
-root>/HYPERSPECTRAL/Rices_90``).
+Download
+--------
+Direct (Zenodo record 3241923, doi:10.5281/zenodo.3241923, CC BY 4.0, no account;
+Fabiyi et al., IEEE Access 2020). Without a local copy, ``fetch_rices90`` downloads
+``RGB and VIS-NIR HSI Data for 90 Rice Seed Varieties.zip`` (17 255 958 035 bytes,
+md5 of the Zenodo record checked) into ``<cache_dir>/Rices_90/downloads/`` and
+extracts it there (about 35 GB in total; delete the zip afterwards if needed). The
+zip has the layout read here (``index.csv``, ``Data-VIS-<session>/``; the CRC-32 of
+``index.csv`` and of sampled cubes equal the local copy). Already downloaded::
+
+    fetch_rices90(archive="~/Downloads/RGB and VIS-NIR HSI Data for 90 Rice Seed Varieties.zip")
+
+(the zip, or the extracted folder).
 """
 
 import os
+import urllib.parse
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 from ..core.config import dataset_path
-from ..core.fetch import Bunch, check_local, run_pipeline
+from ..core.fetch import Bunch, download, run_pipeline
 from ..manager import DatasetManager
+from ..utils.sources import source_dir
 from ._common import (
     HSIDataset,
     covariance_stage,
@@ -50,7 +62,11 @@ from ._common import (
 )
 
 DOMAIN, NAME = "HYPERSPECTRAL", "Rices_90"
-FILES = {}  # local copy (no public mirror identified)
+PAGE = "https://zenodo.org/records/3241923"
+ZIP = "RGB and VIS-NIR HSI Data for 90 Rice Seed Varieties.zip"
+ZIP_MD5, ZIP_SIZE = "aeb8e4b9bfbf80550d368c13c766d761", 17_255_958_035
+URL = PAGE + "/files/" + urllib.parse.quote(ZIP) + "?download=1"
+FILES = {URL: ZIP_MD5}
 N_BANDS = 256
 
 
@@ -100,19 +116,29 @@ def segment_grains(cube, dark):
 
 
 def fetch_rices90(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
-                  verify="size", *, band_bin=4, val_fraction=0.2, seed=0):
+                  verify="size", *, band_bin=4, val_fraction=0.2, seed=0, archive=None):
     """Grain covariances of Rices_90.
+
+    Parameters
+    ----------
+    archive : path, optional
+        The Zenodo zip already downloaded, or its extracted folder (see
+        "Download" in the module docstring).
 
     Returns
     -------
     Bunch with ``covariances`` (B, p, p) unscaled, ``means``, ``labels``
     (variety), ``groups`` (cube), ``meta`` (``cube``, ``bundle``,
-    ``session``, ``n_pixels``...), ``info`` and ``splits``.
+    ``session``, ``n_pixels``...), ``info``, ``splits`` and ``root`` (dataset
+    folder, to pass as ``data_dir`` to :class:`Rices90Dataset`).
     """
     if N_BANDS % band_bin:
         raise ValueError(f"band_bin must divide {N_BANDS}")
-    root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify=verify, required=("index.csv",))
+    root = source_dir(
+        NAME, dataset_path(DOMAIN, NAME, data_dir), required=("index.csv",),
+        page_url=PAGE, expected=f"{ZIP} ({ZIP_SIZE} bytes, md5 {ZIP_MD5})",
+        cache_dir=cache_dir, archive=archive, checksum=ZIP_MD5, size=ZIP_SIZE, verify=verify,
+        download=lambda d: download(URL, d / ZIP, checksum=ZIP_MD5, algo="md5"))
     p = N_BANDS // band_bin
     params = {"band_bin": band_bin, "source": str(root.resolve()), "version": 2}
 
@@ -158,7 +184,7 @@ def fetch_rices90(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
         info=out.info,
         splits=map_splits(bundle_splits(out.meta_all, val_fraction, seed), meta["proc_index"],
                           len(out.meta_all)),
-        processed_path=res.processed_dir, covariance_path=res.covariance_dir,
+        processed_path=res.processed_dir, covariance_path=res.covariance_dir, root=root,
     )
 
 

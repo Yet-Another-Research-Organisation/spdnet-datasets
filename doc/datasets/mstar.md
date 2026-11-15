@@ -38,6 +38,19 @@ protocol: training at 17°, test at 15°.
   licence restricts redistribution to non-commercial academic use. The data
   must be downloaded by hand and placed under `<root>/SAR/MSTAR_SOC`.
 
+## Getting the data
+
+Manual. The official AFRL SDMS release (free account) ships raw MSTAR files,
+which this package does not convert. The loader reads the converted layout of the
+GitHub mirror <https://github.com/omae11/MSTAR-dataset> (commit `d9900729…`,
+non-commercial academic use), for which no byte-stable archive exists: clone it
+at that commit (or download its zip) and pass it. Without a local copy,
+`fetch_mstar()` opens the mirror page and raises `ManualDownloadRequired`.
+
+```python
+fetch_mstar(archive="MSTAR-dataset")  # clone or zip of the mirror
+```
+
 ## Raw data
 
 ```text

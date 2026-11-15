@@ -40,6 +40,19 @@ fertilizer level (0, 0.5 or 1) and three continuous targets: grain weight
   for the competition submission, are not loaded: every split is cut from
   the training set.
 
+## Getting the data
+
+Kaggle competition [`hyperleaf2024`](https://www.kaggle.com/competitions/hyperleaf2024)
+(there is no Kaggle dataset of that name). It needs Kaggle credentials (see
+[Fetching](../guide/fetch.md)) and the competition rules accepted with the same
+account. Without a local copy, `fetch_hyperleaf()` downloads the competition
+archive into `<cache>/HyperLeaf2024/downloads/` (no checksum published) and reads
+the folder holding `train.csv` and `images/`.
+
+```python
+fetch_hyperleaf(archive="~/Downloads/hyperleaf2024.zip")
+```
+
 ## Raw data
 
 `images/<ImageId>.tiff` holds images of 48 × 352 pixels × 204 bands, stored

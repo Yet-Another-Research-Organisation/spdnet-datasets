@@ -25,11 +25,24 @@ Outputs: raw or mean only (``OUTPUTS = ("raw", "mean")``).
 
 Mean = per-channel mean of the raw chip.
 
-Download (manual): public GitHub mirror https://github.com/omae11/MSTAR-dataset,
-commit ``d99007290d20ce52933c8bf0f8c3f461acd522ee`` (non-commercial academic use).
-The ``codeload`` archives are not byte-stable, so no sha256 is registered: clone the
-repository at that commit (git checks every blob) and place it under ``data_dir``
-(default ``<data root>/SAR/MSTAR_SOC``).
+Download
+--------
+Manual. The official release (AFRL SDMS,
+https://www.sdms.afrl.af.mil/index.php?collection=mstar, free SDMS account,
+"Distribution A") ships raw MSTAR files (Phoenix header + big-endian magnitude and
+phase) in ``MSTAR-PublicMixedTargets-CD1/CD2``, ``15_DEG`` / ``17_DEG`` folders: this
+loader does **not** convert them (the 10-class SOC selection by depression and the
+8-bit ``.jpg`` quick-looks would have to be rebuilt). It reads the layout of the
+public GitHub mirror https://github.com/omae11/MSTAR-dataset (commit
+``d99007290d20ce52933c8bf0f8c3f461acd522ee``, non-commercial academic use), already
+converted: ``soc/{train,test}/<class>/*.jpg`` and ``soc_complex/...``. The
+``codeload`` archives are not byte-stable, so no checksum is registered: clone the
+repository at that commit (git checks every blob), or download its zip, and pass
+it (``fetch_mstar()`` without local copy opens the mirror page and raises
+:class:`~spdnet_datasets.core.access.ManualDownloadRequired`)::
+
+    # git clone https://github.com/omae11/MSTAR-dataset && git -C MSTAR-dataset checkout d9900729
+    fetch_mstar(archive="MSTAR-dataset")
 """
 
 import re
@@ -42,12 +55,14 @@ import torch
 from ..base import BaseDataset
 from ..core.config import dataset_path
 from ..core.estimators import channel_mean
-from ..core.fetch import Bunch, check_local
+from ..core.fetch import Bunch
 from ..manager import DatasetManager
+from ..utils.sources import source_dir
 from ._common import finalize_labels
 
 DOMAIN, NAME = "SAR", "MSTAR_SOC"
-FILES = {}  # manual download
+PAGE = "https://github.com/omae11/MSTAR-dataset/tree/d99007290d20ce52933c8bf0f8c3f461acd522ee"
+FILES = {}  # manual: GitHub mirror (no byte-stable archive), official SDMS files not converted
 SOURCES = ("jpg", "amplitude", "complex")
 
 
@@ -75,8 +90,17 @@ def center_crop(x, crop):
     return x[r:r + crop, c:c + crop]
 
 
-def fetch_mstar(data_dir=None, *, source="jpg", verify="size", val_size=0.1, seed=0):
+def fetch_mstar(data_dir=None, *, source="jpg", verify="size", val_size=0.1, seed=0,
+                cache_dir=None, archive=None):
     """Index the MSTAR SOC chips.
+
+    Parameters
+    ----------
+    cache_dir : path, optional
+        Where a zip ``archive`` is extracted.
+    archive : path, optional
+        Clone (or zip) of the GitHub mirror (see "Download" in the module
+        docstring).
 
     Returns
     -------
@@ -85,9 +109,14 @@ def fetch_mstar(data_dir=None, *, source="jpg", verify="size", val_size=0.1, see
     """
     if source not in SOURCES:
         raise ValueError(f"source must be one of {SOURCES}")
-    root = dataset_path(DOMAIN, NAME, data_dir)
     folder = "soc" if source == "jpg" else "soc_complex"
-    check_local(root, verify=verify, required=(f"{folder}/train", f"{folder}/test"))
+    root = source_dir(
+        NAME, dataset_path(DOMAIN, NAME, data_dir),
+        required=(f"{folder}/train", f"{folder}/test"), page_url=PAGE,
+        expected="a clone (or the zip) of the GitHub mirror omae11/MSTAR-dataset at commit "
+                 "d99007290d20ce52933c8bf0f8c3f461acd522ee (folders soc/ and soc_complex/); "
+                 "the raw SDMS files are not converted by this package",
+        cache_dir=cache_dir, archive=archive, verify=verify)
     rows = []
     for part in ("train", "test"):
         for cls_dir in sorted((root / folder / part).iterdir()):

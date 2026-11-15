@@ -37,6 +37,20 @@ random by patch.
 - The crop names behind the codes are not available locally: classes are
   `code k`.
 
+## Getting the data
+
+Manual. ScienceDB, doi:10.57760/sciencedb.01898, version V6, CC BY-SA 4.0:
+<https://www.scidb.cn/detail?dataSetId=6de15e4ec9b74dacab12e29cb557f041> (page
+rendered in JavaScript, no stable file URL). The record holds one file of
+1 017 930 890 bytes (name not recorded, no checksum). Without a local copy,
+`fetch_uav()` opens the page and raises `ManualDownloadRequired`; then pass the
+file (zip or tar, size checked) or the extracted folder. The folder holding
+`Train/Training/gt` and `Test/gt` is used as `source/`.
+
+```python
+fetch_uav(archive="~/Downloads/<file of the record>")
+```
+
 ## Raw data
 
 `source/{Train/Training, Train/Validation, Test}/{rs, gt}/<SCENE>_patch_<k>_<row>_<col>.npy`

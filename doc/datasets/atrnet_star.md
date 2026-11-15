@@ -34,9 +34,24 @@ and scenes. There are two representations:
   Sensing Object Recognition in the Wild*, arXiv:2501.13354
   (<https://arxiv.org/abs/2501.13354>). Version 4 of the paper is in the
   dataset folder.
-- The licence is not stated in the local copy. The data must be downloaded by
-  hand and placed under `<root>/SAR/ATRNet-STAR`. There is no checksum
-  registry.
+- The licence is not stated in the local copy. See
+  [Getting the data](#getting-the-data).
+
+## Getting the data
+
+Hugging Face, gated: [`waterdisappear/ATRNet-STAR`](https://huggingface.co/datasets/waterdisappear/ATRNet-STAR)
+(CC BY-SA 4.0). Accept the conditions on the page (automatic approval) and
+provide a read token (`HF_TOKEN`, see [Fetching](../guide/fetch.md)). Without a
+local copy, `fetch_atrnet_star()` downloads only the 7z volumes of the requested
+protocol (`Slant_Range/Complex_Float_Quad/<protocol>.7z.*`, e.g. 14.9 GB for
+`SOC_40classes`; one 10.2 GB archive for every `Amplitude_8bit` protocol) into
+`<cache>/atrnet_star/downloads/`, checks their sizes (the checksums are hidden by
+the gate) and extracts them with the `7z` command or the optional `py7zr`
+(`pip install 'spdnet-datasets[archives]'`).
+
+```python
+fetch_atrnet_star(archive="~/Downloads/SOC_40classes.7z.001")  # first volume, or a folder
+```
 
 ## Raw data
 
