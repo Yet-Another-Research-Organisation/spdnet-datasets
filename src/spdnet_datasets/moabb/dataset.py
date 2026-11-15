@@ -8,8 +8,12 @@ here. This module only caches what it derives from the epochs, under
 
     processed/<hash>/   epochs.npy (float32), labels.npy, metadata.csv
     covariance/<hash>/  covariances.npy, means.npy, labels.npy, metadata.csv
+
+The covariance stage is keyed on the estimator only on top of the epochs key,
+so changing the estimator does not call ``paradigm.get_data`` again.
 """
 
+import re
 from pathlib import Path
 
 import numpy as np
@@ -24,13 +28,25 @@ from .covariances import epochs_to_covariances
 
 SPLIT_KINDS = ("within_session", "cross_session", "cross_subject")
 
-_PLAIN = (bool, int, float, str, type(None), list, tuple, dict)
+
+def _key_value(v):
+    """JSON-friendly, process-stable form of ``v`` for the cache key."""
+    if isinstance(v, np.generic):
+        return v.item()
+    if isinstance(v, (bool, int, float, str, type(None))):
+        return v
+    if isinstance(v, (list, tuple)):
+        return [_key_value(x) for x in v]
+    if isinstance(v, dict):
+        return {str(k): _key_value(x) for k, x in sorted(v.items(), key=lambda kv: str(kv[0]))}
+    if isinstance(v, np.ndarray):
+        return _key_value(v.tolist())
+    return re.sub(r" at 0x[0-9a-fA-F]+", "", repr(v))  # drop memory addresses
 
 
-def _plain_attributes(obj) -> dict:
-    """JSON-friendly public attributes of ``obj`` (stable across processes)."""
-    return {k: v for k, v in sorted(vars(obj).items())
-            if not k.startswith("_") and isinstance(v, _PLAIN)}
+def _key_attributes(obj) -> dict:
+    """Public attributes of ``obj`` (dataset or paradigm options) for the cache key."""
+    return {k: _key_value(v) for k, v in sorted(vars(obj).items()) if not k.startswith("_")}
 
 
 def _read_metadata(path):
@@ -158,9 +174,9 @@ class MOABBCovariances(BaseDataset):
 
     def _params(self):
         return {"dataset": self.dataset.code, "subjects": self.subjects_requested,
+                "dataset_params": _key_attributes(self.dataset),
                 "paradigm": type(self.paradigm).__name__,
-                "paradigm_params": _plain_attributes(self.paradigm),
-                "estimator": self.estimator}
+                "paradigm_params": _key_attributes(self.paradigm)}
 
     def _process(self, _source, out):
         X, y, metadata = self.paradigm.get_data(dataset=self.dataset,
@@ -179,7 +195,8 @@ class MOABBCovariances(BaseDataset):
     def _load_data(self):
         paths = run_pipeline(f"moabb_{self.dataset.code}", params=self._params(),
                              process_fn=self._process, covariance_fn=self._covariances,
-                             cache_dir=self.data_dir, keep=self.keep, force=self.force)
+                             cache_dir=self.data_dir, keep=self.keep, force=self.force,
+                             covariance_params={"estimator": self.estimator})
         self.paths = paths
         d = paths.covariance_dir
         self.covs = np.load(d / "covariances.npy")

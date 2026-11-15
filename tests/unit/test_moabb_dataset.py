@@ -108,6 +108,30 @@ def test_cache_is_replayed_without_get_data(cache):
     assert len(list((cache / "moabb_Fake-2026" / "covariance").iterdir())) == 2
 
 
+def test_cache_key_covers_dataset_and_paradigm_options(cache):
+    _make(cache, dataset=FakeDataset(n_per_class=6))
+    ds = _make(cache, dataset=FakeDataset(n_per_class=5))  # same code, other options
+    assert len(ds) == 3 * 2 * 2 * 5
+    _make(cache, paradigm=FakeParadigm(fmax=np.float64(30)))  # numpy scalar option
+    paradigm = FakeParadigm()
+    paradigm.filters = [object()]  # non-plain option: keyed by its repr, without address
+    _make(cache, paradigm=paradigm)
+    paradigm = FakeParadigm()
+    paradigm.filters = [object()]
+    _make(cache, paradigm=paradigm)
+    assert paradigm._calls == 0  # same repr: cache replayed
+    assert len(list((cache / "moabb_Fake-2026" / "processed").iterdir())) == 4
+
+
+def test_estimator_change_reuses_the_epochs(cache):
+    paradigm = FakeParadigm()
+    scm = _make(cache, paradigm=paradigm)
+    lw = _make(cache, paradigm=paradigm, estimator="ledoit_wolf")
+    assert paradigm._calls == 1
+    assert scm.paths.processed_dir == lw.paths.processed_dir
+    assert scm.paths.covariance_dir != lw.paths.covariance_dir
+
+
 def test_keep_covariance_drops_epochs_and_forbids_raw(cache):
     ds = _make(cache, keep="keep_covariance")
     assert ds.paths.processed_dir is None and ds.paths.raw_dir is None
@@ -163,3 +187,4 @@ def test_create_dataloaders_uses_moabb_split(cache):
     assert len(tr.dataset) + len(te.dataset) == len(ds) and len(va.dataset) == 0
     x, y = next(iter(tr))
     assert tuple(x.shape) == (8, N_CH, N_CH)
+
