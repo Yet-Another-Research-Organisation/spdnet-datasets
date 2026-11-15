@@ -112,13 +112,15 @@ def build_raw(name, kwargs, split, page, max_samples=400, seed=0, fifth="amplitu
     for j, r in enumerate(raws):
         step = int(np.ceil(max(r.shape[:2]) / 128))
         img = r[::step, ::step, 0]
-        img = np.log10(np.abs(img) + 1e-6) if raw_scale == "log10" else img
+        if raw_scale == "log10":  # floor at 1e-3 of the maximum: zeros stay visible
+            img = np.log10(np.abs(img) + 1e-3 * np.abs(img).max() + 1e-12)
         lo, hi = np.percentile(img, [1, 99])
         fig.add_trace(go.Heatmap(z=np.round(img, 2).astype(np.float32), zmin=lo, zmax=hi,
                                  colorscale=SEQUENTIAL, showscale=False,
                                  hovertemplate="%{z:.2f}<extra></extra>"), 1, j + 1)
         fig.update_yaxes(autorange="reversed", scaleanchor=f"x{j + 1 if j else ''}",
-                         row=1, col=j + 1)
+                         constrain="domain", row=1, col=j + 1)
+        fig.update_xaxes(constrain="domain", row=1, col=j + 1)
     shape = "×".join(str(s) for s in raws[0].shape)
     scale_txt = "log10 scale" if raw_scale == "log10" else "as returned"
     _layout(fig, f"Raw chips ({shape}), {ch[0]}, {scale_txt}")

@@ -10,7 +10,7 @@
 * - Covariance
   - none: raw or mean outputs only
 * - Outputs
-  - raw (32, 32, 4) log10(1 + amplitude) of HH, HV, VH, VV · mean (4,)
+  - raw (32, 32, 4) log10(1 + amplitude) of HH, HV, VH, VV (H horizontal, V vertical; emission then reception) · mean (4,)
 * - Splits
   - `macro1024_fold0` … `macro1024_fold4` (`recommended` = fold 0; 33 407 / 11 013 / 11 710)
 * - Module
@@ -21,7 +21,7 @@
 
 AIR-PolSAR-Seg contains 500 patches of 512 × 512 pixels. They are cut from
 one Gaofen-3 (GF-3) C-band image of Hangzhou (Zhejiang, China), acquired on
-29 April 2019 in QPSI quad-polarisation mode at 8 m resolution. The scene is
+29 April 2019 in its quad-polarisation stripmap mode (QPSI) at 8 m resolution. The scene is
 9 082 × 9 805 pixels. Each patch holds the four amplitudes HH, HV, VH and VV
 (H horizontal, V vertical; emission then reception) as uint16, with a
 pixel-level ground truth in six classes. The official split is 350 training
@@ -75,8 +75,8 @@ Black (0, 0, 0) marks unannotated pixels. With 32 × 32 cells, housing has
 
 ## Covariance construction
 
-The loader builds no covariance. The mission restricts AIR-PolSAR-Seg to raw
-or mean outputs (`OUTPUTS = ("raw", "mean")`), and exactly one of
+The loader builds no covariance. By design, AIR-PolSAR-Seg gives raw or mean
+outputs only ({doc}`../guide/outputs`) (`OUTPUTS = ("raw", "mean")`), and exactly one of
 `return_raw=True` and `return_mean=True` must be set. The dataset ships
 amplitudes only, without phase. A PolSAR covariance or coherency matrix
 therefore cannot be formed; only an amplitude covariance over the pixels of a

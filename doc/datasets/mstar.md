@@ -4,7 +4,7 @@
 :stub-columns: 1
 
 * - Domain
-  - SAR (synthetic aperture radar), automatic target recognition
+  - SAR (synthetic aperture radar), automatic target recognition (ATR)
 * - Task(s)
   - fine classification (10 vehicle classes)
 * - Covariance
@@ -12,7 +12,7 @@
 * - Outputs
   - raw (128, 128, 1) intensity, amplitude, or (128, 128, 2) complex · mean (per channel)
 * - Splits
-  - `official` (SOC: 17° train, 15° test; 2 472 / 275 / 2 425)
+  - `official` (SOC, standard operating conditions: 17° train, 15° test; 2 472 / 275 / 2 425)
 * - Module
   - {mod}`spdnet_datasets.sar.mstar` (`fetch_mstar`, `MSTARDataset`)
 ```
@@ -71,8 +71,8 @@ figure shows the distribution of the chip mean for each class.
 
 ## Covariance construction
 
-The loader builds no covariance. The mission restricts the SAR chip datasets
-to raw or mean outputs (`OUTPUTS = ("raw", "mean")`), and asking for a
+The loader builds no covariance. By design, the SAR chip datasets of the package give raw or mean
+outputs only ({doc}`../guide/outputs`) (`OUTPUTS = ("raw", "mean")`), and asking for a
 covariance raises `ValueError`. Exactly one of `return_raw=True` and
 `return_mean=True` must be set. The mean is the per-channel mean of the
 cropped chip. A covariance model can be built from the raw chip, for example

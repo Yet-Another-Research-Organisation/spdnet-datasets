@@ -4,7 +4,7 @@
 :stub-columns: 1
 
 * - Domain
-  - SAR (synthetic aperture radar), land cover
+  - SAR (synthetic aperture radar), land cover; HH / HV polarisations (horizontal emission, horizontal or vertical reception)
 * - Task(s)
   - fine classification (7 classes, named "1" to "7")
 * - Covariance
@@ -12,7 +12,7 @@
 * - Outputs
   - raw (100, 100, 4) complex parts or (100, 100, 2) amplitudes · mean (|HH|, |HV|)
 * - Splits
-  - `loco_Houston` (= `recommended`), `loco_Chicago`, `loco_Sao Paulo` (leave one city out)
+  - `loco_Houston` (= `recommended`), `loco_Chicago`, `loco_Sao_Paulo` (leave one city out)
 * - Module
   - {mod}`spdnet_datasets.sar.s1slc_cvdl` (`fetch_s1slc_cvdl`, `S1SLCCVDLDataset`)
 ```
@@ -83,8 +83,8 @@ class 2 to 1 680 for class 4, and their proportions change from city to city.
 
 ## Covariance construction
 
-The loader builds no covariance. The mission restricts S1SLC_CVDL to raw or
-mean outputs (`OUTPUTS = ("raw", "mean")`), and exactly one of
+The loader builds no covariance. By design, S1SLC_CVDL gives raw or mean outputs only
+({doc}`../guide/outputs`) (`OUTPUTS = ("raw", "mean")`), and exactly one of
 `return_raw=True` and `return_mean=True` must be set. The mean is the mean
 amplitude (|HH|, |HV|) of the patch, because the mean of the real and imaginary
 parts is zero. A 2 × 2 polarimetric covariance [HH, HV] could be estimated on
