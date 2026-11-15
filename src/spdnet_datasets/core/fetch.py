@@ -35,6 +35,9 @@ from pathlib import Path
 from .config import get_cache_dir
 
 KEEP = ("keep_processed", "keep_covariance", "keep_full")
+# Bumped when a change of the core invalidates cached results (part of every
+# stage hash). 2: stricter SPD check (condition number <= 1e12).
+CACHE_VERSION = 2
 
 
 class Bunch(dict):
@@ -152,8 +155,8 @@ class Stage:
     """One cached stage: ``<cache_dir>/<name>/<stage>/<params_hash>/``."""
 
     def __init__(self, cache_dir, name, stage, params):
-        self.params = params
-        self.hash = params_hash(params)
+        self.params = {**params, "_core_cache_version": CACHE_VERSION}
+        self.hash = params_hash(self.params)
         self.path = Path(cache_dir) / name / stage / self.hash
 
     def done(self) -> bool:

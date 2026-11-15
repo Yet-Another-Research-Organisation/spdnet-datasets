@@ -85,7 +85,7 @@ def covariance_stage(estimator):
         processed_dir, out_dir = Path(processed_dir), Path(out_dir)
         raw = np.load(processed_dir / "raw.npy", mmap_mode="r")
         offsets = np.load(processed_dir / "offsets.npy")
-        meta = pd.read_csv(processed_dir / "meta.csv")
+        meta = pd.read_csv(processed_dir / "meta.csv", dtype={"group": str, "participant": str})
         meta["raw_index"] = np.arange(len(meta))
         p = raw.shape[1]
         covs, means, kept = [], [], []

@@ -66,11 +66,11 @@ def build(name, kwargs, split, page, max_samples=600, seed=0):
     from spdnet_datasets import DatasetManager
 
     cls = DatasetManager.DATASETS[name]
-    ds = cls(**kwargs)
-    has_raw = "raw" in cls.OUTPUTS
     if "cov" not in cls.OUTPUTS:
-        raise SystemExit(f"{name} has no covariance output; write its figures by hand")
-    ds.return_mean, ds.return_raw = True, has_raw
+        raise SystemExit(f"{name} has no covariance output; use make_figures_raw.py")
+    # request the extra outputs at construction: some loaders open the raw data there
+    wanted = {"return_mean": "mean" in cls.OUTPUTS, "return_raw": "raw" in cls.OUTPUTS}
+    ds = cls(**{**wanted, **kwargs})
     rng = np.random.default_rng(seed)
     idx = rng.choice(len(ds), size=min(max_samples, len(ds)), replace=False)
     covs, means, raws, ys = _samples(ds, idx)
@@ -89,19 +89,22 @@ def build(name, kwargs, split, page, max_samples=600, seed=0):
         for j in range(k):
             r = np.asarray(raws[j], dtype=float)
             img = r.mean(-1) if r.ndim == 3 else r.T  # band-mean image or (p, T) spectrogram
-            fig.add_trace(go.Heatmap(z=img, colorscale=SEQUENTIAL, showscale=False,
-                                     hovertemplate="value %{z:.3g}<extra></extra>"), 1, j + 1)
+            img = img[:, ::-(-img.shape[1] // 400)]  # at most 400 columns (file size)
+            fig.add_trace(go.Heatmap(z=img.astype(np.float32), colorscale=SEQUENTIAL,
+                                     showscale=False, hovertemplate="value %{z:.3g}<extra></extra>"), 1, j + 1)
         _layout(fig, "Examples of the preprocessed data (band mean / spectrogram)")
         figs["raw_samples"] = fig
 
     # class_means (8 classes at most: fixed categorical order, no cycling)
     fig = go.Figure()
-    M = np.stack(means)
+    # without a mean output (provided matrices), the profile is the log10 variance
+    M = np.stack(means) if means else np.log10(np.diagonal(covs, axis1=1, axis2=2))
     for c, color in zip(np.unique(ys[ys >= 0])[:8], SERIES, strict=False):
         fig.add_scatter(y=M[ys == c].mean(0), mode="lines", name=names[c],
                         line={"width": 2, "color": color})
-    _layout(fig, "Mean channel profile per class (first 8 classes)", xaxis_title="channel",
-            yaxis_title="mean")
+    what = "profile" if means else "log10 variance"
+    _layout(fig, f"Mean channel {what} per class (first 8 classes)", xaxis_title="channel",
+            yaxis_title="mean" if means else "log10 variance")
     figs["class_means"] = fig
 
     # class_hist

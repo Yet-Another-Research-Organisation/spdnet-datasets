@@ -12,7 +12,6 @@ from .audio import BirdSetXCMDataset, ESC50Dataset, GTZANDataset
 from .base import BaseDataset, create_dataloaders
 from .estimator import EstimateCovariance, EstimateCovarianceTorch
 from .hyperspectral import (
-    AVIRISDataset,
     ChikuseiDataset,
     DeepHSFruitDataset,
     GSOFFDataset,
@@ -60,7 +59,6 @@ __all__ = [
     'UAVDataset',
     'GSOffDataset',
     'GSOFFDataset',
-    'AVIRISDataset',
     'ChikuseiDataset',
     'DeepHSFruitDataset',
     'PlacentaDataset',

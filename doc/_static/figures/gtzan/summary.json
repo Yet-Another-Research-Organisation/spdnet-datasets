@@ -1,0 +1,59 @@
+{
+ "name": "gtzan",
+ "kwargs": {
+  "subset": null
+ },
+ "split": "stratified",
+ "p": 20,
+ "n_samples": 985,
+ "classes": [
+  "blues",
+  "classical",
+  "country",
+  "disco",
+  "hiphop",
+  "jazz",
+  "metal",
+  "pop",
+  "reggae",
+  "rock"
+ ],
+ "counts": {
+  "train": [
+   60,
+   60,
+   60,
+   59,
+   58,
+   60,
+   56,
+   58,
+   60,
+   60
+  ],
+  "val": [
+   20,
+   20,
+   20,
+   20,
+   20,
+   19,
+   19,
+   20,
+   19,
+   20
+  ],
+  "test": [
+   20,
+   20,
+   20,
+   20,
+   20,
+   20,
+   18,
+   20,
+   20,
+   19
+  ]
+ }
+}
