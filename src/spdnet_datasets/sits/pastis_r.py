@@ -801,15 +801,16 @@ class PastisRDataset(BaseDataset):
         self.scale = 1.0
         if self.normalize and len(parts["train"]):  # fitted on the training part only
             self.scale = geometric_scale(b.covariances[idx[parts["train"]]])
-        if self.subset is not None:
-            idx, y = idx[parts[self.subset]], y[parts[self.subset]]
-            parts = {k: (np.arange(len(idx)) if k == self.subset else np.zeros(0, int))
-                     for k in parts}
-        if self.balance in ("undersample", "oversample"):
+        self.class_weights = None
+        if self.balance in ("undersample", "oversample"):  # before the subset selection
             tr = parts["train"]
             parts["train"] = tr[balance_indices(y[tr], self.balance, seed=self.seed)]
         if self.balance == "weights":
             self.class_weights = class_weights(y[parts["train"]], n_classes=len(class_names))
+        if self.subset is not None:
+            idx, y = idx[parts[self.subset]], y[parts[self.subset]]
+            parts = {k: (np.arange(len(idx)) if k == self.subset else np.zeros(0, int))
+                     for k in parts}
 
         self.covariances = b.covariances[idx]
         self.means = b.means[idx]

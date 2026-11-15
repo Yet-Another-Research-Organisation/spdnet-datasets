@@ -273,6 +273,21 @@ def test_registered_and_tasks(pastis_dir, tmp_path):
     assert set(ds.meta.fold) == {5} and len(ds) == 2
 
 
+def test_balance_before_subset_and_class_weights(pastis_dir, tmp_path):
+    kw = {"cache_dir": tmp_path / "c", "ref_date": REF, "verbose": False}
+    assert PastisRDataset(pastis_dir, **kw).class_weights is None
+    for subset in ("val", "test"):  # empty training part after the subset selection
+        ds = PastisRDataset(pastis_dir, subset=subset, balance="undersample", **kw)
+        assert len(ds) == 2 and ds.class_weights is None
+    full = PastisRDataset(pastis_dir, **kw)
+    ds = PastisRDataset(pastis_dir, subset="test", balance="weights", **kw)
+    train = full.labels[full.splits["official"]["train"]]
+    np.testing.assert_allclose(ds.class_weights,
+                               len(train) / (2 * np.bincount(train, minlength=2)))
+    over = PastisRDataset(pastis_dir, subset="train", balance="oversample", **kw)
+    assert np.bincount(over.labels).tolist() == [np.bincount(train).max()] * 2
+
+
 def test_cache_is_replayed_and_keep_covariance(pastis_dir, tmp_path, monkeypatch):
     _fetch(pastis_dir, tmp_path, scenario="A")
     monkeypatch.setattr(pr, "_process", lambda *a: (_ for _ in ()).throw(RuntimeError))
