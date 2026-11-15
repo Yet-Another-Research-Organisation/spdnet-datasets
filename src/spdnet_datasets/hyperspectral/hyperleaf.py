@@ -199,7 +199,7 @@ class HyperLeafDataset(HSIDataset):
             x = self.transform(x)
         y = self.labels[i]
         if self.task == "regression":
-            return x, torch.as_tensor(y, dtype=torch.float64)
+            return x, torch.tensor(np.array(y, dtype=np.float64))
         return x, int(y)
 
 

@@ -9,23 +9,29 @@ This package provides:
 
 from .base import BaseDataset, create_dataloaders
 from .estimator import EstimateCovariance, EstimateCovarianceTorch
-from .manager import DatasetManager
 
-# Import real datasets to register them
-from .real import (
+# Hyperspectral datasets (registered on import)
+from .hyperspectral import (
+    AVIRISDataset,
     ChikuseiDataset,
-    CI4RDataset,
     DeepHSFruitDataset,
-    DopNetDataset,
+    GSOFFDataset,
     GSOffDataset,
-    HDM05Dataset,
     HyperLeafDataset,
     KaggleWheatDataset,
-    MVDopplerDataset,
-    NTU120Dataset,
     PlacentaDataset,
     Rices90Dataset,
     UAVDataset,
+)
+from .manager import DatasetManager
+
+# Other real datasets (registered on import)
+from .real import (
+    CI4RDataset,
+    DopNetDataset,
+    HDM05Dataset,
+    MVDopplerDataset,
+    NTU120Dataset,
 )
 
 __version__ = "0.1.0"
@@ -46,6 +52,8 @@ __all__ = [
     'HDM05Dataset',
     'UAVDataset',
     'GSOffDataset',
+    'GSOFFDataset',
+    'AVIRISDataset',
     'ChikuseiDataset',
     'DeepHSFruitDataset',
     'PlacentaDataset',

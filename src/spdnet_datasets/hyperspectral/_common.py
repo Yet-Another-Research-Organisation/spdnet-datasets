@@ -402,8 +402,13 @@ class HSIDataset(BaseDataset):
             x = self.transform(x)
         y = self.labels[i]
         if self.task == "regression":
-            return x, torch.as_tensor(y, dtype=torch.float64)
+            return x, torch.tensor(np.array(y, dtype=np.float64))
         return x, int(y)
+
+    @property
+    def num_classes(self):
+        """Number of classes (0 for regression)."""
+        return len(self.classes) if self.task != "regression" else 0
 
     def _load_data(self):  # data are loaded by _setup
         pass
