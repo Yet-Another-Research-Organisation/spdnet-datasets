@@ -18,16 +18,17 @@ Full description: :doc:`/datasets/esc50`.
 # --------------------
 # The first call extracts the MFCC frames and estimates the covariances into
 # ``$SPDNET_CACHE_DIR``; later calls read the cache (:doc:`/guide/fetch`).
-# Four silent clips are excluded because they have fewer than ``2p`` frames.
+# Clips with fewer than ``2p`` non-silent frames, or whose estimate is not SPD,
+# are excluded (``ds.excluded``).
 
 from spdnet_datasets import create_dataloaders
 from spdnet_datasets.audio.esc50 import ESC50Dataset
 
 # sphinx_gallery_thumbnail_path = "_static/thumbnails/esc50.png"
-ds = ESC50Dataset(split="official", fold=1, return_raw=True)
+ds = ESC50Dataset(split="official", fold=1, return_mean=True)
 print(len(ds), "clips,", ds.num_classes, "classes")
-(cov, raw), y = ds[0]
-print("cov", tuple(cov.shape), "raw (frames x p)", tuple(raw.shape), "class", ds.classes[y])
+(cov, mean), y = ds[0]
+print("cov", tuple(cov.shape), "mean", tuple(mean.shape), "class", ds.classes[y])
 
 # %%
 # Visualizing the dataset
@@ -56,13 +57,15 @@ print("cov", tuple(cov.shape), "raw (frames x p)", tuple(raw.shape), "class", ds
 # ------------------
 # ``official`` is the 5-fold protocol of the paper: test = fold ``fold``,
 # validation = the next fold, train = the three others. Groups are the source
-# Freesound recordings; four of them span two folds in the official protocol,
-# which the check below reports.
+# Freesound recordings; a few of them span two folds of the official protocol
+# (see the dataset page), so the check below counts them instead of asserting.
 
 parts = ds.splits["official"]
 shared = set(ds.groups[parts["train"]]) & set(ds.groups[parts["test"]])
 print({k: len(v) for k, v in parts.items()}, "-", len(shared), "recordings in train and test")
 
+# With ``return_raw=True`` the frame count varies from clip to clip: use
+# ``batch_size=1`` or a custom ``collate_fn``.
 train, val, test = create_dataloaders(ds, split="official", batch_size=32, num_workers=0)
 
 # %%
