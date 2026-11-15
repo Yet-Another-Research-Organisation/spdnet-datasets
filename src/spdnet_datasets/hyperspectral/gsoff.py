@@ -154,12 +154,6 @@ class GSOFFDataset(HSIDataset):
                             block=block, n_splits=n_splits, fold=fold)
         self._setup(bunch, split, subset)
 
-    def _load_raw(self, k):
-        if self.bunch.processed_path is None:
-            raise ValueError("return_raw needs the processed stage (keep != 'keep_covariance')")
-        windows = np.load(Path(self.bunch.processed_path) / "windows.npy", mmap_mode="r")
-        return windows[int(self.meta_all["proc_index"].iloc[k])]
-
 
 GSOffDataset = GSOFFDataset  # former class name
 

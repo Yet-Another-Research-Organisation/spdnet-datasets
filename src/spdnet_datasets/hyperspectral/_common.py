@@ -28,7 +28,12 @@ import numpy as np
 import torch
 
 from ..base import BaseDataset
-from ..core.estimators import NotSPDError, channel_mean, estimate_covariance
+from ..core.estimators import (
+    InsufficientSamplesError,
+    NotSPDError,
+    channel_mean,
+    estimate_covariance,
+)
 from ..core.fetch import Bunch
 from ..core.normalize import geometric_scale
 from ..core.tasks import apply_task, balance_indices, class_weights
@@ -75,19 +80,23 @@ def covariance_stage(proc_dir, out_dir, pixels_fn, estimator="scm"):
     estimator : str
         One of :data:`core.estimators.ESTIMATORS`.
 
-    Samples whose estimate is not SPD (constant band, duplicated pixels...)
-    are dropped and counted in ``info.json`` (``excluded_not_spd``).
+    Samples with fewer than ``2p`` observations, or whose estimate is not SPD
+    (constant band, duplicated pixels...), are dropped and counted in
+    ``info.json`` (``excluded_n_lt_2p_at_estimation``, ``excluded_not_spd``).
     """
     import pandas as pd
 
     proc_dir, out_dir = Path(proc_dir), Path(out_dir)
     meta = pd.read_csv(proc_dir / "meta.csv")
     info = json.loads((proc_dir / "info.json").read_text())
-    covs, means, n_obs, kept = [], [], [], []
+    covs, means, n_obs, kept, short = [], [], [], [], 0
     for i, X in enumerate(pixels_fn(proc_dir, meta)):
         X = np.asarray(X, dtype=np.float64)
         try:
             C = estimate_covariance(X, estimator)
+        except InsufficientSamplesError:
+            short += 1
+            continue
         except NotSPDError:
             continue
         covs.append(C)
@@ -99,7 +108,8 @@ def covariance_stage(proc_dir, out_dir, pixels_fn, estimator="scm"):
     np.save(out_dir / "covs.npy", np.stack(covs))
     np.save(out_dir / "means.npy", np.stack(means))
     np.save(out_dir / "n_obs.npy", np.asarray(n_obs))
-    info["excluded_not_spd"] = len(meta) - len(kept)
+    info["excluded_n_lt_2p_at_estimation"] = short
+    info["excluded_not_spd"] = len(meta) - len(kept) - short
     info["n_samples"] = len(kept)
     meta = meta.iloc[kept].copy()
     meta.insert(0, "proc_index", kept)
@@ -369,8 +379,15 @@ class HSIDataset(BaseDataset):
                   f"{len(self.classes)} classes, p={covs.shape[-1]}, split={split!r}")
 
     def _load_raw(self, k):
-        """Preprocessed observations of sample ``k`` (row of the fetched data)."""
-        raise ValueError(f"return_raw is not available for {type(self).__name__}")
+        """Preprocessed observations of sample ``k`` (row of the fetched data).
+
+        Default: the window stored in the processed stage (``windows.npy``).
+        """
+        proc = self.bunch.get("processed_path")
+        if proc is None or not (Path(proc) / "windows.npy").exists():
+            raise ValueError("return_raw needs the processed stage (keep != 'keep_covariance')")
+        windows = np.load(Path(proc) / "windows.npy", mmap_mode="r")
+        return windows[int(self.meta_all["proc_index"].iloc[k])]
 
     def __getitem__(self, i):
         k = int(self._index[i])
