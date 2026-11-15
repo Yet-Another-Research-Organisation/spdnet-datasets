@@ -111,6 +111,7 @@ def covariance_stage(proc_dir, out_dir, pixels_fn, estimator="scm"):
     info["excluded_n_lt_2p_at_estimation"] = short
     info["excluded_not_spd"] = len(meta) - len(kept) - short
     info["n_samples"] = len(kept)
+    meta.to_csv(out_dir / "meta_all.csv", index=False)  # estimator-independent sample list
     meta = meta.iloc[kept].copy()
     meta.insert(0, "proc_index", kept)
     meta.to_csv(out_dir / "meta.csv", index=False)
@@ -125,6 +126,24 @@ def window_pixels(proc_dir, meta):
         yield valid_pixels(w.reshape(-1, w.shape[-1]))
 
 
+def map_splits(splits, proc_index, n_all):
+    """Restrict splits computed on all processed samples to the estimated ones.
+
+    Folds are drawn on the estimator-independent sample list (``meta_all``)
+    so that two estimators that drop different samples share the same split;
+    ``proc_index`` gives the processed row of each estimated sample.
+    """
+    pos = np.full(n_all, -1)
+    pos[np.asarray(proc_index, dtype=np.int64)] = np.arange(len(proc_index))
+    out = {}
+    for name, parts in splits.items():
+        out[name] = {}
+        for part, idx in parts.items():
+            new = pos[np.asarray(idx, dtype=np.int64)]
+            out[name][part] = new[new >= 0]
+    return out
+
+
 def load_covariance_dir(cov_dir):
     """Read a covariance stage: Bunch(covariances, means, n_obs, meta, info)."""
     import pandas as pd
@@ -135,6 +154,7 @@ def load_covariance_dir(cov_dir):
         means=np.load(cov_dir / "means.npy"),
         n_obs=np.load(cov_dir / "n_obs.npy"),
         meta=pd.read_csv(cov_dir / "meta.csv"),
+        meta_all=pd.read_csv(cov_dir / "meta_all.csv"),
         info=json.loads((cov_dir / "info.json").read_text()),
     )
 

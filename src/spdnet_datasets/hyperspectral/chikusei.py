@@ -81,7 +81,7 @@ def fetch_chikusei(data_dir=None, cache_dir=None, keep=None, estimator="scm", fo
     bands = band_index(N_BANDS, band_step)
     check_sample_size(window * window, len(bands))
     group = f"w{window}"
-    params = {"window": window, "band_step": band_step, "estimator": estimator, "version": 1}
+    params = {"window": window, "band_step": band_step, "estimator": estimator, "version": 2}
 
     def process(_, out_dir):
         import h5py

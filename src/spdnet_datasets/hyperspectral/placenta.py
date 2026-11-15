@@ -38,6 +38,7 @@ from ._common import (
     covariance_stage,
     group_kfold_split,
     load_covariance_dir,
+    map_splits,
     valid_pixels,
     write_json,
 )
@@ -66,7 +67,7 @@ def fetch_placenta(data_dir=None, cache_dir=None, keep=None, estimator="scm", fo
         raise ValueError(f"Expected {N_BANDS} bands, got {windows.shape}")
     bands = band_index(N_BANDS, band_step)
     check_sample_size(windows.shape[1] * windows.shape[2], len(bands))
-    params = {"band_step": band_step, "estimator": estimator, "version": 1}
+    params = {"band_step": band_step, "estimator": estimator, "version": 2}
 
     def process(_, out_dir):
         records = json.loads((root / METADATA).read_text())
@@ -96,7 +97,11 @@ def fetch_placenta(data_dir=None, cache_dir=None, keep=None, estimator="scm", fo
     meta = out.meta
     labels = meta["label"].to_numpy()
     groups = meta["sample_id"].to_numpy()
-    by_image = group_kfold_split(labels, groups, n_splits=n_splits, fold=fold, seed=seed)
+    full = out.meta_all
+    by_image = map_splits(
+        {"s": group_kfold_split(full["label"].to_numpy(), full["sample_id"].to_numpy(),
+                                n_splits=n_splits, fold=fold, seed=seed)},
+        meta["proc_index"], len(full))["s"]
     dye = meta["dye_type"].to_numpy()
     return Bunch(
         covariances=out.covariances, means=out.means, n_obs=out.n_obs, labels=labels,

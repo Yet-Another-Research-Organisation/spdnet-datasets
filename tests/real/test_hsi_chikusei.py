@@ -6,7 +6,8 @@ import h5py
 import numpy as np
 import pytest
 
-from spdnet_datasets.core import verify_local
+from spdnet_datasets.core import assert_no_window_overlap, verify_local
+from spdnet_datasets.hyperspectral._common import window_boxes
 from spdnet_datasets.hyperspectral.chikusei import (
     PREPARED,
     SOURCE,
@@ -46,3 +47,6 @@ def test_counts_match_the_atlas_fiche():
     assert b.covariances.shape[1:] == (64, 64)
     train = collections.Counter(b.labels[sp["train"]])
     assert train["Forest"] == 539 and train["Manmade (dark)"] == 340
+    boxes = window_boxes(b.positions, 15)
+    for a, c in (("train", "val"), ("train", "test"), ("val", "test")):
+        assert_no_window_overlap(boxes[sp[a]], boxes[sp[c]])

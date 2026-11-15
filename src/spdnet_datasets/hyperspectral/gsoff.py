@@ -41,6 +41,7 @@ from ._common import (
     block_kfold_split,
     covariance_stage,
     load_covariance_dir,
+    map_splits,
     purity_grid_windows,
     valid_pixels,
     window_pixels,
@@ -93,7 +94,7 @@ def fetch_gsoff(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
     bands = band_index(N_BANDS, band_step)
     check_sample_size(window * window, len(bands))
     params = {"window": window, "band_step": band_step, "threshold": threshold,
-              "estimator": estimator, "version": 1}
+              "estimator": estimator, "version": 2}
 
     def process(_, out_dir):
         import tifffile
@@ -110,12 +111,14 @@ def fetch_gsoff(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
     res = run_pipeline(NAME, params=params, process_fn=process, covariance_fn=covariance,
                        cache_dir=cache_dir, keep=keep, force=force)
     out = load_covariance_dir(res.covariance_dir)
-    meta = out.meta
+    meta, full = out.meta, out.meta_all
+    spatial = block_kfold_split(full[["row", "col"]].to_numpy(), full["label"].to_numpy(),
+                                window=window, block=block, n_splits=n_splits, fold=fold,
+                                seed=seed)
+    out.info["split_dropped_overlap"] = spatial.pop("dropped")
+    spatial = map_splits({"s": spatial}, meta["proc_index"], len(full))["s"]
     positions = meta[["row", "col"]].to_numpy()
     labels = meta["label"].to_numpy()
-    spatial = block_kfold_split(positions, labels, window=window, block=block,
-                                n_splits=n_splits, fold=fold, seed=seed)
-    out.info["split_dropped_overlap"] = spatial.pop("dropped")
     return Bunch(
         covariances=out.covariances, means=out.means, n_obs=out.n_obs, labels=labels,
         groups=(positions[:, 0] // block) * 10**6 + positions[:, 1] // block,

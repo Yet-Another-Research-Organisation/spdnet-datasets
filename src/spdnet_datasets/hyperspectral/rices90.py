@@ -37,7 +37,13 @@ import pandas as pd
 from ..core.config import dataset_path
 from ..core.fetch import Bunch, run_pipeline, verify_local
 from ..manager import DatasetManager
-from ._common import HSIDataset, covariance_stage, load_covariance_dir, write_json
+from ._common import (
+    HSIDataset,
+    covariance_stage,
+    load_covariance_dir,
+    map_splits,
+    write_json,
+)
 
 DOMAIN, NAME = "HYPERSPECTRAL", "Rices_90"
 FILES = {}  # local copy (no public mirror identified)
@@ -104,7 +110,7 @@ def fetch_rices90(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
     root = dataset_path(DOMAIN, NAME, data_dir)
     verify_local(root, verify=verify, required=("index.csv",))
     p = N_BANDS // band_bin
-    params = {"band_bin": band_bin, "estimator": estimator, "version": 1}
+    params = {"band_bin": band_bin, "estimator": estimator, "version": 2}
 
     def process(_, out_dir):
         index = pd.read_csv(root / "index.csv")
@@ -144,7 +150,9 @@ def fetch_rices90(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
     return Bunch(
         covariances=out.covariances, means=out.means, n_obs=out.n_obs,
         labels=meta["label"].to_numpy(), groups=meta["cube"].to_numpy(), meta=meta,
-        info=out.info, splits=bundle_splits(meta, val_fraction, seed),
+        info=out.info,
+        splits=map_splits(bundle_splits(out.meta_all, val_fraction, seed), meta["proc_index"],
+                          len(out.meta_all)),
         processed_path=res.processed_dir, covariance_path=res.covariance_dir,
     )
 

@@ -40,6 +40,7 @@ from ._common import (
     covariance_stage,
     group_kfold_split,
     load_covariance_dir,
+    map_splits,
     valid_pixels,
     write_json,
 )
@@ -97,7 +98,7 @@ def fetch_hyperleaf(data_dir=None, cache_dir=None, keep=None, estimator="scm", f
     root = dataset_path(DOMAIN, NAME, data_dir)
     verify_local(root, verify=verify, required=("train.csv", "images"))
     bands = band_index(N_BANDS, band_step)
-    params = {"band_step": band_step, "estimator": estimator, "version": 1}
+    params = {"band_step": band_step, "estimator": estimator, "version": 2}
 
     def process(_, out_dir):
         # leaves with fewer than 2p pixels are dropped (and counted) at estimation
@@ -119,7 +120,11 @@ def fetch_hyperleaf(data_dir=None, cache_dir=None, keep=None, estimator="scm", f
     meta["n_valid"] = out.n_obs
     return Bunch(covariances=out.covariances, means=out.means, n_obs=out.n_obs, meta=meta,
                  groups=meta["plot"].to_numpy(), info=out.info, bands=bands, root=root,
-                 splits=_splits(meta, n_splits, fold, seed),
+                 labels=meta["cultivar"].to_numpy(),
+                 targets=meta[list(REGRESSION_TARGETS)].to_numpy(np.float64),
+                 target_names=list(REGRESSION_TARGETS),
+                 splits=map_splits(_splits(_label_columns(out.meta_all), n_splits, fold, seed),
+                                   meta["proc_index"], len(out.meta_all)),
                  covariance_path=res.covariance_dir)
 
 

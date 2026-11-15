@@ -91,3 +91,8 @@ def test_mix_regression_and_dominant(mix_dir, tmp_path):
     dom = AVIRISDataset(mix_dir, version="mix", task="fine", cache_dir=tmp_path / "c",
                         verbose=False)
     assert isinstance(dom[0][1], int) and dom.classes == ["eau", "vignes"]
+
+
+def test_coarse_task(fine_dir, tmp_path):
+    ds = AVIRISDataset(fine_dir, cache_dir=tmp_path / "c", verbose=False, task="coarse")
+    assert ds.classes == ["eau", "vergers_vignes"]

@@ -36,6 +36,7 @@ from ._common import (
     covariance_stage,
     group_kfold_split,
     load_covariance_dir,
+    map_splits,
     valid_pixels,
     write_json,
 )
@@ -76,7 +77,7 @@ def fetch_kaggle_wheat(data_dir=None, cache_dir=None, keep=None, estimator="scm"
     p = 125 - skip_first - skip_last
     check_sample_size(32 * 32, p)
     params = {"part": part, "skip_first": skip_first, "skip_last": skip_last,
-              "estimator": estimator, "version": 1}
+              "estimator": estimator, "version": 2}
 
     def process(_, out_dir):
         rows, zero, short = [], 0, 0
@@ -108,8 +109,11 @@ def fetch_kaggle_wheat(data_dir=None, cache_dir=None, keep=None, estimator="scm"
     groups = np.arange(len(meta))
     if part == "train":
         labels = meta["label"].to_numpy()
-        sp = group_kfold_split(labels, groups, n_splits=n_splits, fold=fold, seed=seed)
-        splits = {"stratified": sp, "recommended": sp}
+        full = out.meta_all
+        sp = group_kfold_split(full["label"].to_numpy(), np.arange(len(full)),
+                               n_splits=n_splits, fold=fold, seed=seed)
+        splits = map_splits({"stratified": sp, "recommended": sp}, meta["proc_index"],
+                            len(full))
     else:
         labels, splits = np.full(len(meta), None, dtype=object), {}
     return Bunch(covariances=out.covariances, means=out.means, n_obs=out.n_obs,

@@ -44,6 +44,7 @@ from ._common import (
     covariance_stage,
     group_kfold_split,
     load_covariance_dir,
+    map_splits,
     valid_pixels,
     write_json,
 )
@@ -55,6 +56,12 @@ PROPORTIONS = ["amandiers", "arbustes", "eau", "foret_coniferes", "foret_mixte",
                "prairie_paturage", "sol_nu", "urbain_dense", "urbain_faible",
                "urbain_moyen", "urbain_ouvert", "vignes", "autre"]
 CLIP = (0.0, 1.5)
+# task="coarse": 7 groups of series_aviris (+ "autre" for the MIX dominant class)
+COARSE_MAP = {"urbain_dense": "urbain", "urbain_faible": "urbain", "urbain_moyen": "urbain",
+              "urbain_ouvert": "urbain", "foret_coniferes": "foret", "foret_mixte": "foret",
+              "arbustes": "arbustes", "prairie_paturage": "prairie",
+              "amandiers": "vergers_vignes", "vignes": "vergers_vignes", "eau": "eau",
+              "sol_nu": "sol_nu", "autre": "autre"}
 
 
 def _bands(root, band_step):
@@ -95,7 +102,7 @@ def fetch_aviris(data_dir=None, cache_dir=None, keep=None, estimator="scm", forc
                  required=("meta/labels.csv", "meta/date_mask.npz", "meta/bands.csv"))
     bands = _bands(root, band_step)
     check_sample_size(32 * 32, len(bands))
-    params = {"band_step": band_step, "estimator": estimator, "clip": CLIP, "version": 1}
+    params = {"band_step": band_step, "estimator": estimator, "clip": CLIP, "version": 2}
 
     def process(_, out_dir):
         labels = pd.read_csv(root / "meta" / "labels.csv")
@@ -143,7 +150,11 @@ def fetch_aviris(data_dir=None, cache_dir=None, keep=None, estimator="scm", forc
         targets=targets, target_names=PROPORTIONS if version == "mix" else None,
         groups=blocks, meta=meta, info=out.info, bands=bands, root=root,
         splits={"fold5": fold5, "recommended": fold5,
-                "block10km": group_kfold_split(labels, blocks, fold=fold, seed=seed)},
+                "block10km": map_splits(
+                    {"s": group_kfold_split(out.meta_all["label"].to_numpy(),
+                                            out.meta_all["block10km"].to_numpy(),
+                                            fold=fold, seed=seed)},
+                    meta["proc_index"], len(out.meta_all))["s"]},
         covariance_path=res.covariance_dir,
     )
 
@@ -151,6 +162,9 @@ def fetch_aviris(data_dir=None, cache_dir=None, keep=None, estimator="scm", forc
 @DatasetManager.register_dataset("aviris")
 class AVIRISDataset(HSIDataset):
     """AVIRIS-C CA TS14 static covariances (83 x 83), FINE or MIX.
+
+    ``task="coarse"`` groups the classes into urbain, foret, arbustes, prairie,
+    vergers_vignes, eau, sol_nu (and autre for MIX), see ``COARSE_MAP``.
 
     Parameters
     ----------
@@ -164,6 +178,8 @@ class AVIRISDataset(HSIDataset):
     **kwargs
         :class:`~spdnet_datasets.base.BaseDataset` options.
     """
+
+    COARSE_MAP = COARSE_MAP
 
     def __init__(self, data_dir=None, *, version="fine", band_step=2, fold=0,
                  split="recommended", subset=None, cache_dir=None, keep=None, force=False,

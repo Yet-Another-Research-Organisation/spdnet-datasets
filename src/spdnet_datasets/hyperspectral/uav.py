@@ -45,6 +45,7 @@ from ._common import (
     block_kfold_split,
     covariance_stage,
     load_covariance_dir,
+    map_splits,
     purity_grid_windows,
     valid_pixels,
     window_pixels,
@@ -109,7 +110,7 @@ def fetch_uav(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=F
     bands = band_index(N_BANDS, band_step)
     check_sample_size(window * window, len(bands))
     params = {"scenes": list(scenes), "window": window, "band_step": band_step,
-              "threshold": threshold, "estimator": estimator, "version": 1}
+              "threshold": threshold, "estimator": estimator, "version": 2}
 
     def process(_, out_dir):
         patches = list_patches(root / "source")
@@ -142,13 +143,15 @@ def fetch_uav(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=F
                        covariance_fn=lambda p, o: covariance_stage(p, o, window_pixels, estimator),
                        cache_dir=cache_dir, keep=keep, force=force)
     out = load_covariance_dir(res.covariance_dir)
-    meta = out.meta
+    meta, full = out.meta, out.meta_all
+    spatial = block_kfold_split(full[["row", "col"]].to_numpy(), full["label"].to_numpy(),
+                                window=window, block=block, n_splits=n_splits, fold=fold,
+                                seed=seed, scene=full["scene_index"].to_numpy())
+    out.info["split_dropped_overlap"] = spatial.pop("dropped")
+    spatial = map_splits({"s": spatial}, meta["proc_index"], len(full))["s"]
     positions = meta[["row", "col"]].to_numpy()
     scene = meta["scene_index"].to_numpy()
     labels = meta["label"].to_numpy()
-    spatial = block_kfold_split(positions, labels, window=window, block=block,
-                                n_splits=n_splits, fold=fold, seed=seed, scene=scene)
-    out.info["split_dropped_overlap"] = spatial.pop("dropped")
     official = {k: np.flatnonzero(meta["official"].to_numpy() == k)
                 for k in ("train", "val", "test")}
     splits = {"spatial": spatial, "recommended": spatial, "official": official}

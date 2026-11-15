@@ -90,3 +90,12 @@ def test_estimators_and_balance(gsoff_dir, tmp_path, estimator):
                                     verbose=False)
     x, y = next(iter(tr))
     assert x.shape[1:] == (63, 63)
+
+
+def test_max_classes_and_samples_keep_splits_in_range(gsoff_dir, tmp_path):
+    ds = GSOFFDataset(gsoff_dir, cache_dir=tmp_path / "cache", block=30, verbose=False,
+                      max_classes=1, max_samples_per_class=10, seed=3)
+    assert len(ds.classes) == 1 and len(ds) == 10
+    parts = ds.splits["recommended"]
+    assert all(len(v) == 0 or v.max() < len(ds) for v in parts.values())
+    assert sum(len(v) for v in parts.values()) <= 10
