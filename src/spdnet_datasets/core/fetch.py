@@ -29,6 +29,7 @@ import csv
 import hashlib
 import json
 import shutil
+import urllib.error
 import urllib.request
 import warnings
 from pathlib import Path
@@ -75,7 +76,8 @@ def download(url, dest, checksum=None, algo="sha256", resume=True, timeout=60) -
 
     The file is written to ``dest.part`` and renamed when complete, so an
     interrupted download is resumed (HTTP Range) or restarted, never mistaken
-    for a finished one.
+    for a finished one. A ``416`` answer to a resume means that ``.part`` is
+    already complete: it is checked (``checksum``) and renamed.
     """
     dest = Path(dest)
     if dest.exists():
@@ -86,10 +88,15 @@ def download(url, dest, checksum=None, algo="sha256", resume=True, timeout=60) -
     part = dest.with_name(dest.name + ".part")
     start = part.stat().st_size if (resume and part.exists()) else 0
     req = urllib.request.Request(url, headers={"Range": f"bytes={start}-"} if start else {})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        mode = "ab" if start and getattr(resp, "status", 200) == 206 else "wb"
-        with open(part, mode) as out:
-            shutil.copyfileobj(resp, out, 1 << 20)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            mode = "ab" if start and getattr(resp, "status", 200) == 206 else "wb"
+            with open(part, mode) as out:
+                shutil.copyfileobj(resp, out, 1 << 20)
+    except urllib.error.HTTPError as exc:
+        # 416 on a resume: the range starts at the end of the file, .part is complete
+        if not (start and exc.code == 416):
+            raise
     if checksum and _hash_file(part, algo) != checksum:
         part.unlink()
         raise OSError(f"Checksum mismatch for {url}")

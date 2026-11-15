@@ -57,6 +57,27 @@ def test_download_resumes_partial_file(tmp_path, fake_net):
     assert (tmp_path / "f.bin").read_bytes() == payload
 
 
+@pytest.mark.parametrize("good", [True, False])
+def test_download_complete_part_answered_416(tmp_path, monkeypatch, good):
+    payload = b"spd" * 1000
+
+    def urlopen(req, timeout=None):
+        raise F.urllib.error.HTTPError(req.full_url, 416, "Range Not Satisfiable", {}, None)
+
+    monkeypatch.setattr(F.urllib.request, "urlopen", urlopen)
+    (tmp_path / "f.bin.part").write_bytes(payload if good else payload[:-1])
+    sha = hashlib.sha256(payload).hexdigest()
+    if good:
+        assert F.download("http://x/f.bin", tmp_path / "f.bin", checksum=sha).read_bytes() == payload
+        assert not (tmp_path / "f.bin.part").exists()
+    else:
+        with pytest.raises(OSError, match="Checksum"):
+            F.download("http://x/f.bin", tmp_path / "f.bin", checksum=sha)
+        assert not list(tmp_path.iterdir())
+    with pytest.raises(F.urllib.error.HTTPError):  # 416 without a .part is an error
+        F.download("http://x/g.bin", tmp_path / "g.bin")
+
+
 def test_download_bad_checksum_leaves_no_file(tmp_path, fake_net):
     with pytest.raises(OSError, match="Checksum"):
         F.download("http://x/f.bin", tmp_path / "f.bin", checksum="0" * 64)
