@@ -13,6 +13,10 @@ The covariance precomputation scripts (``covariance_precompute``,
 they were removed: every ``fetch_<dataset>()`` now builds its covariances in
 the cache (``SPDNET_CACHE_DIR``).
 
+Dataset sources (sources): local copy -> ``archive=`` -> cache -> download ->
+manual download, folder lookup in extracted archives, 7z / RAR extraction
+(used by the hyperspectral and SAR ``fetch_<dataset>()`` functions).
+
 Placenta utilities (placenta_utils sub-package):
     - spectral_tiffs: Read/write spectral TIFF image cubes and mask bitmaps
     - annotations: Parse and render annotation CSV files as bitmap masks

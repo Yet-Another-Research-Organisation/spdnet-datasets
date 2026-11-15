@@ -98,11 +98,16 @@ by you over environment variables in shell history.
 from spdnet_datasets.sar.s1slc_cvdl import fetch_s1slc_cvdl
 
 fetch_s1slc_cvdl()            # opens the IEEE DataPort page, explains what to download
-fetch_s1slc_cvdl(archive="~/Downloads/S1SLC_CVDL.zip")    # checks and extracts it
+fetch_s1slc_cvdl(archive="~/Downloads/S1SLC_CVDL.rar")    # checks and extracts it
 ```
 
 The archive is checked (size, checksum when the source publishes one) and
-extracted into the cache (`raw/`); paths that would escape the cache folder
-are rejected. An already extracted folder can be given instead of an
+extracted into the cache (`raw/`, or `<name>/downloads/` for the hyperspectral
+and SAR datasets, which keeps the sources outside the `keep` policy); paths that
+would escape the cache folder are rejected. A `.7z` archive needs the `7z`
+command or the optional `py7zr` package (`pip install 'spdnet-datasets[archives]'`),
+a `.rar` archive the `unrar`, `7z` or `bsdtar` command. When the data come from
+the cache, the Bunch returned by the fetch holds `root`: pass it as `data_dir`
+to the dataset class. An already extracted folder can be given instead of an
 archive; it is then read in place. Set `SPDNET_OPEN_BROWSER=0` to never open
 a browser (servers, batch jobs).
