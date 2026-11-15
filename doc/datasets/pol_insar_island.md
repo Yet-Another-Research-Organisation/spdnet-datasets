@@ -4,7 +4,7 @@
 :stub-columns: 1
 
 * - Domain
-  - SAR (synthetic aperture radar), multi-frequency PolInSAR land cover
+  - SAR (synthetic aperture radar), multi-frequency PolInSAR (polarimetric SAR interferometry) land cover
 * - Task(s)
   - fine classification (12 classes)
 * - Covariance
@@ -19,8 +19,8 @@
 
 ## Description and source
 
-Pol-InSAR-Island ("PolINSAR Iceland" in the mission text) is a benchmark for
-land-cover classification from PolInSAR (polarimetric SAR interferometry).
+Pol-InSAR-Island, also referred to as "PolINSAR Iceland", is a benchmark for
+land-cover classification from PolInSAR.
 The F-SAR airborne sensor of the DLR (German Aerospace Center) flew over
 Baltrum, an island of the German Wadden Sea, in L band and S band. The
 acquisitions are repeat-pass along two flight paths, FP1 and FP2. Both paths
@@ -91,10 +91,10 @@ The union cells, built on the train and test labels merged, number 5 033 in
   observations are the labelled pixels of the cell, so n ≥ 512 ≥ 2p. Every
   estimator of `core.estimators` applies. This is the only construction with
   correlations between the L and S bands, but it ignores the phases. The
-  median condition number of the SCM covariances is about 20.
+  median condition number of the SCM (sample covariance matrix) covariances is about 20.
 - `"t6"`: for each band, the mean T6 of the labelled pixels of the cell. That
   is a 6 × 6 Hermitian matrix: each pixel T6 has rank one, so the mean is the
-  sample covariance of the scattering vectors. It is mapped to the real SPD
+  sample covariance of the scattering vectors. It is mapped to the real SPD (symmetric positive definite)
   (symmetric positive definite) matrix `[[Re T, −Im T], [Im T, Re T]]`, which
   is 12 × 12. The map is injective, commutes with products, inverses and
   logarithms, and doubles every eigenvalue. The two bands are placed on a

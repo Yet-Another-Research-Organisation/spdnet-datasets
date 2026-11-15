@@ -20,7 +20,8 @@
 ## Description and source
 
 FUSAR-Ship 1.0 is a set of 8-bit amplitude chips cut from Gaofen-3 (GF-3)
-C-band images in DH/DV dual-polarisation modes. Each chip is centred on a
+C-band images in the DH and DV dual-polarisation modes (horizontal or
+vertical emission, both receptions). Each chip is centred on a
 ship. The ship is matched automatically with AIS (Automatic Identification
 System) messages, which give its MMSI (Maritime Mobile Service Identity),
 dimensions and type. The labels are a category / sub-category hierarchy taken
@@ -79,8 +80,8 @@ balanced metric.
 
 ## Covariance construction
 
-The loader builds no covariance. The mission restricts the SAR chip datasets
-to raw or mean outputs (`OUTPUTS = ("raw", "mean")`), and exactly one of
+The loader builds no covariance. By design, the SAR chip datasets of the package give raw or mean
+outputs only ({doc}`../guide/outputs`) (`OUTPUTS = ("raw", "mean")`), and exactly one of
 `return_raw=True` and `return_mean=True` must be set. This changes the API of
 the historical `real/fusar.py` loader in two ways: raw chips are now
 (H, W, 1) instead of (1, H, W), and setting one of the two flags is mandatory.

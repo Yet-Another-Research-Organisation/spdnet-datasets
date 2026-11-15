@@ -8,11 +8,11 @@
 * - Task(s)
   - fine classification (8 classes)
 * - Covariance
-  - 40×40 (amplitude of HH and HV on 20 dates), n = valid pixels of the parcel (≥ 80; median ≈ 10 000)
+  - 40×40 (amplitude of HH and HV on 20 dates; H horizontal, V vertical, emission then reception), n = valid pixels of the parcel (≥ 80; median ≈ 10 000)
 * - Outputs
   - cov · mean (40,) · raw (n, 40) valid pixels
 * - Splits
-  - `sgkf5_fold0` … `sgkf5_fold4` (`recommended` = fold 0; DSC 39 / 14 / 13 parcels)
+  - `sgkf5_fold0` … `sgkf5_fold4` (`recommended` = fold 0; descending orbit (DSC): 39 / 14 / 13 parcels)
 * - Module
   - {mod}`spdnet_datasets.sar.cpazmal` (`fetch_cpazmal`, `CPAZMaLDataset`)
 ```
@@ -32,7 +32,8 @@ horizontal or vertical reception. The series cover January 2020 to December
 
 The dataset annotates 68 sites in 8 classes and adds two unlabelled study
 areas. The stacks are linear intensities, geocoded on a common EPSG:4326 grid
-(WGS84 geographic coordinates).
+(EPSG: European Petroleum Survey Group code; 4326 = WGS84 geographic
+coordinates).
 
 - Lin-Kwong-Chon C., Gallet M., *CPAZMAL: Cryosphere PAZ SAR Data for MAchine
   Learning*, Workshop SAR & Cryosphere, 19 September 2024, LISTIC
@@ -99,8 +100,8 @@ excluded sites with the reason.
 
 ## Covariance construction
 
-**Sample unit: the parcel.** The mission asks for the parcels of the source
-shapefile. No shapefile is published: it is neither in the HDF5 file, nor on
+**Sample unit: the parcel.** The parcels should come from the source
+shapefile, but no shapefile is published: it is neither in the HDF5 file, nor on
 Hugging Face, nor in the `CPAZMaL_dataset` GitHub repository, which cites
 `DATASET/SHP/<class>/*.shp` without providing it. The polygons survive only
 rasterised in the HDF5 masks (`mask != -127`). Each polygon is a single
@@ -132,7 +133,7 @@ parcels have 317 to about 195 000 valid pixels, with a median of about
 
 **Normalisation.** The cache keeps unscaled covariances. At load time, the
 geometric scale of `core.normalize` is fitted on the training part of `split`.
-The median condition number of the SCM covariances is about 90 (DSC) and 150
+The median condition number of the SCM (sample covariance matrix) covariances is about 90 (DSC) and 150
 (ASC) per parcel, and about 250 with 16 × 16 blocks.
 
 ```{raw} html

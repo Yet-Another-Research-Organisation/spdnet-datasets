@@ -32,10 +32,10 @@ void, plus parcel identifiers. The French Land Parcel Identification System
 provides the crop types.
 
 - Sainte Fare Garnot V., Landrieu L., *Panoptic segmentation of satellite image
-  time series with convolutional temporal attention networks*, ICCV 2021.
+  time series with convolutional temporal attention networks*, ICCV (International Conference on Computer Vision) 2021.
 - Sainte Fare Garnot V., Landrieu L., Chehata N., *Multi-modal temporal
-  attention models for crop mapping from satellite time series*, ISPRS Journal
-  of Photogrammetry and Remote Sensing, 2022 (the radar extension, "-R").
+  attention models for crop mapping from satellite time series*, ISPRS (International Society for Photogrammetry and
+  Remote Sensing) Journal of Photogrammetry and Remote Sensing, 2022 (the radar extension, "-R").
 - Data and documentation: <https://github.com/VSainteuf/pastis-benchmark>
   (Zenodo archive, CC BY 4.0 according to the authors' page).
 
@@ -48,13 +48,12 @@ copy is checked against `MANIFEST_NAS.tsv`. Nothing is downloaded.
 | Array | Shape | Content |
 |---|---|---|
 | `DATA_S2/S2_<patch>.npy` | (T, 10, 128, 128) int16 | reflectance × 10⁴, bands B02, B03, B04, B05, B06, B07, B08, B8A, B11, B12 |
-| `DATA_S1A/S1A_<patch>.npy`, `DATA_S1D/…` | (T, 3, 128, 128) float16 | backscatter in dB: VV, VH, VV − VH |
+| `DATA_S1A/S1A_<patch>.npy`, `DATA_S1D/…` | (T, 3, 128, 128) float16 | backscatter in dB: VV, VH, VV − VH (VV and VH: vertical emission, vertical or horizontal reception) |
 | `ANNOTATIONS/TARGET_<patch>.npy` | (3, 128, 128) | semantic class in channel 0 (0 background, 19 void) |
 | `ANNOTATIONS/ParcelIDs_<patch>.npy` | (128, 128) | parcel identifier of each pixel |
 | `metadata.geojson` | 2 433 features | tile, fold, acquisition dates of each series |
 
-VV and VH are the co- and cross-polarised channels, with vertical emission and
-vertical or horizontal reception. The `ParcelIDs` files are in
+The `ParcelIDs` files are in
 `ANNOTATIONS/`, not in `INSTANCE_ANNOTATIONS/` as some descriptions say.
 35 patches have images but no entry in `metadata.geojson`, so they have no
 label and no fold. The loader ignores them.
@@ -91,17 +90,16 @@ copies always stay in the same fold.
 | Scenario | Channels | p | min. pixels (2p) | Parcels | train / val / test |
 |---|---|---|---|---|---|
 | A | S2, 10 bands, 1 date | 10 | 30 | 82 112 | 49 412 / 16 694 / 16 006 |
-| B | A + NDVI + NDWI | 12 | 30 | 82 102 | 49 407 / 16 690 / 16 005 |
+| B | A + NDVI (normalised difference vegetation index) + NDWI (normalised difference water index) | 12 | 30 | 82 102 | 49 407 / 16 690 / 16 005 |
 | C | S2 10 + S1A (VV, VH, VV/VH) + S1D (idem), 1 date | 16 | 32 | 79 684 | 47 825 / 16 363 / 15 496 |
 | D | S2 10 bands, 3 consecutive dates | 30 | 60 | 63 670 | 38 132 / 12 974 / 12 564 |
 | E | (S2 10 + S1A 3 + S1D 3) × 2 consecutive S2 dates | 32 | 64 | 62 867 | 37 769 / 12 895 / 12 203 |
 
-Counts are measured on BERTHA with the default options and `estimator="scm"`.
+Counts are measured on the local copy with the default options and
+`estimator="scm"`, the SCM (sample covariance matrix).
 The minimum pixel count follows the n ≥ 2p rule.
 
-**Indices.** The normalised difference vegetation index is
-NDVI = (B08 − B04) / (B08 + B04). The normalised difference water index
-follows McFeeters: NDWI = (B03 − B08) / (B03 + B08). A pixel whose denominator
+**Indices.** NDVI = (B08 − B04) / (B08 + B04). NDWI follows McFeeters: NDWI = (B03 − B08) / (B03 + B08). A pixel whose denominator
 is not positive is invalid.
 
 **Radar ratio.** PASTIS-R stores S1 in dB, and its third channel is exactly
