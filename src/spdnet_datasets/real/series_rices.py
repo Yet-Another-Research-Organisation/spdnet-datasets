@@ -16,10 +16,7 @@ import os
 
 import numpy as np
 
-from ..estimator.covariance import EstimateCovariance
-from .series import otsu_threshold, spectral_windows
-
-RICES_ROOT = "/DATA/Rices_90"
+from .series import data_root, otsu_threshold, spectral_windows
 
 
 def _read_envi(header: str) -> np.ndarray:
@@ -56,7 +53,7 @@ def _grains(cube: np.ndarray, dark: np.ndarray) -> list[np.ndarray]:
 
 
 def rices_series(
-    root: str = RICES_ROOT,
+    root: str | None = None,
     band_window: int = 16,
     band_step: int = 8,
     cross_session_test: bool = False,
@@ -66,10 +63,10 @@ def rices_series(
     {"split": 0 train / 1 validation / 2 test / -1 dropped}."""
     import pandas as pd
 
+    root = data_root(root, "HYPERSPECTRAL", "Rices_90")
     index = pd.read_csv(os.path.join(root, "index.csv"))
     varieties = sorted(index["Species Full Name"].unique())
     sessions = index.groupby("Species Full Name").Folder.nunique()
-    estimator = EstimateCovariance("ledoit_wolf", remove_mean=True, exclude_zero=False)
     darks = {}
     rng = np.random.default_rng(seed)
     data, labels, n_pixels, split = [], [], [], []
@@ -86,7 +83,7 @@ def rices_series(
             parts[:] = -1
         for pixels in grains:
             binned = pixels.reshape(len(pixels), 64, 4).mean(-1)
-            data.append(spectral_windows(binned, band_window, band_step, estimator))
+            data.append(spectral_windows(binned, band_window, band_step))
             n_pixels.append(len(pixels))
         labels += [varieties.index(row[1])] * len(grains)
         split += list(parts)

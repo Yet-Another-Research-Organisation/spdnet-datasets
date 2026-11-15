@@ -5,10 +5,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from spdnet_datasets.core.config import dataset_path
 from spdnet_datasets.real.series_treesat import MIN_PIXELS, treesat_series
 
-ROOT = "/DATA/TreeSatAI-TS"
-pytestmark = pytest.mark.skipif(not Path(ROOT).is_dir(), reason="TreeSatAI-TS not available")
+ROOT = str(dataset_path("SITS", "TreeSatAI-TS"))
+pytestmark = [pytest.mark.real_data,
+              pytest.mark.skipif(not Path(ROOT).is_dir(), reason="TreeSatAI-TS not available")]
 
 
 @pytest.fixture(scope="module")
@@ -34,11 +36,9 @@ def test_tokens(series):
 
 
 def test_patch_missing_months_are_identity():
-    from spdnet_datasets.estimator.covariance import EstimateCovariance
     from spdnet_datasets.real.series_treesat import treesat_patch
 
-    estimator = EstimateCovariance("ledoit_wolf", remove_mean=True, exclude_zero=False)
     for path in sorted(Path(ROOT, "sentinel-ts").glob("*.h5"))[:20]:
-        covariances, pixels = treesat_patch(str(path), estimator)
+        covariances, pixels = treesat_patch(str(path))
         identity = (covariances == np.eye(10)).all((-2, -1))
         assert np.array_equal(identity, pixels < MIN_PIXELS)  # valid token <=> n >= 2p clear pixels

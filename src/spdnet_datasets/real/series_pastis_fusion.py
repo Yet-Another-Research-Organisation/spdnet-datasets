@@ -24,9 +24,9 @@ from multiprocessing import Pool
 
 import numpy as np
 
-from .series_breizhcrops import _cap_stratified, _ledoit_wolf
+from .series import covariance, data_root
+from .series_breizhcrops import _cap_stratified
 
-ROOT = "/DATA/PASTIS-R/PASTIS-R"
 SENSORS = ("S2", "S1A", "S1D")
 CHANNELS = {"S2": list(range(10)), "S1A": [0, 1], "S1D": [0, 1]}
 
@@ -55,19 +55,20 @@ def _patch_series(args: tuple) -> list[np.ndarray]:
     for parcel in parcels:
         pixels = cube[:, :, ids == parcel].transpose(0, 2, 1)  # (T, n, 14)
         if pooled:
-            out.append(_ledoit_wolf(pixels[valid].reshape(-1, pixels.shape[-1]))[None])
+            out.append(covariance(pixels[valid].reshape(-1, pixels.shape[-1]))[None])
         else:
             series = np.tile(np.eye(pixels.shape[-1]), (len(pixels), 1, 1))
             for t in np.flatnonzero(valid):
-                series[t] = _ledoit_wolf(pixels[t])
+                series[t] = covariance(pixels[t])
             out.append(series)
     return out
 
 
-def pastis_fusion_series(root: str = ROOT, n_periods: int = 12, min_pixels: int = 30,
+def pastis_fusion_series(root: str | None = None, n_periods: int = 12, min_pixels: int = 30,
                          caps: tuple[int, int, int] = (20000, 5000, 10000), pooled: bool = False,
                          jobs: int = 3) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
     """(N, 12, 14, 14) covariances (or (N, 1, 14, 14) pooled), labels 0..17, pixels per parcel, {"split"}."""
+    root = data_root(root, "SITS", "PASTIS-R", "PASTIS-R")
     with open(os.path.join(root, "metadata.geojson")) as f:
         patches = [x["properties"] for x in json.load(f)["features"]]
     acquisitions = lambda v: v if isinstance(v, dict) else ast.literal_eval(v)  # noqa: E731
@@ -87,7 +88,7 @@ def pastis_fusion_series(root: str = ROOT, n_periods: int = 12, min_pixels: int 
         target = np.load(os.path.join(root, "ANNOTATIONS", f"TARGET_{pid}.npy"))[0].ravel()
         ids, inverse, counts = np.unique(np.load(os.path.join(root, "ANNOTATIONS", f"ParcelIDs_{pid}.npy")).ravel(),
                                          return_inverse=True, return_counts=True)
-        for k, (parcel, count) in enumerate(zip(ids, counts)):
+        for k, (parcel, count) in enumerate(zip(ids, counts, strict=True)):
             label = np.bincount(target[inverse == k]).argmax()  # majority semantic class of the parcel
             if parcel != 0 and count >= min_pixels and label not in (0, 19):
                 fold = int(patch["Fold"])

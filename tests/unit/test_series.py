@@ -6,13 +6,21 @@ from pathlib import Path
 import pytest
 import torch
 
-from spdnet_datasets.synthetic.series import (
+from spdnet_datasets.core.config import dataset_path
+
+pytest.importorskip("yetanotherspdnet")
+
+from yetanotherspdnet.functions.spd_geometries import affine_invariant as ai  # noqa: E402
+
+from spdnet_datasets.synthetic.series import (  # noqa: E402
     SeriesConfig,
     generate_series,
     sample_wishart,
     validate_series,
 )
-from yetanotherspdnet.functions.spd_geometries import affine_invariant as ai
+
+DEEPHS = dataset_path("HYPERSPECTRAL", "DeepHS-Fruit")
+CI4R = dataset_path("RADAR_DOPPLER", "CI4R-MULTI3")
 
 
 @pytest.fixture(scope="module")
@@ -111,7 +119,7 @@ def test_dispersion_decreases_with_df():
     for df in (30, 100, 300, 1000):
         series = generate_series(SeriesConfig(df=df), 100)
         dispersions.append(max(validate_series(series)["dispersion_q"]))
-    assert all(a > b for a, b in zip(dispersions, dispersions[1:]))
+    assert all(a > b for a, b in zip(dispersions, dispersions[1:], strict=False))
 
 
 def test_df_per_class():
@@ -182,7 +190,8 @@ def test_otsu_threshold_separates_two_modes():
     assert values[:300].max() <= threshold < values[300:].min()
 
 
-@pytest.mark.skipif(not Path("/DATA/DeepHS-Fruit").is_dir(), reason="DeepHS-Fruit not available")
+@pytest.mark.real_data
+@pytest.mark.skipif(not Path(DEEPHS).is_dir(), reason="DeepHS-Fruit not available")
 def test_deephs_series_shapes_and_groups():
     import numpy as np
 
@@ -205,7 +214,8 @@ def test_jet_to_scalar_inverts_the_colour_map():
     assert np.abs(jet_to_scalar(rgb) - values).max() < 0.01
 
 
-@pytest.mark.skipif(not Path("/DATA/CI4R-MULTI3").is_dir(), reason="CI4R-MULTI3 not available")
+@pytest.mark.real_data
+@pytest.mark.skipif(not Path(CI4R).is_dir(), reason="CI4R-MULTI3 not available")
 def test_ci4r_series_shapes():
     import numpy as np
 
@@ -213,7 +223,7 @@ def test_ci4r_series_shapes():
 
     data, labels, n_columns, groups = ci4r_series(max_images=3)
     assert data.shape == (3, 13, 16, 16) and np.all(np.linalg.eigvalsh(data) > 0)
-    assert n_columns >= 2 * 16 and set(labels) == {0} and len(set(groups)) == 1
+    assert n_columns.shape == (3,) and (n_columns >= 2 * 16).all() and set(labels) == {0} and len(set(groups)) == 1
 
 
 def test_uav_series_blocks_do_not_share_pixels(tmp_path):
@@ -283,3 +293,25 @@ def test_continuous_target_moves_the_centre_along_one_direction(scenario):
     torch.testing.assert_close(coords.norm(dim=-1), config.class_radius * series.labels.abs()[:, None].expand(-1, config.n_steps))
     unit = coords / coords.norm(dim=-1, keepdim=True)
     assert ((unit * unit[:1]).sum(-1).abs() > 1 - 1e-8).all()
+
+
+def test_validate_series_continuous_target():  # finding 3: no empty quantile on float labels
+    series = generate_series(SeriesConfig(n_features=4, target="continuous"), 20)
+    report = validate_series(series)
+    assert len(report["dispersion_q"]) == 1 and math.isfinite(report["dispersion_q"][0])
+    assert report["min_eigval"] > 0 and math.isfinite(report["separation_ratio"])
+
+
+@pytest.mark.parametrize("option", [{"target": "continuous"}, {"match_log_det": True},
+                                    {"class_angles": [0.0, 90.0, 180.0]}, {"tangent_noise_std": 0.1}])
+def test_rotating_scenario_rejects_unsupported_options(option):  # finding 4
+    with pytest.raises(ValueError, match="rotating scenario does not support"):
+        generate_series(SeriesConfig(scenario="rotating", **option), 2)
+
+
+def test_synthetic_package_imports_lazily():
+    import spdnet_datasets.synthetic as synthetic
+
+    assert "generate_series" in synthetic.__all__ and synthetic.generate_series is generate_series
+    with pytest.raises(AttributeError):
+        synthetic.not_a_generator  # noqa: B018

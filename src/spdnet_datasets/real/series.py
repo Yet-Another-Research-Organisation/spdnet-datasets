@@ -1,7 +1,27 @@
 """
-Covariance series from real datasets (strategies of the data atlas, /DATA/_atlas, chapter "Séries de
-covariances"). Every builder returns float64 arrays (n_series, T, p, p), integer labels and the
-number of observations per covariance, so that the constraint n >= 2p of the specification can be checked.
+Covariance series from real datasets (strategies of the data atlas, chapter "Séries de covariances").
+
+Output contract of every ``*_series`` builder (``real/series*.py``)::
+
+    data, labels, n_obs, groups_or_splits[, mean]
+
+- ``data``: float64 (N, T, p, p), one series of T SPD tokens per sample. Missing tokens (padding, masked dates
+  or windows) are identity matrices (convention E8 of the atlas).
+- ``labels``: (N,) integer classes, or float targets for a regression.
+- ``n_obs``: (N,) number of observations behind the covariances of each sample (the smallest or the median over
+  its tokens when they differ; documented per builder), so that ``n >= 2p`` can be audited.
+- ``groups_or_splits``: (N,) group ids for a grouped split (subject, session, spatial block, ...), or a dict
+  with ``"split"`` (0 train / 1 validation / 2 test) and other per-sample arrays.
+- ``mean`` (only with ``return_mean=True``, where available): float64 (N, T, p), the per-channel mean of the
+  observations of each token.
+
+Estimation goes through :func:`covariance` (:func:`spdnet_datasets.core.estimate_covariance`, centred, then a
+relative diagonal loading ``load * tr(C) / p * I``, 1e-6 everywhere unless stated). ``n >= 2p`` is enforced
+(:class:`spdnet_datasets.core.InsufficientSamplesError`); the few builders where it does not hold by design
+take ``allow_small_n=False`` and must be called with ``allow_small_n=True`` (documented derogation). Data roots
+default to ``<SPDNET_DATA_ROOT>/<DOMAIN>/<Name>`` (:func:`spdnet_datasets.core.dataset_path`); every builder
+takes ``root`` to override it. Statistics used for normalising the data are fitted on the training samples
+only (``fit_mask`` or the internal split, see each builder).
 
 - :func:`sliding_covariances`: generic sliding window over the observation axis.
 - :func:`fmcw_series`: FMCW 24 GHz (figshare, simulated activities). Coherent integration of the 102 rows,
@@ -42,10 +62,12 @@ number of observations per covariance, so that the constraint n >= 2p of the spe
 
 import glob
 import os
+import warnings
 
 import numpy as np
 
-from ..estimator.covariance import EstimateCovariance
+from ..core.config import dataset_path
+from ..core.estimators import check_sample_size, check_spd, estimate_covariance
 
 FMCW_CLASSES = ["B", "K", "P", "G", "W", "SU", "SD", "STW", "WTS", "WTF", "FTW"]
 HYPERLEAF_CULTIVARS = ["Heerup", "Kvium", "Rembrandt", "Sheriff"]
@@ -59,44 +81,106 @@ KAGGLE_WHEAT_CLASSES = ["Health", "Other", "Rust"]
 CI4R_CLASSES = ["Away", "Bend", "Crawl", "Kneel", "Limp", "Pick", "SStep", "Scissor", "Sit", "Toes", "Towards"]
 
 
+def data_root(root, domain: str, name: str, *parts: str) -> str:
+    """``root`` if given, else ``<SPDNET_DATA_ROOT>/<domain>/<name>/<parts...>`` (resolved at call time)."""
+    if root is not None:
+        return str(root)
+    return str(dataset_path(domain, name).joinpath(*parts))
+
+
+def covariance(
+    x: np.ndarray,
+    estimator: str = "ledoit_wolf",
+    load: float = 1e-6,
+    allow_small_n: bool = False,
+    spd: bool = True,
+) -> np.ndarray:
+    """
+    One (p, p) token from observations ``x`` (n, p): :func:`spdnet_datasets.core.estimate_covariance` (centred,
+    ``estimator`` in scm / ledoit_wolf / tyler / student), plus the relative diagonal loading
+    ``load * tr(C) / p * I``.
+
+    ``n >= 2p`` is checked first unless ``allow_small_n`` (documented derogations only). ``spd``: check the
+    loaded token is SPD (:class:`spdnet_datasets.core.NotSPDError`); callers that replace degenerate tokens
+    themselves (constant windows -> identity or fallback) pass ``spd=False``.
+    """
+    x = np.asarray(x, dtype=np.float64)
+    n, p = x.shape
+    if not allow_small_n:
+        check_sample_size(n, p)
+    c = estimate_covariance(x, estimator, check=False)
+    c = c + load * np.trace(c) / p * np.eye(p)
+    if spd:
+        check_spd(c)
+    return c
+
+
+def resolve_fit_mask(fit_mask, n: int, *args) -> np.ndarray:
+    """Boolean (n,) mask of the samples that fit the normalisation statistics. ``fit_mask``: None (every
+    sample, with a warning: test statistics leak into the normalisation), a boolean / index array, or a
+    callable applied to ``args`` (e.g. labels and groups) that returns one."""
+    if fit_mask is None:
+        warnings.warn("normalisation statistics fitted on all the samples, test included: pass fit_mask "
+                      "(training samples) to avoid the leak", UserWarning, stacklevel=3)
+        return np.ones(n, bool)
+    if callable(fit_mask):
+        fit_mask = fit_mask(*args)
+    fit_mask = np.asarray(fit_mask)
+    if fit_mask.dtype != bool:
+        mask = np.zeros(n, bool)
+        mask[fit_mask] = True
+        fit_mask = mask
+    if fit_mask.shape != (n,) or not fit_mask.any():
+        raise ValueError(f"fit_mask must select at least one of the {n} samples")
+    return fit_mask
+
+
 def sliding_covariances(
     observations: np.ndarray,
     window: int,
     step: int | None,
-    estimator: EstimateCovariance,
+    estimator: str = "scm",
     load: float = 1e-6,
     n_windows: int | None = None,
-) -> np.ndarray:
+    return_mean: bool = False,
+    spd: bool = True,
+):
     """
     observations (n, p) ordered along n -> covariances (T, p, p) of the windows [s, s + window): starts every
     ``step`` (T = floor((n - window) / step) + 1), or ``n_windows`` starts spread evenly over [0, n - window].
-    Each covariance is diagonally loaded by load * tr(C) / p (SPD guaranteed).
+    Each covariance is diagonally loaded by load * tr(C) / p (:func:`covariance`). ``return_mean``: also the
+    (T, p) window means. Raises ``ValueError`` when ``n < window`` (no complete window).
     """
     n, p = observations.shape
+    if n < window:
+        raise ValueError(f"{n} observations for windows of {window}: no complete window")
     if n_windows is not None:
         starts = np.linspace(0, n - window, n_windows).round().astype(int)
     else:
         starts = range(0, n - window + 1, step)
-    covariances = np.stack([estimator(observations[s:s + window]) for s in starts])
-    trace = np.trace(covariances, axis1=-2, axis2=-1)[:, None, None] / p
-    return covariances + load * trace * np.eye(p)
+    covariances = np.stack([covariance(observations[s:s + window], estimator, load, spd=spd) for s in starts])
+    if return_mean:
+        return covariances, np.stack([observations[s:s + window].mean(0) for s in starts])
+    return covariances
 
 
 def fmcw_series(
-    root: str = "/DATA/FMCW24GHz-figshare",
+    root: str | None = None,
     nperseg: int = 128,
     hop: int = 32,
     n_bands: int = 16,
     window: int = 64,
     n_windows: int = 8,
     files_per_class: int | None = None,
-) -> tuple[np.ndarray, np.ndarray, int]:
-    """(n_files, T, n_bands, n_bands) covariances of log-power spectrogram bands, labels, observations per covariance."""
+    return_mean: bool = False,
+) -> tuple:
+    """(n_files, T, n_bands, n_bands) SCM covariances of log-power spectrogram bands, labels, observations per
+    covariance (``window``); with ``return_mean``, also the (n_files, T, n_bands) window means."""
     import scipy.io as sio
     from scipy.signal import stft
 
-    estimator = EstimateCovariance("scm", remove_mean=True, exclude_zero=False)
-    data, labels = [], []
+    root = data_root(root, "RADAR_DOPPLER", "FMCW24GHz-figshare")
+    data, labels, means = [], [], []
     for label, name in enumerate(FMCW_CLASSES):
         files = sorted(glob.glob(os.path.join(root, name, "*.mat")))[:files_per_class]
         for path in files:
@@ -105,13 +189,17 @@ def fmcw_series(
             power = np.abs(np.fft.fftshift(spectrum, 0)) ** 2  # (nperseg, frames)
             bands = power.reshape(n_bands, nperseg // n_bands, -1).mean(1)  # (n_bands, frames)
             features = np.log(bands + 1e-12 * bands.max()).T  # (frames, n_bands)
-            data.append(sliding_covariances(features, window, None, estimator, n_windows=n_windows))
+            covariances, mean = sliding_covariances(features, window, None, "scm", n_windows=n_windows,
+                                                    return_mean=True)
+            data.append(covariances)
+            means.append(mean)
             labels.append(label)
-    return np.stack(data), np.array(labels), window
+    out = (np.stack(data), np.array(labels), window)
+    return (*out, np.stack(means)) if return_mean else out
 
 
 def hyperleaf_series(
-    root: str = "/DATA/HyperLeaf2024",
+    root: str | None = None,
     band_window: int = 16,
     band_step: int = 8,
     max_images: int | None = None,
@@ -122,8 +210,8 @@ def hyperleaf_series(
     import pandas as pd
     import tifffile
 
+    root = data_root(root, "HYPERSPECTRAL", "HyperLeaf2024")
     table = pd.read_csv(os.path.join(root, "train.csv"), dtype={"ImageId": str})[:max_images]
-    estimator = EstimateCovariance("scm", remove_mean=True, exclude_zero=False)
     data, labels, n_pixels = [], [], []
     for row in table.itertuples():
         cube = tifffile.imread(os.path.join(root, "images", f"{row.ImageId}.tiff")).astype(np.float64) / 65535.0
@@ -138,21 +226,16 @@ def hyperleaf_series(
                 cuts = np.quantile(index, np.arange(1, n_cuts) / n_cuts)
                 zone = zone * n_cuts + (index[:, None] > cuts).sum(1)  # ties go to the lower zone
             groups = [pixels[leaf][zone == z] for z in range(zones[0] * zones[1])]
-        n_bands = pixels.shape[1]
-        windows = [
-            estimator(group[:, b:b + band_window]) for group in groups
-            for b in range(0, n_bands - band_window + 1, band_step)
-        ]
-        covariances = np.stack(windows)
-        trace = np.trace(covariances, axis1=-2, axis2=-1)[:, None, None] / band_window
+        # loaded tokens: the trace test below compares loaded traces, the same ratio as unloaded ones
+        covariances = np.concatenate([spectral_windows(group, band_window, band_step, "scm", spd=False)
+                                      for group in groups])
         if zones != (1, 1):  # (almost) constant zone window: whole-leaf window instead
-            whole = np.stack([estimator(pixels[leaf][:, b:b + band_window])
-                              for b in range(0, n_bands - band_window + 1, band_step)])
-            whole = np.tile(whole, (len(groups), 1, 1))
-            constant = trace < 1e-2 * np.trace(whole, axis1=-2, axis2=-1)[:, None, None] / band_window
+            whole = np.tile(spectral_windows(pixels[leaf], band_window, band_step, "scm"), (len(groups), 1, 1))
+            trace = np.trace(covariances, axis1=-2, axis2=-1)[:, None, None]
+            constant = trace < 1e-2 * np.trace(whole, axis1=-2, axis2=-1)[:, None, None]
             covariances = np.where(constant, whole, covariances)
-            trace = np.trace(covariances, axis1=-2, axis2=-1)[:, None, None] / band_window
-        data.append(covariances + 1e-6 * trace * np.eye(band_window))
+        check_spd(covariances)
+        data.append(covariances)
         labels.append(int(np.argmax([getattr(row, c) for c in HYPERLEAF_CULTIVARS])))
         n_pixels.append(min(len(group) for group in groups))
     return np.stack(data), np.array(labels), np.array(n_pixels)
@@ -169,7 +252,7 @@ def otsu_threshold(values: np.ndarray, bins: int = 256) -> float:
 
 
 def deephs_series(
-    root: str = "/DATA/DeepHS-Fruit",
+    root: str | None = None,
     band_window: int = 16,
     band_step: int = 8,
     max_images: int | None = None,
@@ -180,25 +263,20 @@ def deephs_series(
 
     from spectral.io import envi
 
+    root = data_root(root, "HYPERSPECTRAL", "DeepHS-Fruit")
     with open(os.path.join(root, "annotations", "merged_annotations.json")) as f:
         annotations = json.load(f)
     ripeness = {a["record_id"]: a["ripeness_state"] for a in annotations["annotations"]}
     ripeness = {k: "perfect" if v == "ripe" else v for k, v in ripeness.items()}
     records = [r for r in annotations["records"]
                if r["camera_type"] == "VIS" and ripeness.get(r["id"]) in DEEPHS_RIPENESS][:max_images]
-    estimator = EstimateCovariance("scm", remove_mean=True, exclude_zero=False)
     data, labels, n_pixels, fruits = [], [], [], []
     for record in records:
         header = os.path.join(root, record["files"]["header_file"])
         cube = np.asarray(envi.open(header, header.replace(".hdr", ".bin")).load(), dtype=np.float64)
         nir = cube[..., 150:200].mean(-1)
         pixels = cube[nir > otsu_threshold(nir)]  # (fruit pixels, 224 bands)
-        windows = [
-            estimator(pixels[:, b:b + band_window]) for b in range(0, pixels.shape[1] - band_window + 1, band_step)
-        ]
-        covariances = np.stack(windows)
-        trace = np.trace(covariances, axis1=-2, axis2=-1)[:, None, None] / band_window
-        data.append(covariances + 1e-6 * trace * np.eye(band_window))
+        data.append(spectral_windows(pixels, band_window, band_step, "scm"))
         labels.append(DEEPHS_RIPENESS.index(ripeness[record["id"]]))
         n_pixels.append(len(pixels))
         fruits.append(os.path.basename(header).rsplit("_", 1)[0])  # e.g. avocado_day_01_01
@@ -217,36 +295,51 @@ def jet_to_scalar(rgb: np.ndarray) -> np.ndarray:
 
 
 def ci4r_series(
-    root: str = "/DATA/CI4R-MULTI3",
+    root: str | None = None,
     n_bands: int = 16,
     window: int = 200,
     step: int = 100,
     max_images: int | None = None,
     pooled_cov: bool = False,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    return_mean: bool = False,
+) -> tuple:
     """(n_images, T, p, p) covariances of the 77 GHz spectrograms over time windows, activity labels, columns
-    per window, recording session per image. ``pooled_cov``: one covariance over all the columns, (n_images, 1, p, p)
-    (baseline B3, no series)."""
+    per covariance (n_images,), recording session per image. ``pooled_cov``: one covariance over all the columns,
+    (n_images, 1, p, p) (baseline B3, no series); ``n_obs`` is then the number of columns of each image.
+    Every column is kept (no silent removal of the all-zero ones); a constant window (null covariance) becomes an
+    identity token (masked, E8), with a warning giving their count. ``return_mean``: also the (n_images, T, p)
+    window means."""
     from PIL import Image
 
+    root = data_root(root, "RADAR_DOPPLER", "CI4R-MULTI3")
     files = sorted(f for f in glob.glob(os.path.join(root, "11_class_activity_data", "77GHz", "*", "*.png"))
                    if "(copy)" not in f)[:max_images]  # the "(copy)" files duplicate other takes
-    estimator = EstimateCovariance("ledoit_wolf", remove_mean=True)
-    data, labels, sessions = [], [], []
+    data, means, labels, sessions, n_obs = [], [], [], [], []
+    n_constant = 0
     for path in files:
         image = jet_to_scalar(np.asarray(Image.open(path).convert("RGB")))  # (Doppler 804, time 1475)
         height = image.shape[0]
         band = image[height // 4: height // 4 + (height // 2) // n_bands * n_bands]  # central half of the Doppler axis
-        pooled = band.reshape(n_bands, -1, band.shape[1]).mean(1)  # (p, time)
-        data.append(sliding_covariances(pooled.T, pooled.shape[1] if pooled_cov else window, step, estimator))
+        pooled = band.reshape(n_bands, -1, band.shape[1]).mean(1).T  # (time, p)
+        width = len(pooled) if pooled_cov else window
+        covariances, mean = sliding_covariances(pooled, width, step, "ledoit_wolf", return_mean=True, spd=False)
+        constant = np.trace(covariances, axis1=-2, axis2=-1) <= 0
+        covariances[constant] = np.eye(n_bands)
+        n_constant += int(constant.sum())
+        data.append(covariances)
+        means.append(mean)
+        n_obs.append(width)
         labels.append(CI4R_CLASSES.index(os.path.basename(os.path.dirname(path))))
         sessions.append(os.path.basename(path).split("_")[0])
+    if n_constant:
+        warnings.warn(f"CI4R: {n_constant} constant windows replaced by identity tokens", UserWarning, stacklevel=2)
     _, groups = np.unique(sessions, return_inverse=True)
-    return np.stack(data), np.array(labels), np.array(window), groups
+    out = (np.stack(data), np.array(labels), np.array(n_obs), groups)
+    return (*out, np.stack(means)) if return_mean else out
 
 
 def pastis_series(
-    root: str = "/DATA/PASTIS-R/PASTIS-R",
+    root: str | None = None,
     n_dates: int = 24,
     min_pixels: int = 30,
     per_class_and_fold: int = 100,
@@ -260,6 +353,7 @@ def pastis_series(
     import datetime
     import json
 
+    root = data_root(root, "SITS", "PASTIS-R", "PASTIS-R")
     with open(os.path.join(root, "metadata.geojson")) as f:
         patches = [x["properties"] for x in json.load(f)["features"]]
 
@@ -279,7 +373,7 @@ def pastis_series(
         target = np.load(os.path.join(root, "ANNOTATIONS", f"TARGET_{pid}.npy"))[0].ravel()
         parcels = np.load(os.path.join(root, "ANNOTATIONS", f"ParcelIDs_{pid}.npy")).ravel()
         ids, inverse, counts = np.unique(parcels, return_inverse=True, return_counts=True)
-        for k, (parcel, count) in enumerate(zip(ids, counts)):
+        for k, (parcel, count) in enumerate(zip(ids, counts, strict=True)):
             label = np.bincount(target[inverse == k]).argmax()  # majority semantic class of the parcel
             if parcel != 0 and count >= min_pixels and label not in (0, 19):
                 candidates.append((pid, parcel, label - 1, int(patch["Fold"]), count))
@@ -295,7 +389,6 @@ def pastis_series(
 
     # Ledoit-Wolf: cloudy or saturated dates give nearly rank-one covariances (condition number ~1e7 even
     # after diagonal loading), which the per-position recentring turns into numerically singular tokens.
-    estimator = EstimateCovariance("ledoit_wolf", remove_mean=True, exclude_zero=False)
     data, labels, n_pixels, split = [], [], [], []
     current, s2, parcels = None, None, None
     for pid, parcel, label, fold, count in kept:
@@ -306,11 +399,10 @@ def pastis_series(
             parcels = np.load(os.path.join(root, "ANNOTATIONS", f"ParcelIDs_{pid}.npy"))
         pixels = s2[:, :, parcels == parcel]  # (T, 10, n)
         if pooled:
-            covariances = estimator(pixels.transpose(0, 2, 1).reshape(-1, pixels.shape[1]))[None]
+            covariances = covariance(pixels.transpose(0, 2, 1).reshape(-1, pixels.shape[1]))[None]
         else:
-            covariances = np.stack([estimator(x.T) for x in pixels])
-        trace = np.trace(covariances, axis1=-2, axis2=-1)[:, None, None] / covariances.shape[-1]
-        data.append(covariances + 1e-6 * trace * np.eye(covariances.shape[-1]))
+            covariances = np.stack([covariance(x.T) for x in pixels])
+        data.append(covariances)
         labels.append(label)
         n_pixels.append(count)
         split.append(0 if fold <= 3 else fold - 3)
@@ -318,7 +410,7 @@ def pastis_series(
 
 
 def dopnet_series(
-    root: str = "/DATA/Dop-NET/Training Data",
+    root: str | None = None,
     n_bands: int = 16,
     n_bins: int = 128,
     window: int = 48,
@@ -327,10 +419,11 @@ def dopnet_series(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """(n_gestures, T_max, p, p) covariances of the log Doppler power over windows of frames, identity after the
     last window; labels = cell index 0..3 of the training files (the class names of the cells are ambiguous,
-    see the data atlas: only the index is used); frames per gesture; person index (A-F)."""
+    see the data atlas: only the index is used); frames per covariance (``min(window, gesture length)``);
+    person index (A-F)."""
     from scipy.io import loadmat
 
-    estimator = EstimateCovariance("scm", remove_mean=True, exclude_zero=False)
+    root = data_root(root, "RADAR_DOPPLER", "Dop-NET", "Training Data")
     series, labels, n_frames, persons = [], [], [], []
     for person, path in enumerate(sorted(glob.glob(os.path.join(root, "*Person_*.mat")))):
         cells = loadmat(path)["Data_Training"]["Doppler_Signals"][0, 0]
@@ -339,10 +432,10 @@ def dopnet_series(
                 centre = signal.shape[0] // 2
                 power = np.abs(signal[centre - n_bins // 2: centre + n_bins // 2]) ** 2
                 bands = np.log10(power.reshape(n_bands, -1, power.shape[1]).mean(1) + 1e-12)  # (p, frames)
-                length = bands.shape[1]
-                series.append(sliding_covariances(bands.T, min(window, length), step, estimator))
+                width = min(window, bands.shape[1])
+                series.append(sliding_covariances(bands.T, width, step, "scm"))
                 labels.append(label)
-                n_frames.append(length)
+                n_frames.append(width)
                 persons.append(person)
     t_max = max(len(x) for x in series)
     eye = np.eye(n_bands)
@@ -350,25 +443,38 @@ def dopnet_series(
     return data, np.array(labels), np.array(n_frames), np.array(persons)
 
 
-def spectral_windows(pixels: np.ndarray, band_window: int, band_step: int, estimator: EstimateCovariance) -> np.ndarray:
-    """pixels (n, bands) -> (T, b, b) covariances of the spectral windows, diagonally loaded by 1e-6 tr(C) / b."""
-    windows = [estimator(pixels[:, b:b + band_window])
-               for b in range(0, pixels.shape[1] - band_window + 1, band_step)]
-    covariances = np.stack(windows)
-    trace = np.trace(covariances, axis1=-2, axis2=-1)[:, None, None] / band_window
-    return covariances + 1e-6 * trace * np.eye(band_window)
+def spectral_windows(
+    pixels: np.ndarray,
+    band_window: int,
+    band_step: int,
+    estimator: str = "ledoit_wolf",
+    return_mean: bool = False,
+    spd: bool = True,
+):
+    """pixels (n, bands) -> (T, b, b) covariances of the spectral windows, diagonally loaded by 1e-6 tr(C) / b
+    (:func:`covariance`); ``return_mean``: also the (T, b) window means."""
+    starts = range(0, pixels.shape[1] - band_window + 1, band_step)
+    covariances = np.stack([covariance(pixels[:, b:b + band_window], estimator, spd=spd) for b in starts])
+    if return_mean:
+        return covariances, np.stack([pixels[:, b:b + band_window].mean(0) for b in starts])
+    return covariances
 
 
 def uav_series(
-    root: str = "/DATA/Hyperspectral/UAV-HSI-Crop/XJM_W15_T80",
+    root: str | None = None,
     band_window: int = 16,
     band_step: int = 8,
     block: int = 128,
     min_windows: int = 50,
     max_per_class: int = 300,
     seed: int = 0,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """(n_windows, T, b, b) spectral-window covariances, crop labels (0 .. C-1), pixels per window, spatial groups."""
+    return_mean: bool = False,
+) -> tuple:
+    """(n_windows, T, b, b) spectral-window covariances, crop labels (0 .. C-1), pixels per window, spatial groups;
+    with ``return_mean``, also the (n_windows, T, b) window means. Default root:
+    ``<SPDNET_DATA_ROOT>/HYPERSPECTRAL/UAV-HSI-Crop/XJM_W15_T80`` (on BERTHA the prepared windows only exist
+    outside the canonical copy: pass ``root``)."""
+    root = data_root(root, "HYPERSPECTRAL", "UAV-HSI-Crop", "XJM_W15_T80")
     images = np.load(os.path.join(root, "uav_windows_data.npy"), mmap_mode="r")  # (N, w, w, bands)
     crops = np.load(os.path.join(root, "uav_windows_labels.npy")).astype(int)
     centres = np.load(os.path.join(root, "uav_windows_positions.npy"))
@@ -380,30 +486,36 @@ def uav_series(
     rng = np.random.default_rng(seed)
     index = np.concatenate([rng.permutation(np.nonzero(inside & (crops == c))[0])[:max_per_class] for c in kept_crops])
     index.sort()
-    estimator = EstimateCovariance("ledoit_wolf", remove_mean=True, exclude_zero=False)
-    data = np.stack([spectral_windows(np.asarray(images[i], np.float64).reshape(-1, images.shape[-1]), band_window,
-                                      band_step, estimator) for i in index])
+    tokens = [spectral_windows(np.asarray(images[i], np.float64).reshape(-1, images.shape[-1]), band_window,
+                               band_step, "ledoit_wolf", return_mean=True) for i in index]
+    data = np.stack([c for c, _ in tokens])
     labels = np.searchsorted(kept_crops, crops[index])
     blocks = centres[index] // block
     groups = np.unique(np.stack([blocks[:, 0], blocks[:, 1], labels], 1), axis=0, return_inverse=True)[1].ravel()
-    return data, labels, np.full(len(index), images.shape[1] * images.shape[2]), groups
+    out = (data, labels, np.full(len(index), images.shape[1] * images.shape[2]), groups)
+    return (*out, np.stack([m for _, m in tokens])) if return_mean else out
 
 
 def kaggle_wheat_series(
-    root: str = "/DATA/Kaggle_Prepared/train/HS",
+    root: str | None = None,
     band_window: int = 16,
     band_step: int = 8,
     n_bands: int = 125,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """(n_patches, T, b, b) spectral-window covariances, labels (Health / Other / Rust), pixels per patch."""
+    return_mean: bool = False,
+) -> tuple:
+    """(n_patches, T, b, b) spectral-window covariances, labels (Health / Other / Rust), pixels per patch; with
+    ``return_mean``, also the (n_patches, T, b) window means."""
     import tifffile
 
-    estimator = EstimateCovariance("ledoit_wolf", remove_mean=True, exclude_zero=False)
-    data, labels = [], []
+    root = data_root(root, "HYPERSPECTRAL", "Wheat_Disease_ICPR26", "train", "HS")
+    data, labels, means = [], [], []
     for path in sorted(glob.glob(os.path.join(root, "*.tif"))):
         pixels = tifffile.imread(path).astype(np.float64)[..., :n_bands].reshape(-1, n_bands) / 65535.0
         if not pixels.any():  # 23 patches are entirely zero (atlas)
             continue
-        data.append(spectral_windows(pixels, band_window, band_step, estimator))
+        covariances, mean = spectral_windows(pixels, band_window, band_step, "ledoit_wolf", return_mean=True)
+        data.append(covariances)
+        means.append(mean)
         labels.append(KAGGLE_WHEAT_CLASSES.index(os.path.basename(path).split("_")[0]))
-    return np.stack(data), np.array(labels), np.full(len(labels), 32 * 32)
+    out = (np.stack(data), np.array(labels), np.full(len(labels), 32 * 32))
+    return (*out, np.stack(means)) if return_mean else out

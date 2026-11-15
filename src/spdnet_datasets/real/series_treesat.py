@@ -18,13 +18,13 @@ import os
 
 import numpy as np
 
-from ..estimator.covariance import EstimateCovariance
+from .series import covariance, data_root
 
 N_BANDS = 10
 MIN_PIXELS = 2 * N_BANDS
 
 
-def treesat_patch(path: str, estimator: EstimateCovariance, pooled: bool = False) -> tuple[np.ndarray, np.ndarray]:
+def treesat_patch(path: str, estimator: str = "ledoit_wolf", pooled: bool = False) -> tuple[np.ndarray, np.ndarray]:
     """One .h5 patch -> (12, 10, 10) monthly covariances (identity when < 20 clear pixels), clear pixels per month.
     ``pooled``: (1, 10, 10), one covariance over the clear pixels of the valid months (baseline B3, no series)."""
     import h5py
@@ -43,18 +43,17 @@ def treesat_patch(path: str, estimator: EstimateCovariance, pooled: bool = False
         x = pixels[months == m][clear[months == m]]
         counts[m] = len(x)
         if counts[m] >= MIN_PIXELS:
-            c = estimator(x)
-            covariances[m] = c + 1e-6 * np.trace(c) / N_BANDS * np.eye(N_BANDS)
+            covariances[m] = covariance(x, estimator)
     if pooled:
         x = np.concatenate([pixels[months == m][clear[months == m]] for m in range(12) if counts[m] >= MIN_PIXELS]
                            or [pixels[:0].reshape(0, N_BANDS)])
-        c = estimator(x) if len(x) >= MIN_PIXELS else np.eye(N_BANDS)
+        c = covariance(x, estimator, load=0.0) if len(x) >= MIN_PIXELS else np.eye(N_BANDS)
         covariances = (c + 1e-6 * np.trace(c) / N_BANDS * np.eye(N_BANDS))[None]
     return covariances, counts
 
 
 def treesat_series(
-    root: str = "/DATA/TreeSatAI-TS",
+    root: str | None = None,
     max_per_class: int = 400,
     n_classes: int = 6,
     seed: int = 0,
@@ -64,6 +63,7 @@ def treesat_series(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
     """(n_patches, 12, 10, 10) monthly covariances, labels in 0..n_classes-1 (most frequent first), median clear
     pixels per valid month, {"split": 0 train / 1 validation / 2 test}."""
+    root = data_root(root, "SITS", "TreeSatAI-TS")
     with open(os.path.join(root, "TreeSatBA_v9_60m_multi_labels.json")) as f:
         proportions = json.load(f)
     official = {}
@@ -82,7 +82,6 @@ def treesat_series(
     genera, counts = np.unique(list(dominant.values()), return_counts=True)
     classes = list(genera[np.argsort(-counts, kind="stable")][:n_classes])
 
-    estimator = EstimateCovariance("ledoit_wolf", remove_mean=True, exclude_zero=False)
     rng = np.random.default_rng(seed)
     data, labels, n_obs, split = [], [], [], []
     for test in (False, True):
@@ -90,7 +89,7 @@ def treesat_series(
             names = sorted(n for n, g in dominant.items() if g == genus and (official[n] == "test") == test)
             kept = []
             for i in rng.permutation(len(names)):  # draw until max_per_class series with enough valid months
-                covariances, pixels = treesat_patch(files[names[i]], estimator, pooled)
+                covariances, pixels = treesat_patch(files[names[i]], pooled=pooled)
                 valid = pixels >= MIN_PIXELS
                 if valid.sum() >= min_months:
                     kept.append((covariances, np.median(pixels[valid])))

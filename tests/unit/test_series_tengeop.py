@@ -5,10 +5,12 @@ import os
 import numpy as np
 import pytest
 
+from spdnet_datasets.core.config import dataset_path
 from spdnet_datasets.real.series_tengeop import tengeop_series
 
-ROOT = "/DATA/TenGeoP-SARwv"
-pytestmark = pytest.mark.skipif(not os.path.isdir(ROOT), reason="TenGeoP-SARwv not available")
+ROOT = str(dataset_path("SAR", "TenGeoP-SARwv"))
+pytestmark = [pytest.mark.real_data,
+              pytest.mark.skipif(not os.path.isdir(ROOT), reason="TenGeoP-SARwv not available")]
 
 
 @pytest.fixture(scope="module")

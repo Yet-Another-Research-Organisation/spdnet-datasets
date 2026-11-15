@@ -16,9 +16,10 @@ from multiprocessing import Pool
 import numpy as np
 import pandas as pd
 
-from .series_breizhcrops import _cap_stratified, _ledoit_wolf
+from .series import covariance, data_root
+from .series_breizhcrops import _cap_stratified
 
-ROOT = "/DATA/DATASET/RADAR_DOPPLER/MVDoppler"
+DOMAIN, NAME = "RADAR_DOPPLER", "MVDoppler"
 MVDOPPLER_CLASSES = ["normal", "phone_call", "pockets", "texting"]
 FOLDS = {1: 0, 2: 0, 0: 1, 3: 2}  # official fold -> train / val / test
 
@@ -36,13 +37,14 @@ def _snapshot_series(args: tuple) -> np.ndarray:
         x = np.log(np.clip(f["radar_dat"][32:96, :, 0], 1e-12, None)).astype(np.float64)  # (64 bins, 256 frames)
     bands = x.reshape(16, 4, -1).mean(1).T  # (256 frames, 16)
     if pooled:
-        return _ledoit_wolf(bands)[None]
-    return np.stack([_ledoit_wolf(bands[s:s + 64]) for s in range(0, 256 - 64 + 1, 32)])
+        return covariance(bands)[None]
+    return np.stack([covariance(bands[s:s + 64]) for s in range(0, 256 - 64 + 1, 32)])
 
 
-def mvdoppler_series(root: str = ROOT, caps: tuple[int, int, int] = (20000, 5000, 10000), pooled: bool = False,
+def mvdoppler_series(root: str | None = None, caps: tuple[int, int, int] = (20000, 5000, 10000), pooled: bool = False,
                      jobs: int = 3) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
     """(N, 7, 16, 16) covariances (or (N, 1, 16, 16) pooled), patterns 0..3, frames per window, {"split"}."""
+    root = data_root(root, DOMAIN, NAME)
     design = pd.read_csv(f"{root}/Labels_and_metadata/design_table.csv")
     design = design[[_readable(f"{root}/Data/{name}.h5") for name in design.fname]]
     rng = np.random.default_rng(0)
@@ -52,7 +54,8 @@ def mvdoppler_series(root: str = ROOT, caps: tuple[int, int, int] = (20000, 5000
         y = rows.pattern.map(MVDOPPLER_CLASSES.index).to_numpy()
         keep = _cap_stratified(y, caps[role], rng)
         paths += [f"{root}/Data/{name}.h5" for name in rows.fname[keep]]
-        labels.append(y[keep]); split.append(np.full(len(keep), role))
+        labels.append(y[keep])
+        split.append(np.full(len(keep), role))
     with Pool(jobs) as pool:
         data = np.stack(pool.map(_snapshot_series, [(p, pooled) for p in paths], chunksize=64))
     return data, np.concatenate(labels), np.full(len(paths), 256 if pooled else 64), {"split": np.concatenate(split)}

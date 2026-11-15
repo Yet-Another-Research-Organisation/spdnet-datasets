@@ -19,7 +19,7 @@ import re
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
-from ..estimator.covariance import EstimateCovariance
+from .series import covariance, data_root
 
 TENGEOP_CLASSES = ["Pure Ocean Waves", "Wind Streaks", "Micro Convective Cells", "Rain Cells", "Biological Slicks",
                    "Sea Ice", "Iceberg", "Low Wind Area", "Atmospheric Front", "Oceanic Front"]  # folders F .. O
@@ -41,7 +41,7 @@ def read_vignette(path: str) -> np.ndarray:
 
 
 def patch_window_covariances(image: np.ndarray, window: int, step: int, patch: int,
-                             estimator: EstimateCovariance) -> np.ndarray:
+                             estimator: str = "ledoit_wolf") -> np.ndarray:
     """(H, W) image -> (T, patch^2, patch^2) covariances of the windows of a row-major grid (window, step),
     diagonally loaded by 1e-6 tr(C) / p."""
     p = patch * patch
@@ -49,14 +49,12 @@ def patch_window_covariances(image: np.ndarray, window: int, step: int, patch: i
     for y in range(0, image.shape[0] - window + 1, step):
         for x in range(0, image.shape[1] - window + 1, step):
             patches = sliding_window_view(image[y:y + window, x:x + window], (patch, patch)).reshape(-1, p)
-            covariances.append(estimator(patches))
-    covariances = np.stack(covariances)
-    trace = np.trace(covariances, axis1=-2, axis2=-1)[:, None, None] / p
-    return covariances + 1e-6 * trace * np.eye(p)
+            covariances.append(covariance(patches, estimator))
+    return np.stack(covariances)
 
 
 def tengeop_series(
-    root: str = "/DATA/TenGeoP-SARwv",
+    root: str | None = None,
     window: int = 96,
     step: int = 96,
     patch: int = 4,
@@ -65,6 +63,7 @@ def tengeop_series(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
     """(N, T, patch^2, patch^2) patch covariances over a grid of windows, labels 0..9 (F .. O), patches per window,
     {"groups": datatake of each vignette}. T = g^2 with g = (431 - window) // step + 1 (4 x 4 = 16 by default)."""
+    root = data_root(root, "SAR", "TenGeoP-SARwv")
     side = (TENGEOP_MIN_SIDE - window) // step + 1
     crop = (side - 1) * step + window  # common centred square crop
     rng = np.random.default_rng(seed)
@@ -76,12 +75,11 @@ def tengeop_series(
         chosen = rng.permutation(len(paths))[:max_per_class]
         files += [paths[i] for i in sorted(chosen)]
         labels += [label] * len(chosen)
-    estimator = EstimateCovariance("ledoit_wolf", remove_mean=True, exclude_zero=False)
     data = []
     for path in files:
         image = read_vignette(path)
         top, left = (image.shape[0] - crop) // 2, (image.shape[1] - crop) // 2
-        data.append(patch_window_covariances(image[top:top + crop, left:left + crop], window, step, patch, estimator))
+        data.append(patch_window_covariances(image[top:top + crop, left:left + crop], window, step, patch))
     # s1a-wv1-slc-vv-<start>-<stop>-<orbit>-<datatake>-<index>.tiff
     datatakes = ["-".join(os.path.basename(f).split("-")[i] for i in (0, 7)) for f in files]
     _, groups = np.unique(datatakes, return_inverse=True)
