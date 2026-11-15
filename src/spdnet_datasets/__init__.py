@@ -27,6 +27,7 @@ from .real import (
     Rices90Dataset,
     UAVDataset,
 )
+from .sar.s1_iceland import S1IcelandDataset, fetch_s1_iceland
 
 __version__ = "0.1.0"
 
@@ -54,4 +55,6 @@ __all__ = [
     'CI4RDataset',
     'DopNetDataset',
     'MVDopplerDataset',
+    'S1IcelandDataset',
+    'fetch_s1_iceland',
 ]
