@@ -27,6 +27,15 @@ from .real import (
     Rices90Dataset,
     UAVDataset,
 )
+from .sar import (
+    AIRPolSARSegDataset,
+    ATRNetSTARDataset,
+    CPAZMaLDataset,
+    FUSARShipDataset,
+    MSTARDataset,
+    PolInSARIslandDataset,
+    S1SLCCVDLDataset,
+)
 
 __version__ = "0.1.0"
 
@@ -54,4 +63,13 @@ __all__ = [
     'CI4RDataset',
     'DopNetDataset',
     'MVDopplerDataset',
+
+    # SAR datasets
+    'AIRPolSARSegDataset',
+    'ATRNetSTARDataset',
+    'CPAZMaLDataset',
+    'FUSARShipDataset',
+    'MSTARDataset',
+    'PolInSARIslandDataset',
+    'S1SLCCVDLDataset',
 ]
