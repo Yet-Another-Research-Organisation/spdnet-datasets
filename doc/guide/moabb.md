@@ -43,8 +43,14 @@ export MNE_DATA=/path/to/mne_data
 
 - `estimator` is one of `"scm"`, `"ledoit_wolf"`, `"tyler"` or `"student"`;
   `tyler` and `student` need the `robust` extra;
-- an epoch with `n_times < 2 * n_channels` raises `InsufficientSamplesError`;
-- a matrix that is not SPD raises `NotSPDError`.
+- in `Covariances` (a scikit-learn transformer, which cannot drop trials), an
+  epoch with `n_times < 2 * n_channels` raises `InsufficientSamplesError` and a
+  matrix that is not SPD (condition number above `1e12` included) raises
+  `NotSPDError`;
+- in `MOABBCovariances`, such trials are excluded and counted
+  (`dataset.n_excluded`); labels and metadata stay aligned, and an error is
+  raised only if no trial is left. Typical causes are a common average
+  reference (rank `n_channels - 1`) or a flat channel.
 
 `Covariances` is not `pyriemann.estimation.Covariances`. Both map
 `(n_trials, n_channels, n_times)` to `(n_trials, n_channels, n_channels)`, but
@@ -149,9 +155,16 @@ deletes them. Under `SPDNET_CACHE_DIR/moabb_<dataset code>/`, it caches:
 - `covariance/<hash>/`: the unscaled covariances, the channel means, the
   labels and the metadata.
 
-The hash covers the dataset code, the subjects, the paradigm class with its
-public settings, and the estimator. A second run with the same settings reads
-the cache and does not call `get_data` again. `force=True` recomputes.
+The `processed` hash covers the dataset code and every public setting of the
+MOABB dataset object (for instance `PhysionetMI(imagined=True)` and
+`PhysionetMI(executed=True)` get different entries), the subjects, and the
+paradigm class with its public settings (NumPy scalars included). The
+`covariance` hash adds the estimator only: changing the estimator recomputes
+the covariances from the cached epochs without calling `get_data` again. A
+second run with the same settings reads the cache. `force=True` recomputes.
+
+MOABB needs no account: it downloads the recordings itself (from the
+datasets' official servers or NEMAR) into `MNE_DATA`.
 
 | `keep` | Cache content |
 |---|---|
