@@ -326,6 +326,7 @@ class S1IcelandDataset(BaseDataset):
             for parts in splits.values():
                 tr = parts["train"]
                 parts["train"] = tr[balance_indices(y[tr], self.balance, seed=self.seed)]
+        splits["recommended"] = splits["official"]  # alias (PLAN template)
         train = splits[self.split]["train"]
         self.scale = geometric_scale(covs[train]) if self.normalize else 1.0
         self.class_weights = class_weights(y[train]) if self.balance == "weights" else None

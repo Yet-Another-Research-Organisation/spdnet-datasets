@@ -135,6 +135,7 @@ def test_official_split_has_no_spatial_or_temporal_leakage(fake):
 def test_normalisation_fitted_on_train(fake):
     root, cache = fake
     ds = S.S1IcelandDataset(root, cache_dir=cache, verbose=False)
+    assert ds.splits["recommended"] is ds.splits["official"]
     tr = ds.splits["official"]["train"]
     eig = np.linalg.eigvalsh(ds.covariances[tr])
     assert abs(np.mean(np.log(eig))) < 1e-10
