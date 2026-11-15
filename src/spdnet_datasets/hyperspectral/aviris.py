@@ -86,6 +86,10 @@ def fetch_aviris(data_dir=None, cache_dir=None, keep=None, estimator="scm", forc
                  verify="size", *, version="fine", band_step=2, fold=0, seed=0):
     """Static covariances of AVIRIS-C CA TS14 FINE or MIX (one per window).
 
+    ``fold`` (0-4) selects the test fold of both splits; ``seed`` is the random
+    state of the ``block10km`` StratifiedGroupKFold. Raises ``OSError`` when
+    the local copy differs from ``MANIFEST_NAS.tsv``.
+
     Returns
     -------
     Bunch with ``covariances`` (B, p, p) unscaled, ``means``, ``labels``
@@ -97,9 +101,14 @@ def fetch_aviris(data_dir=None, cache_dir=None, keep=None, estimator="scm", forc
     if version not in NAMES:
         raise ValueError(f"version must be one of {sorted(NAMES)}")
     name = NAMES[version]
+    if not 0 <= fold < 5:
+        raise ValueError(f"fold must be in [0, 5), got {fold}")
     root = dataset_path(DOMAIN, name, data_dir)
-    verify_local(root, verify=verify,
-                 required=("meta/labels.csv", "meta/date_mask.npz", "meta/bands.csv"))
+    report = verify_local(root, verify=verify,
+                          required=("meta/labels.csv", "meta/date_mask.npz", "meta/bands.csv"))
+    bad = report.missing + report.wrong_size + report.wrong_md5
+    if bad:
+        raise OSError(f"{len(bad)} files of {root} differ from MANIFEST_NAS.tsv, e.g. {bad[:3]}")
     bands = _bands(root, band_step)
     check_sample_size(32 * 32, len(bands))
     params = {"band_step": band_step, "estimator": estimator, "clip": CLIP, "version": 2}
@@ -166,13 +175,18 @@ class AVIRISDataset(HSIDataset):
     ``task="coarse"`` groups the classes into urbain, foret, arbustes, prairie,
     vergers_vignes, eau, sol_nu (and autre for MIX), see ``COARSE_MAP``.
 
+    With ``return_raw=True`` the raw part of a sample is ``(T_ok, 1024, p)``
+    float32, where ``T_ok`` (number of QC-valid dates) varies from window to
+    window: the default PyTorch collate needs ``batch_size=1`` or a custom
+    ``collate_fn``.
+
     Parameters
     ----------
     version : {"fine", "mix"}
         FINE: 12-class classification. MIX: ``task="regression"`` on the 13
         proportions, or ``task="fine"`` on the dominant class.
     band_step, fold
-        See :func:`fetch_aviris`.
+        See :func:`fetch_aviris` (``seed`` also sets the ``block10km`` folds).
     split, subset
         See :class:`~spdnet_datasets.hyperspectral._common.HSIDataset`.
     **kwargs
@@ -192,7 +206,7 @@ class AVIRISDataset(HSIDataset):
         super().__init__(data_dir=str(root), **kwargs)
         self.version = version
         bunch = fetch_aviris(root, cache_dir, keep, self.estimator, force, verify,
-                             version=version, band_step=band_step, fold=fold)
+                             version=version, band_step=band_step, fold=fold, seed=self.seed)
         self._setup(bunch, split, subset)
 
     def _load_raw(self, k):

@@ -96,3 +96,31 @@ def test_mix_regression_and_dominant(mix_dir, tmp_path):
 def test_coarse_task(fine_dir, tmp_path):
     ds = AVIRISDataset(fine_dir, cache_dir=tmp_path / "c", verbose=False, task="coarse")
     assert ds.classes == ["eau", "vergers_vignes"]
+
+
+def test_manifest_mismatch_raises(fine_dir, tmp_path):
+    (fine_dir / "MANIFEST_NAS.tsv").write_text("path\tsize\tmtime\nmeta/bands.csv\t1\tx\n")
+    with pytest.raises(OSError, match="MANIFEST"):
+        fetch_aviris(fine_dir, cache_dir=tmp_path / "c")
+
+
+def test_raw_has_one_row_per_valid_date(fine_dir, tmp_path):
+    mask = np.load(fine_dir / "meta" / "date_mask.npz")
+    ok = mask["ok"].copy()
+    ok[1, 7] = False  # window 1: 12 valid dates instead of 13
+    np.savez(fine_dir / "meta" / "date_mask.npz", window_id=mask["window_id"], ok=ok)
+    ds = AVIRISDataset(fine_dir, cache_dir=tmp_path / "c", verbose=False, return_raw=True)
+    assert ds[0][0][1].shape == (13, 1024, 83) and ds[1][0][1].shape == (12, 1024, 83)
+
+
+def test_fold_range_and_seed(fine_dir, tmp_path):
+    for fold in (-1, 5):
+        with pytest.raises(ValueError, match="fold"):
+            fetch_aviris(fine_dir, cache_dir=tmp_path / "c", fold=fold)
+    a = AVIRISDataset(fine_dir, cache_dir=tmp_path / "c", verbose=False, split="block10km")
+    b = AVIRISDataset(fine_dir, cache_dir=tmp_path / "c", verbose=False, split="block10km",
+                      seed=1)
+    ref = fetch_aviris(fine_dir, cache_dir=tmp_path / "c", seed=1).splits["block10km"]
+    np.testing.assert_array_equal(b.splits["block10km"]["test"], ref["test"])
+    assert any(not np.array_equal(a.splits["block10km"][k], b.splits["block10km"][k])
+               for k in ("train", "val", "test"))
