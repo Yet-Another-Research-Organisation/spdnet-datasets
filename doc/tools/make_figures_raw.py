@@ -37,7 +37,6 @@ import json
 from pathlib import Path
 
 import numpy as np
-
 from make_figures import GRID, OUT, SEQUENTIAL, SERIES, _layout  # noqa: F401
 
 PART_COLORS = {"train": SERIES[0], "val": SERIES[1], "test": SERIES[2]}
