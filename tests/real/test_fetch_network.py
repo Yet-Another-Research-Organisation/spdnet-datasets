@@ -1,6 +1,8 @@
 """Real download of one small file (needs Internet; ``pytest -m "slow and network"``)."""
 
 import hashlib
+import importlib
+import urllib.request
 
 import pytest
 
@@ -21,3 +23,22 @@ def test_real_download_of_a_small_file(tmp_path):
     assert len(data) == 1006 and sha256sum(path) == SHA256
     assert hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest() == GIT_OID
     assert download(URL, path, checksum=SHA256) == path  # idempotent, no second request
+
+
+MAGIC = {".parquet": b"PAR1", ".hdf5": b"\x89HDF", ".zip": b"PK\x03\x04"}
+REGISTERED = [(url, sha) for name in ("audio.esc50", "audio.gtzan", "sar.cpazmal", "sits.pastis_r")
+              for url, sha in importlib.import_module(f"spdnet_datasets.{name}").FILES.items()]
+
+
+@pytest.mark.slow
+@pytest.mark.network
+@pytest.mark.parametrize("url", [u for u, _ in REGISTERED])
+def test_registered_url_serves_the_file(url):
+    """First 4 bytes of every registered file through ``urllib`` (as ``download`` does)."""
+    req = urllib.request.Request(url, headers={"Range": "bytes=0-3"})
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        head = resp.read(4)  # never read() the body: a server ignoring Range sends it all
+        status = resp.status
+    suffix = next(s for s in MAGIC if url.split("?")[0].endswith(s))
+    assert head == MAGIC[suffix]
+    assert status == 206  # HTTP Range honoured: interrupted downloads resume

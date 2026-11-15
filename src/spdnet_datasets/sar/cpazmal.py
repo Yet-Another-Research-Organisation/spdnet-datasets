@@ -6,7 +6,7 @@ Gallet M., *CPAZMAL: Cryosphere PAZ SAR data for MAchine Learning* (LISTIC, 2024
 
 Download: when ``CPAZMaL.hdf5`` is absent from ``data_dir``, the file of the
 pinned Hugging Face revision (1.5 GB, sha256 = LFS identifier, equal to the
-local copy) is downloaded once into ``<cache_dir>/cpazmal/downloads/``. This
+local copy) is downloaded once into ``<cache_dir>/cpazmal/downloads/<revision>/``. This
 folder is outside the ``keep`` policy (never deleted by the fetch, remove it by
 hand): the processed stage depends on ``orbit``, ``n_dates``, ``block``..., and
 deleting the source after each run would download 1.5 GB again for every new
@@ -220,7 +220,7 @@ def fetch_cpazmal(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
     else:
         def raw_fn(raw_dir):
             # persistent sibling of raw/, outside the keep policy (module docstring)
-            dest = Path(raw_dir).parent / "downloads" / FILENAME
+            dest = Path(raw_dir).parent / "downloads" / HF_REVISION / FILENAME
             return dest if dest.exists() else download(HF_URL, dest, checksum=FILES[HF_URL])
     opts = {"orbit": orbit, "n_dates": n_dates, "scale": scale, "max_mask_value": max_mask_value,
                 "min_pixels": min_pixels, "block": block}

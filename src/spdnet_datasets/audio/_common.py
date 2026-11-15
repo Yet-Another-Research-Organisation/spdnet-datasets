@@ -41,6 +41,7 @@ from ..core import (
     download,
     estimate_covariance,
     geometric_scale,
+    get_cache_dir,
     verify_local,
 )
 
@@ -255,11 +256,19 @@ class SequenceCovarianceDataset(BaseDataset):
 
     DOMAIN = NAME = None
     COARSE_MAP = None
+    DOWNLOADABLE = False  # True: a missing ``data_dir`` is downloaded by the fetch
 
     def __init__(self, data_dir=None, *, split="recommended", subset="train", fold=1,
                  cache_dir=None, keep=None, force=False, verify="size", limit=None,
                  **kwargs):
-        super().__init__(data_dir=dataset_path(self.DOMAIN, self.NAME, data_dir), **kwargs)
+        root = dataset_path(self.DOMAIN, self.NAME, data_dir)
+        if root.exists() or not self.DOWNLOADABLE:
+            super().__init__(data_dir=root, **kwargs)
+        else:  # the fetch downloads the sources into the cache
+            cache = Path(cache_dir) if cache_dir else get_cache_dir()
+            cache.mkdir(parents=True, exist_ok=True)
+            super().__init__(data_dir=cache, **kwargs)
+            self.data_dir = root
         if subset == "all":
             subset = None
         if subset not in (None, "train", "val", "test"):

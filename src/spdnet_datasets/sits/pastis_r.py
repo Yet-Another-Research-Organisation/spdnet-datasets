@@ -759,7 +759,10 @@ class PastisRDataset(BaseDataset):
     def __init__(self, data_dir=None, *, scenario="A", split="official", subset=None,
                  cache_dir=None, **kwargs):
         self._fetch_kwargs = {k: kwargs.pop(k) for k in self._FETCH_KEYS if k in kwargs}
-        root, _ = _resolve(data_dir)
+        root, files_dir = _resolve(data_dir)
+        if not (files_dir / "metadata.geojson").exists():  # downloaded into the cache
+            root = Path(cache_dir) if cache_dir else get_cache_dir()
+            root.mkdir(parents=True, exist_ok=True)
         super().__init__(str(root), **kwargs)
         if subset not in (None, "train", "val", "test"):
             raise ValueError("subset must be None, 'train', 'val' or 'test'")

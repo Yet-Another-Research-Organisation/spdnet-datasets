@@ -164,6 +164,7 @@ class ESC50Dataset(SequenceCovarianceDataset):
     """
 
     DOMAIN, NAME = DOMAIN, NAME
+    DOWNLOADABLE = True
 
     def __init__(self, data_dir=None, *, features="mfcc", n_mfcc=20, n_mels=64, **kwargs):
         self.feature_kwargs = {"features": features, "n_mfcc": n_mfcc, "n_mels": n_mels}
