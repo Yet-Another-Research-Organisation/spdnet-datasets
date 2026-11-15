@@ -36,6 +36,10 @@ gesture equals a training one; persons are shared: intra-person split).
 files); ``"recommended"`` is ``person{fold}``. The band of step 3 is fitted on
 the training files, which include the held-out person of ``person<k>``.
 ``raw`` has a variable length ``T``: use ``batch_size=1`` or a custom collate.
+
+Download (manual): registration on https://dop-net.com. Download ``Training Data/``
+and ``Test Data/`` (``.mat`` files listed above) and place it under ``data_dir``
+(default ``<data root>/RADAR_DOPPLER/Dop-NET``).
 """
 
 import hashlib
@@ -44,11 +48,10 @@ import numpy as np
 import pandas as pd
 
 from ..core.config import dataset_path
-from ..core.fetch import run_pipeline
+from ..core.fetch import check_local, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     RadarCovarianceDataset,
-    check_local,
     covariance_stage,
     load_bunch,
     write_processed,
@@ -139,7 +142,7 @@ def fetch_dopnet(data_dir=None, cache_dir=None, keep=None, estimator="scm", forc
     if min_frames < 2 * p:
         raise ValueError(f"min_frames={min_frames} < 2p={2 * p}: covariances need n >= 2p")
     root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify=verify, required=("Training Data", TEST_FILE))
+    check_local(root, verify=verify, required=("Training Data", TEST_FILE), strict=False)
 
     def process_fn(_source, out_dir):
         rows, seen, profiles = [], set(), []
@@ -179,10 +182,11 @@ def fetch_dopnet(data_dir=None, cache_dir=None, keep=None, estimator="scm", forc
         }
         write_processed(out_dir, spectrograms, meta, info)
 
-    params = {"energy": energy, "p": p, "min_frames": min_frames, "estimator": estimator,
-              "version": 1}
+    params = {"energy": energy, "p": p, "min_frames": min_frames,
+              "source": str(root.resolve()), "version": 1}
     paths = run_pipeline("dopnet", params=params, process_fn=process_fn,
-                         covariance_fn=covariance_stage(estimator), cache_dir=cache_dir,
+                         covariance_fn=covariance_stage(estimator),
+                         covariance_params={"estimator": estimator}, cache_dir=cache_dir,
                          keep=keep, force=force)
     bunch = load_bunch(paths, CLASSES)
     source = bunch.meta.source.to_numpy()

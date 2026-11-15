@@ -34,7 +34,10 @@ def finalize_labels(ds, labels, groups, splits, *, coarse_map=None):
         Indices (into the loaded samples) of the kept samples, in order. The
         caller subsets its arrays with it. ``ds.targets``, ``ds.classes``,
         ``ds.class_to_idx``, ``ds.groups``, ``ds.splits`` and
-        ``ds.class_weights`` are set on the kept samples.
+        ``ds.class_weights`` are set on the kept samples; the class weights
+        are computed on the training part of ``splits[ds.split]`` (default
+        ``"recommended"``), ``None`` if that split is absent or its training
+        part is empty.
     """
     labels = np.asarray(labels)
     y, mask, names = apply_task(labels, task=ds.task, coarse_map=coarse_map,
@@ -79,7 +82,9 @@ def finalize_labels(ds, labels, groups, splits, *, coarse_map=None):
     ds.class_to_idx = {c: i for i, c in enumerate(names)}
     ds.groups = np.asarray(groups)[keep]
     ds.splits = new_splits
-    ds.class_weights = class_weights(y) if len(y) else np.zeros(0)
+    train = new_splits.get(getattr(ds, "split", "recommended"), {}).get("train", ())
+    ds.class_weights = (class_weights(y[train], n_classes=len(names)) if len(train)
+                        else None)
     return keep
 
 

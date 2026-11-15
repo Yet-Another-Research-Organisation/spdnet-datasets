@@ -20,6 +20,12 @@ Splits:
   placenta is almost surely on both sides (leakage not measurable);
 - ``"dye_transfer"``: train red_blue images, test ICG images (the ICG images
   were taken after the red/blue injection on the same placentas).
+
+Download (manual): the source images are on Zenodo, record 8045940 (CC BY-NC-SA 4.0
+on Zenodo; md5 of every zip in the record metadata). The ``imagettes/`` windows
+read here are a LISTIC extraction (purity >= 0.9) that this package does not
+rebuild from the zips, so nothing is downloaded automatically: copy ``imagettes/``
+under ``data_dir`` (default ``<data root>/HYPERSPECTRAL/Hyperspectral_Placenta_Dataset``).
 """
 
 import json
@@ -30,7 +36,7 @@ import pandas as pd
 
 from ..core.config import dataset_path
 from ..core.estimators import check_sample_size
-from ..core.fetch import Bunch, run_pipeline, verify_local
+from ..core.fetch import Bunch, check_local, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     HSIDataset,
@@ -44,7 +50,7 @@ from ._common import (
 )
 
 DOMAIN, NAME = "HYPERSPECTRAL", "Hyperspectral_Placenta_Dataset"
-FILES = {}  # Data in Brief 2023 (Zenodo / Mendeley): manual download
+FILES = {}  # Zenodo 8045940 holds the source zips, not the windows: manual copy
 WINDOWS = "imagettes/placenta_windows_data.npy"
 METADATA = "imagettes/placenta_windows_metadata.json"
 N_BANDS = 37
@@ -61,13 +67,13 @@ def fetch_placenta(data_dir=None, cache_dir=None, keep=None, estimator="scm", fo
     (``"by_image"`` = ``"recommended"``, ``"dye_transfer"``).
     """
     root = dataset_path(DOMAIN, NAME, data_dir)
-    verify_local(root, verify=verify, required=(WINDOWS, METADATA))
+    check_local(root, verify=verify, required=(WINDOWS, METADATA))
     windows = np.load(root / WINDOWS, mmap_mode="r")
     if windows.shape[-1] != N_BANDS:
         raise ValueError(f"Expected {N_BANDS} bands, got {windows.shape}")
     bands = band_index(N_BANDS, band_step)
     check_sample_size(windows.shape[1] * windows.shape[2], len(bands))
-    params = {"band_step": band_step, "estimator": estimator, "version": 2}
+    params = {"band_step": band_step, "source": str(root.resolve()), "version": 2}
 
     def process(_, out_dir):
         records = json.loads((root / METADATA).read_text())
@@ -92,6 +98,7 @@ def fetch_placenta(data_dir=None, cache_dir=None, keep=None, estimator="scm", fo
 
     res = run_pipeline(NAME, params=params, process_fn=process,
                        covariance_fn=lambda p, o: covariance_stage(p, o, pixels, estimator),
+                       covariance_params={"estimator": estimator},
                        cache_dir=cache_dir, keep=keep, force=force)
     out = load_covariance_dir(res.covariance_dir)
     meta = out.meta

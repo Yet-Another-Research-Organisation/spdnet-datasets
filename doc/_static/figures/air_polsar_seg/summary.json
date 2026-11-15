@@ -1,0 +1,47 @@
+{
+ "name": "air_polsar_seg",
+ "kwargs": {},
+ "split": "recommended",
+ "n_samples": 57267,
+ "n_groups": 123,
+ "raw_shape": [
+  32,
+  32,
+  4
+ ],
+ "mean_dim": 4,
+ "classes": [
+  "housing",
+  "industrial",
+  "land use",
+  "natural",
+  "other",
+  "water"
+ ],
+ "counts": {
+  "train": [
+   13741,
+   6732,
+   307,
+   9450,
+   846,
+   2331
+  ],
+  "val": [
+   4587,
+   2248,
+   126,
+   3096,
+   158,
+   798
+  ],
+  "test": [
+   4882,
+   2364,
+   227,
+   3184,
+   193,
+   860
+  ]
+ }
+}

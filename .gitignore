@@ -49,6 +49,7 @@ htmlcov/
 *.tif
 data/
 datasets/
+!doc/datasets/
 
 # OS
 .DS_Store

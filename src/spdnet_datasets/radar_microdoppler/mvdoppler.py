@@ -37,17 +37,21 @@ train = the rest. ``"official"`` is fold ``fold``. Groups are subjects.
 Snapshots of one recording overlap by 50 %: never split them at random.
 Files without the HDF5 signature and ``.h5`` files absent from
 ``design_table.csv`` are skipped and counted.
+
+Download (manual): the data are on the authors' Google Drive, linked from
+https://github.com/soheilhr/MVDoppler (no stable direct URL or checksum). Download
+``Data/`` and ``Labels_and_metadata/`` and place it under ``data_dir`` (default
+``<data root>/RADAR_DOPPLER/MVDoppler``).
 """
 
 import numpy as np
 import pandas as pd
 
 from ..core.config import dataset_path
-from ..core.fetch import run_pipeline
+from ..core.fetch import check_local, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     RadarCovarianceDataset,
-    check_local,
     covariance_stage,
     finish_processed,
     load_bunch,
@@ -144,7 +148,7 @@ def fetch_mvdoppler(data_dir=None, cache_dir=None, keep=None, estimator="scm", f
     import h5py
 
     root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify=verify, required=("Labels_and_metadata/design_table.csv", "Data"))
+    check_local(root, verify=verify, required=("Labels_and_metadata/design_table.csv", "Data"), strict=False)
 
     def process_fn(_source, out_dir):
         meta, info = index_mvdoppler(root, limit)
@@ -159,9 +163,10 @@ def fetch_mvdoppler(data_dir=None, cache_dir=None, keep=None, estimator="scm", f
         np.save(out_dir / "offsets.npy", offsets)
         finish_processed(out_dir, meta, info)
 
-    params = {"limit": limit, "estimator": estimator, "version": 1}
+    params = {"limit": limit, "source": str(root.resolve()), "version": 1}
     paths = run_pipeline("mvdoppler", params=params, process_fn=process_fn,
-                         covariance_fn=covariance_stage(estimator), cache_dir=cache_dir,
+                         covariance_fn=covariance_stage(estimator),
+                         covariance_params={"estimator": estimator}, cache_dir=cache_dir,
                          keep=keep, force=force)
     bunch = load_bunch(paths, CLASSES)
     bunch.splits = official_folds(bunch.meta)

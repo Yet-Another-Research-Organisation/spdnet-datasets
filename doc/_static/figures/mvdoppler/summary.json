@@ -1,0 +1,33 @@
+{
+ "name": "mvdoppler",
+ "kwargs": {},
+ "split": "official",
+ "p": 64,
+ "n_samples": 54834,
+ "classes": [
+  "normal",
+  "phone_call",
+  "pockets",
+  "texting"
+ ],
+ "counts": {
+  "train": [
+   10478,
+   9411,
+   9438,
+   10035
+  ],
+  "val": [
+   1118,
+   962,
+   1027,
+   962
+  ],
+  "test": [
+   2974,
+   2778,
+   2801,
+   2850
+  ]
+ }
+}

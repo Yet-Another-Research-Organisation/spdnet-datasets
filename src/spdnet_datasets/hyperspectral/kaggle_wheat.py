@@ -20,6 +20,11 @@ Split: no plot, flight or position is available, so the patches are split
 with a stratified K-fold (``"stratified"`` = ``"recommended"``; test = fold
 ``fold``, val = fold ``fold + 1``). Neighbouring patches of one plot may fall
 on both sides: the leakage cannot be measured (atlas fiche).
+
+Download (manual): Kaggle competition of the ICPR 2026 challenge
+(https://han-research.gitlab.io/Agvision/; Kaggle account and acceptance of the
+competition rules required). Download ``train/`` and ``val/`` and place it under
+``data_dir`` (default ``<data root>/HYPERSPECTRAL/Wheat_Disease_ICPR26``).
 """
 
 from pathlib import Path
@@ -29,7 +34,7 @@ import pandas as pd
 
 from ..core.config import dataset_path
 from ..core.estimators import check_sample_size
-from ..core.fetch import Bunch, run_pipeline, verify_local
+from ..core.fetch import Bunch, check_local, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     HSIDataset,
@@ -73,11 +78,11 @@ def fetch_kaggle_wheat(data_dir=None, cache_dir=None, keep=None, estimator="scm"
     if part not in ("train", "val"):
         raise ValueError("part must be 'train' or 'val'")
     root = dataset_path(DOMAIN, NAME, data_dir)
-    verify_local(root, verify=verify, required=(f"{part}/HS",))
+    check_local(root, verify=verify, required=(f"{part}/HS",))
     p = 125 - skip_first - skip_last
     check_sample_size(32 * 32, p)
     params = {"part": part, "skip_first": skip_first, "skip_last": skip_last,
-              "estimator": estimator, "version": 2}
+              "source": str(root.resolve()), "version": 2}
 
     def process(_, out_dir):
         rows, zero, short = [], 0, 0
@@ -103,6 +108,7 @@ def fetch_kaggle_wheat(data_dir=None, cache_dir=None, keep=None, estimator="scm"
 
     res = run_pipeline(NAME, params=params, process_fn=process,
                        covariance_fn=lambda pr, o: covariance_stage(pr, o, pixels, estimator),
+                       covariance_params={"estimator": estimator},
                        cache_dir=cache_dir, keep=keep, force=force)
     out = load_covariance_dir(res.covariance_dir)
     meta = out.meta

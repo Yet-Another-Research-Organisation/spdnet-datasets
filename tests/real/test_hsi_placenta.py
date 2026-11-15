@@ -15,9 +15,10 @@ ROOT = dataset_dir("HYPERSPECTRAL", "Hyperspectral_Placenta_Dataset")
 def test_counts_vs_fiche():
     skip_if_missing(ROOT)
     b = fetch_placenta()
-    # 77203 windows (fiche); the singular SCM (0.45 % in the fiche) are dropped and counted
+    # 77203 windows (fiche); the singular SCM (0.45 % in the fiche) are dropped and
+    # counted, plus the numerically singular ones (condition number > 1e12): 435 (0.56 %)
     assert len(b.labels) + b.info["excluded_not_spd"] == 77203
-    assert b.info["excluded_not_spd"] < 0.005 * 77203
+    assert b.info["excluded_not_spd"] < 0.01 * 77203
     fiche = {"Artery": 10162, "Stroma": 56272, "Suture": 114, "Umbilical": 3345, "Vein": 7310}
     counts = collections.Counter(b.labels)
     assert set(counts) == set(fiche) and all(counts[c] <= fiche[c] for c in fiche)

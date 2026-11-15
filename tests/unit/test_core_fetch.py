@@ -57,6 +57,27 @@ def test_download_resumes_partial_file(tmp_path, fake_net):
     assert (tmp_path / "f.bin").read_bytes() == payload
 
 
+@pytest.mark.parametrize("good", [True, False])
+def test_download_complete_part_answered_416(tmp_path, monkeypatch, good):
+    payload = b"spd" * 1000
+
+    def urlopen(req, timeout=None):
+        raise F.urllib.error.HTTPError(req.full_url, 416, "Range Not Satisfiable", {}, None)
+
+    monkeypatch.setattr(F.urllib.request, "urlopen", urlopen)
+    (tmp_path / "f.bin.part").write_bytes(payload if good else payload[:-1])
+    sha = hashlib.sha256(payload).hexdigest()
+    if good:
+        assert F.download("http://x/f.bin", tmp_path / "f.bin", checksum=sha).read_bytes() == payload
+        assert not (tmp_path / "f.bin.part").exists()
+    else:
+        with pytest.raises(OSError, match="Checksum"):
+            F.download("http://x/f.bin", tmp_path / "f.bin", checksum=sha)
+        assert not list(tmp_path.iterdir())
+    with pytest.raises(F.urllib.error.HTTPError):  # 416 without a .part is an error
+        F.download("http://x/g.bin", tmp_path / "g.bin")
+
+
 def test_download_bad_checksum_leaves_no_file(tmp_path, fake_net):
     with pytest.raises(OSError, match="Checksum"):
         F.download("http://x/f.bin", tmp_path / "f.bin", checksum="0" * 64)
@@ -90,6 +111,19 @@ def test_verify_local_missing(tmp_path):
         F.verify_local(tmp_path, required=["absent.h5"])
     (tmp_path / "a.npy").unlink()
     assert F.verify_local(tmp_path).missing == ["a.npy"]
+
+
+def test_check_local_raises_or_warns(tmp_path):
+    _make_local_dataset(tmp_path)
+    assert F.check_local(tmp_path, verify="md5").n_checked == 2
+    (tmp_path / "a.npy").write_bytes(b"1")
+    with pytest.raises(OSError, match="1 wrong size"):
+        F.check_local(tmp_path)
+    with pytest.warns(UserWarning, match="1 wrong size"):
+        rep = F.check_local(tmp_path, strict=False)
+    assert rep.wrong_size == ["a.npy"]
+    with pytest.raises(FileNotFoundError):
+        F.check_local(tmp_path, required=["absent.h5"])
 
 
 class _Pipeline:
@@ -159,7 +193,8 @@ def test_failed_covariance_replays_from_cache_without_download(tmp_path):
 def test_params_change_the_stage_directory(tmp_path):
     a = F.Stage(tmp_path, "toy", "covariance", {"w": 15})
     b = F.Stage(tmp_path, "toy", "covariance", {"w": 16})
-    assert a.path != b.path and a.hash == F.params_hash({"w": 15})
+    assert a.path != b.path
+    assert a.hash == F.params_hash({"w": 15, "_core_cache_version": F.CACHE_VERSION})
 
 
 def test_bad_keep(tmp_path):

@@ -6,6 +6,7 @@ import json
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 
 from spdnet_datasets import DatasetManager
 from spdnet_datasets.core import assert_no_leakage
@@ -260,6 +261,25 @@ def test_output_tuples(pastis_dir, tmp_path):
     np.testing.assert_allclose(raw.numpy().mean(0), mean.numpy(), atol=1e-5)
 
 
+def test_normalisation_scales_mean_and_raw_by_sqrt_s(pastis_dir, tmp_path):
+    kw = {"cache_dir": tmp_path / "c", "ref_date": REF, "verbose": False}
+    ds = PastisRDataset(pastis_dir, return_mean=True, return_raw=True, **kw)
+    (cov, mean, raw), _ = ds[0]
+    (cov0, mean0, raw0), _ = PastisRDataset(pastis_dir, normalize=False, return_mean=True, return_raw=True, **kw)[0]
+    s = ds.scale
+    assert s != 1.0
+    np.testing.assert_allclose(cov.numpy(), s * cov0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(mean.numpy(), np.sqrt(s) * mean0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(raw.numpy(), np.sqrt(s) * raw0.numpy(), rtol=1e-6)
+
+
+def test_transform_is_applied(pastis_dir, tmp_path):
+    kw = {"cache_dir": tmp_path / "c", "ref_date": REF, "verbose": False}
+    ds = PastisRDataset(pastis_dir, **kw)
+    doubled = PastisRDataset(pastis_dir, transform=lambda x: 2 * x, **kw)
+    torch.testing.assert_close(doubled[0][0], 2 * ds[0][0])
+
+
 def test_registered_and_tasks(pastis_dir, tmp_path):
     assert DatasetManager.DATASETS["pastis_r"] is PastisRDataset
     ds = PastisRDataset(pastis_dir, cache_dir=tmp_path / "c", ref_date=REF, task="coarse",
@@ -271,6 +291,21 @@ def test_registered_and_tasks(pastis_dir, tmp_path):
     ds = PastisRDataset(pastis_dir, cache_dir=tmp_path / "c", ref_date=REF, subset="test",
                         verbose=False)
     assert set(ds.meta.fold) == {5} and len(ds) == 2
+
+
+def test_balance_before_subset_and_class_weights(pastis_dir, tmp_path):
+    kw = {"cache_dir": tmp_path / "c", "ref_date": REF, "verbose": False}
+    assert PastisRDataset(pastis_dir, **kw).class_weights is None
+    for subset in ("val", "test"):  # empty training part after the subset selection
+        ds = PastisRDataset(pastis_dir, subset=subset, balance="undersample", **kw)
+        assert len(ds) == 2 and ds.class_weights is None
+    full = PastisRDataset(pastis_dir, **kw)
+    ds = PastisRDataset(pastis_dir, subset="test", balance="weights", **kw)
+    train = full.labels[full.splits["official"]["train"]]
+    np.testing.assert_allclose(ds.class_weights,
+                               len(train) / (2 * np.bincount(train, minlength=2)))
+    over = PastisRDataset(pastis_dir, subset="train", balance="oversample", **kw)
+    assert np.bincount(over.labels).tolist() == [np.bincount(train).max()] * 2
 
 
 def test_cache_is_replayed_and_keep_covariance(pastis_dir, tmp_path, monkeypatch):
