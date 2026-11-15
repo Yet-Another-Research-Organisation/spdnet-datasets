@@ -34,13 +34,13 @@ produced from the polygons `tree_species.shp` by the repository's script
 **Provenance and licence unknown.** No reference paper, licence, sensor
 description, wavelengths or class names could be found. The attribute table of
 the shapefile (`.dbf`) is missing, so classes are only known as codes 1 to 12.
-Do not redistribute the data, and cite the repository above if you publish
-results.
+The acquisition date is unknown as well. Do not redistribute the data, and
+cite the repository above if you publish results.
 ```
 
 - Scene: `source/data/testarea2_new/sg_quac_test2.tif`, 572 × 906 pixels × 125
   bands, float32. QUAC stands for QUick Atmospheric Correction. The scene is in
-  a local metric frame with no EPSG code. The atlas fiche says 570 × 906; the
+  a local metric frame with no EPSG (European Petroleum Survey Group) code. The atlas fiche says 570 × 906; the
   file is 572 × 906.
 - GT: `sg_quac_test2_gt.tif`, 572 × 906 uint8, codes 1 to 12, 0 = unlabelled
   (213 700 labelled pixels).

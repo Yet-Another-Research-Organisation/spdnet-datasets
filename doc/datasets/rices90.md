@@ -24,7 +24,8 @@
 Rices_90 contains VNIR (visible and near-infrared) cubes of 90 Vietnamese
 rice varieties, acquired by a push-broom laboratory imager with 256 bands
 from 383 to 1 006 nm. Each variety has two bundles of about 48 grains laid
-out on a grid, which gives 180 cubes. The acquisitions span 9 sessions.
+out on a grid, which gives 180 cubes. The acquisitions span 9 sessions,
+whose dates are not provided (only the session folders).
 
 - Reference: S. D. Fabiyi *et al.*, "Varietal classification of rice seeds
   using RGB and hyperspectral images", *IEEE Access* 8, 2020. This citation
@@ -113,11 +114,8 @@ variety. The grains of a cube are never split between train and test.
 | Risk | Measure | Residual |
 |---|---|---|
 | grains of one cube on both sides | train and test come from different bundles; checked by the real-data test | none for test |
-| **variety confounded with session**: for 73 of 90 varieties, both bundles share their session | `cross_session` test (17 varieties) | `bundle` scores mix variety and session. The atlas measures a TS-LR OA of 0.516 on same-session test grains, but 0.016 on the 17 cross-session varieties (chance: 0.011) |
+| **variety confounded with session**: for 73 of 90 varieties, both bundles share their session | `cross_session` test (17 varieties) | `bundle` scores mix variety and session. The atlas measures a TS-LR (tangent-space logistic regression) OA (overall accuracy) of 0.516 on same-session test grains, but 0.016 on the 17 cross-session varieties (chance: 0.011) |
 | validation drawn from the training cubes | documented | validation is optimistic; do not use it to report results |
-
-TS-LR stands for tangent-space logistic regression, and OA for overall
-accuracy.
 
 ## Supported tasks
 

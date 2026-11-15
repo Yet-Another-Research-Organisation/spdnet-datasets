@@ -24,9 +24,9 @@
 These are the data of task 1 of the ICPR 2026 competition "Beyond Visible
 Spectrum: AI for Agriculture" (ICPR: International Conference on Pattern
 Recognition), distributed on Kaggle. Each sample is a wheat patch seen by a
-snapshot hyperspectral camera on a UAV: a 32 × 32 HS patch with 125 or 126
-bands, plus a multispectral (MS) patch of 64 × 64 × 5 and an RGB patch of
-64 × 64. Only the HS patches are used here.
+snapshot hyperspectral camera on a UAV: a 32 × 32 hyperspectral (HS) patch with 125 or 126
+bands, plus a multispectral (MS) patch of 64 × 64 × 5 and an RGB (red, green,
+blue) patch of 64 × 64. Only the HS patches are used here.
 
 - Reference: L. Han, W. Huang, X. Zhang, T. Sobeih, Y. Shi and Y. Dong,
   ICPR 2026 Competition on Beyond Visible Spectrum: AI for Agriculture,
@@ -36,7 +36,7 @@ bands, plus a multispectral (MS) patch of 64 × 64 × 5 and an RGB patch of
   download into `<data root>/HYPERSPECTRAL/Wheat_Disease_ICPR26`.
 - Train: 600 labelled patches, 200 per class, with the class in the file
   name. Validation: 300 unlabelled patches (the competition submission).
-  Wavelengths are not provided.
+  Wavelengths and acquisition dates are not provided.
 
 ## Raw data
 
@@ -71,7 +71,7 @@ spectrum per class.
    Entirely zero patches are **excluded** (`info["excluded_all_zero"]`: 23),
    and so are patches with fewer than 2p = 214 non-zero pixels
    (`info["excluded_n_lt_2p"]`: 2). The former precomputation kept them as
-   zero, non-SPD matrices.
+   zero matrices, which are not SPD (symmetric positive definite).
 3. **Estimator**: SCM (sample covariance matrix) of the centred pixels by
    default; `"ledoit_wolf"`, `"tyler"` or `"student"` are also available.
 4. **Normalisation**: covariances are scaled on the training part of `split`
@@ -108,7 +108,7 @@ per group).
 | Risk | Measure | Residual |
 |---|---|---|
 | neighbouring patches of one plot on both sides | none possible (no plot, flight or position metadata) | **not measurable**: scores may be optimistic |
-| duplicated patches | the only MD5 duplicates are the zero patches, which are excluded | none |
+| duplicated patches | the only MD5 (Message Digest 5) checksum duplicates are the zero patches, which are excluded | none |
 | zero / short patches | excluded and counted | none |
 
 ## Supported tasks

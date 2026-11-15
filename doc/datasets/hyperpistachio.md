@@ -12,7 +12,7 @@ the dataset atlas fiche.
 HyperPistachio is the public subset of a dataset of pistachio nuts
 contaminated with aflatoxin B1 (AFB1). It contains 52 hyperspectral cubes
 taken by a Resonon Pika XC2 laboratory imager: 256 × 384 pixels, with 462
-bands from 386.88 to 1 003.60 nm. The cubes are stored as ENVI files in BIL
+bands from 386.88 to 1 003.60 nm. The cubes are stored as ENVI (Environment for Visualizing Images) files in BIL
 (band interleaved by line) order, uint16, with reflectance × 10 000. Each
 cube shows **one** pistachio on a dark background. There are 26 levels of
 controlled contamination, from 0 to 114.67 µg/kg, with 2 pistachios per
@@ -48,7 +48,7 @@ level.
   of a level, and all their windows, must stay on the same side.
 - Control the confounder. One way is to restrict the data to the 13 levels
   that share the 14.74 ms shutter time.
-- Threshold the concentration at the EU limit for AFB1 in pistachios sold to
+- Threshold the concentration at the European Union (EU) limit for AFB1 in pistachios sold to
   the final consumer: 8 µg/kg (Regulation (EU) 2023/915).
 - Clip the specular highlights, where reflectance exceeds 1 (up to 14 % of the
   values of one cube).

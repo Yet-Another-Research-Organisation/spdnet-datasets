@@ -12,7 +12,7 @@
 * - Outputs
   - cov · mean · raw (24 × 24 × 37)
 * - Samples
-  - 76 862 windows (77 203 minus 341 singular SCM, 0.44 %)
+  - 76 862 windows (77 203 minus 341 singular sample covariance matrices, SCM, 0.44 %)
 * - Splits
   - `by_image` = `recommended` (81 images, fold 0: 45 939 / 15 851 / 15 072) · `dye_transfer` (red_blue → ICG: 46 303 / 0 / 30 559)
 * - Module
@@ -25,7 +25,7 @@ The dataset holds 101 hyperspectral images of 1 024 × 1 024 pixels of four
 human placentas, used for microsurgical training. The images were taken with
 a Senop HSC-2 camera mounted on a Zeiss OPMI Pentero 900 surgical microscope
 under xenon illumination. They are flat-field corrected (reflectance 0–1) and
-annotated manually.
+annotated manually. Acquisition dates are not given.
 
 - Reference: S. Puustinen, J. Hyttinen, A.-P. Elomaa and H. Vrzáková,
   "Hyperspectral placenta dataset: hyperspectral image acquisition,
@@ -118,8 +118,8 @@ The article describes no classification split. The loader offers two:
 
 - `task="fine"`: 5 classes. There is no coarse map. `drop_classes=["Suture"]`
   removes the smallest class (114 windows). `merge_classes={"Artery":
-  "Vessel", "Vein": "Vessel", "Umbilical": "Vessel"}` gives vessel versus
-  tissue.
+  "Vessel", "Vein": "Vessel", "Umbilical": "Vessel"}` gives three classes:
+  Vessel, Stroma and Suture.
 - `balance="undersample"` is advisable, because Stroma holds 73 % of the
   windows. `"oversample"` and `"weights"` also act on the training part only.
 

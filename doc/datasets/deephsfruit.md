@@ -29,7 +29,7 @@ record.
 * - Task(s)
   - fine classification: `classification_mode="fruit"` (5 fruits) or `"ripeness"` (3 states)
 * - Covariance
-  - 224×224, precomputed (VIS camera); n unknown
+  - 224×224, precomputed (VIS, visible-range camera); n unknown
 * - Outputs
   - cov only
 * - Samples

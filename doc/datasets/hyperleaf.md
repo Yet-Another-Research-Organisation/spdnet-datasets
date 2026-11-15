@@ -26,12 +26,13 @@ of wheat leaves taken by a laboratory camera, with 204 VNIR (visible and
 near-infrared) bands. Each image is labelled with its cultivar (4), its
 fertilizer level (0, 0.5 or 1) and three continuous targets: grain weight
 (GrainWeight), stomatal conductance (Gsw) and the photosystem II efficiency
-(PhiPS2).
+(PhiPS2). Acquisition dates are not provided.
 
 - Reference: W. M. Laprade *et al.*, "HyperLeaf2024 – a hyperspectral imaging
   dataset for classification and regression of wheat leaves", CVPR Workshops
   (FGVC11), 2024, pp. 1234–1243 (CVPR: Conference on Computer Vision and
-  Pattern Recognition). The reference was not re-verified.
+  Pattern Recognition; FGVC11: 11th Workshop on Fine-Grained Visual
+  Categorization). The reference was not re-verified.
 - Data: <https://www.kaggle.com/competitions/hyperleaf2024> (Kaggle account
   required; URL not verified). Licence: competition terms (check them before
   any redistribution).
@@ -83,7 +84,7 @@ The figures show the cultivar counts and the mean spectrum per cultivar.
    scaled.
 
 `mode="image"` keeps the former image mode. `x` is then the image restricted
-to `bands` (by default approximate R, G and B bands 81, 51 and 21),
+to `bands` (by default bands 81, 51 and 21, approximately red, green and blue),
 standardised per channel, as float32 of shape (C, 48, 352). It is meant for
 CNN (convolutional neural network) backbones, and no covariance is
 computed.
@@ -112,10 +113,8 @@ cultivar (seed 0): test = fold `fold`, validation = fold `fold + 1`. With
 | Risk | Measure | Residual |
 |---|---|---|
 | leaves of the same plot in train and test | groups = reconstructed plot; checked by the real-data test | the plot is a reconstruction, not documented by the authors |
-| random split of leaves | not offered | the atlas measures a cultivar TS-LR accuracy of 0.915 with a random split, against 0.669 grouped; for GrainWeight, R² is 0.79 against 0.18 |
+| random split of leaves | not offered | the atlas measures a cultivar TS-LR (tangent-space logistic regression) accuracy of 0.915 with a random split, against 0.669 grouped; for GrainWeight, R² is 0.79 against 0.18 |
 | regression on GrainWeight | grouped split (one value per plot) | with only 24 values, the regression is close to a classification of plots |
-
-TS-LR stands for tangent-space logistic regression.
 
 ## Supported tasks
 

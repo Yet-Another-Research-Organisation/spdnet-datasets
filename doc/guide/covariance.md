@@ -32,7 +32,7 @@ Pass `estimator=` to the dataset classes. A former argument such as
 used instead.
 
 The former classes `EstimateCovariance` (NumPy) and `EstimateCovarianceTorch`
-(PyTorch, GPU) of `spdnet_datasets.estimator` remain available for images
+(PyTorch, on a GPU: graphics processing unit) of `spdnet_datasets.estimator` remain available for images
 (`from_image`, `method="scm"` or `"ledoit_wolf"`, `exclude_zero=True` to
 ignore the background).
 

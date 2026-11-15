@@ -35,7 +35,7 @@ pixels.
   form). Licence: CC BY 3.0, with an acknowledgement of the Space Application
   Laboratory and a citation of the report.
 - Local copy: `source/HyperspecVNIR_Chikusei_20140729.mat` (MATLAB v7.3 /
-  HDF5) with its GT, and `prepared_v2/chikusei_v2.h5`, the atlas
+  HDF5, Hierarchical Data Format 5) with its GT, and `prepared_v2/chikusei_v2.h5`, the atlas
   re-extraction of 30 October 2026 that this loader reads.
 
 ```{note}

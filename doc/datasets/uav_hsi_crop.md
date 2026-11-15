@@ -22,7 +22,8 @@
 ## Description and source
 
 UAV-HSI-Crop is a crop-mapping dataset acquired by a UAV over three scenes
-(XJM, MJK_N and MJK_S). The data are reflectance from 400 to 1 000 nm, with
+(XJM, MJK_N and MJK_S), during a single flight on 18 September 2019
+according to the literature quoted in the atlas fiche. The data are reflectance from 400 to 1 000 nm, with
 200 bands at 0.1 m. The published dataset is a semantic segmentation
 benchmark: 433 patches of 96 × 96 × 200, with an official split drawn at
 random by patch.
