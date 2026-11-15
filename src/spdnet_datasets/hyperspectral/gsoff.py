@@ -99,7 +99,7 @@ def fetch_gsoff(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
     bands = band_index(N_BANDS, band_step)
     check_sample_size(window * window, len(bands))
     params = {"window": window, "band_step": band_step, "threshold": threshold,
-              "estimator": estimator, "version": 2}
+              "source": str(root.resolve()), "version": 2}
 
     def process(_, out_dir):
         import tifffile
@@ -114,6 +114,7 @@ def fetch_gsoff(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
         covariance_stage(proc_dir, out_dir, window_pixels, estimator)
 
     res = run_pipeline(NAME, params=params, process_fn=process, covariance_fn=covariance,
+                       covariance_params={"estimator": estimator},
                        cache_dir=cache_dir, keep=keep, force=force)
     out = load_covariance_dir(res.covariance_dir)
     meta, full = out.meta, out.meta_all

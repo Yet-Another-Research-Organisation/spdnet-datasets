@@ -114,7 +114,7 @@ def fetch_rices90(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
     root = dataset_path(DOMAIN, NAME, data_dir)
     check_local(root, verify=verify, required=("index.csv",))
     p = N_BANDS // band_bin
-    params = {"band_bin": band_bin, "estimator": estimator, "version": 2}
+    params = {"band_bin": band_bin, "source": str(root.resolve()), "version": 2}
 
     def process(_, out_dir):
         index = pd.read_csv(root / "index.csv")
@@ -148,6 +148,7 @@ def fetch_rices90(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
 
     res = run_pipeline(NAME, params=params, process_fn=process,
                        covariance_fn=lambda pr, o: covariance_stage(pr, o, pixels, estimator),
+                       covariance_params={"estimator": estimator},
                        cache_dir=cache_dir, keep=keep, force=force)
     out = load_covariance_dir(res.covariance_dir)
     meta = out.meta

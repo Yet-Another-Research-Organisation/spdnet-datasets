@@ -103,7 +103,7 @@ def fetch_hyperleaf(data_dir=None, cache_dir=None, keep=None, estimator="scm", f
     root = dataset_path(DOMAIN, NAME, data_dir)
     check_local(root, verify=verify, required=("train.csv", "images"))
     bands = band_index(N_BANDS, band_step)
-    params = {"band_step": band_step, "estimator": estimator, "version": 2}
+    params = {"band_step": band_step, "source": str(root.resolve()), "version": 2}
 
     def process(_, out_dir):
         # leaves with fewer than 2p pixels are dropped (and counted) at estimation
@@ -118,6 +118,7 @@ def fetch_hyperleaf(data_dir=None, cache_dir=None, keep=None, estimator="scm", f
 
     res = run_pipeline(NAME, params=params, process_fn=process,
                        covariance_fn=lambda p, o: covariance_stage(p, o, pixels, estimator),
+                       covariance_params={"estimator": estimator},
                        cache_dir=cache_dir, keep=keep, force=force)
     out = load_covariance_dir(res.covariance_dir)
     meta = out.meta

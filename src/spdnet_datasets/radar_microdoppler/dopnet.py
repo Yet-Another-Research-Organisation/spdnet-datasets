@@ -182,10 +182,11 @@ def fetch_dopnet(data_dir=None, cache_dir=None, keep=None, estimator="scm", forc
         }
         write_processed(out_dir, spectrograms, meta, info)
 
-    params = {"energy": energy, "p": p, "min_frames": min_frames, "estimator": estimator,
-              "version": 1}
+    params = {"energy": energy, "p": p, "min_frames": min_frames,
+              "source": str(root.resolve()), "version": 1}
     paths = run_pipeline("dopnet", params=params, process_fn=process_fn,
-                         covariance_fn=covariance_stage(estimator), cache_dir=cache_dir,
+                         covariance_fn=covariance_stage(estimator),
+                         covariance_params={"estimator": estimator}, cache_dir=cache_dir,
                          keep=keep, force=force)
     bunch = load_bunch(paths, CLASSES)
     source = bunch.meta.source.to_numpy()

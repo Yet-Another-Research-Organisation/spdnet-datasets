@@ -209,9 +209,10 @@ def fetch_ci4r(data_dir=None, cache_dir=None, keep=None, estimator=None, force=F
                 "band": band, "p": p}
         write_processed(out_dir, spectrograms, kept, info)
 
-    params = {"mode": mode, "band": band, "p": p, "estimator": estimator, "version": 1}
+    params = {"mode": mode, "band": band, "p": p, "source": str(root.resolve()), "version": 1}
     paths = run_pipeline(f"ci4r_{mode}", params=params, process_fn=process_fn,
-                         covariance_fn=covariance_stage(estimator), cache_dir=cache_dir,
+                         covariance_fn=covariance_stage(estimator),
+                         covariance_params={"estimator": estimator}, cache_dir=cache_dir,
                          keep=keep, force=force)
     bunch = load_bunch(paths, CLASSES)
     bunch.splits = group_folds(bunch.groups, n_folds, bunch.labels)

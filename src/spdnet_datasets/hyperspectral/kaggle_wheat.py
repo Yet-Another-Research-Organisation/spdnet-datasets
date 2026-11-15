@@ -82,7 +82,7 @@ def fetch_kaggle_wheat(data_dir=None, cache_dir=None, keep=None, estimator="scm"
     p = 125 - skip_first - skip_last
     check_sample_size(32 * 32, p)
     params = {"part": part, "skip_first": skip_first, "skip_last": skip_last,
-              "estimator": estimator, "version": 2}
+              "source": str(root.resolve()), "version": 2}
 
     def process(_, out_dir):
         rows, zero, short = [], 0, 0
@@ -108,6 +108,7 @@ def fetch_kaggle_wheat(data_dir=None, cache_dir=None, keep=None, estimator="scm"
 
     res = run_pipeline(NAME, params=params, process_fn=process,
                        covariance_fn=lambda pr, o: covariance_stage(pr, o, pixels, estimator),
+                       covariance_params={"estimator": estimator},
                        cache_dir=cache_dir, keep=keep, force=force)
     out = load_covariance_dir(res.covariance_dir)
     meta = out.meta

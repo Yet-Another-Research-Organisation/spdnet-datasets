@@ -73,7 +73,7 @@ def fetch_placenta(data_dir=None, cache_dir=None, keep=None, estimator="scm", fo
         raise ValueError(f"Expected {N_BANDS} bands, got {windows.shape}")
     bands = band_index(N_BANDS, band_step)
     check_sample_size(windows.shape[1] * windows.shape[2], len(bands))
-    params = {"band_step": band_step, "estimator": estimator, "version": 2}
+    params = {"band_step": band_step, "source": str(root.resolve()), "version": 2}
 
     def process(_, out_dir):
         records = json.loads((root / METADATA).read_text())
@@ -98,6 +98,7 @@ def fetch_placenta(data_dir=None, cache_dir=None, keep=None, estimator="scm", fo
 
     res = run_pipeline(NAME, params=params, process_fn=process,
                        covariance_fn=lambda p, o: covariance_stage(p, o, pixels, estimator),
+                       covariance_params={"estimator": estimator},
                        cache_dir=cache_dir, keep=keep, force=force)
     out = load_covariance_dir(res.covariance_dir)
     meta = out.meta

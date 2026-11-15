@@ -8,6 +8,7 @@ import pytest
 from spdnet_datasets.core import InsufficientSamplesError, assert_no_leakage
 from spdnet_datasets.hyperspectral.placenta import (
     METADATA,
+    NAME,
     WINDOWS,
     PlacentaDataset,
     fetch_placenta,
@@ -38,6 +39,16 @@ def test_split_grouped_by_image(placenta_dir, tmp_path):
         assert_no_leakage(b.groups[sp[a]], b.groups[sp[c]])
     dye = b.splits["dye_transfer"]
     assert set(b.meta.dye_type[dye["test"]]) == {"ICG"}
+
+
+def test_cache_key_has_source_and_estimator_only_in_covariances(placenta_dir, tmp_path):
+    cache = tmp_path / "c"
+    a = fetch_placenta(placenta_dir, cache_dir=cache)
+    b = fetch_placenta(_make(tmp_path / "copy"), cache_dir=cache)
+    assert a.covariance_path != b.covariance_path
+    fetch_placenta(placenta_dir, cache_dir=cache, estimator="ledoit_wolf")
+    assert len(list((cache / NAME / "processed").iterdir())) == 2  # one per source
+    assert len(list((cache / NAME / "covariance").iterdir())) == 3
 
 
 def test_raw_mode_returns_numpy_window(placenta_dir, tmp_path):

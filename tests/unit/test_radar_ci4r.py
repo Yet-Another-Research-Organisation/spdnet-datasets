@@ -103,6 +103,15 @@ def test_dataset_outputs_normalisation_and_registry(data, tmp_path):
     assert len(tr.dataset) + len(te.dataset) == len(ds) and len(va.dataset) == 0
 
 
+def test_cache_key_has_source_and_estimator_only_in_covariances(data, tmp_path):
+    cache = tmp_path / "cache"
+    a = fetch_ci4r(data, cache, band=0.5, p=P, verify=None)
+    b = fetch_ci4r(make_ci4r(tmp_path / "copy"), cache, band=0.5, p=P, verify=None)
+    assert a.covariance_path != b.covariance_path
+    lw = fetch_ci4r(data, cache, estimator="ledoit_wolf", band=0.5, p=P, verify=None)
+    assert lw.processed_path == a.processed_path and lw.covariance_path != a.covariance_path
+
+
 def test_transform_is_applied(data, tmp_path):
     kw = {"band": 0.5, "p": P, "cache_dir": tmp_path / "cache", "verify": None, "verbose": False}
     ds = CI4RDataset(data, **kw)

@@ -115,7 +115,7 @@ def fetch_uav(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=F
     bands = band_index(N_BANDS, band_step)
     check_sample_size(window * window, len(bands))
     params = {"scenes": list(scenes), "window": window, "band_step": band_step,
-              "threshold": threshold, "estimator": estimator, "version": 2}
+              "threshold": threshold, "source": str(root.resolve()), "version": 2}
 
     def process(_, out_dir):
         patches = list_patches(root / "source")
@@ -146,6 +146,7 @@ def fetch_uav(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=F
 
     res = run_pipeline(NAME, params=params, process_fn=process,
                        covariance_fn=lambda p, o: covariance_stage(p, o, window_pixels, estimator),
+                       covariance_params={"estimator": estimator},
                        cache_dir=cache_dir, keep=keep, force=force)
     out = load_covariance_dir(res.covariance_dir)
     meta, full = out.meta, out.meta_all
