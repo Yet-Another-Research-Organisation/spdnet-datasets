@@ -108,6 +108,22 @@ def test_check_spd_rejects_singular_and_asymmetric():
         check_spd(np.array([[np.nan, 0.0], [0.0, 1.0]]))
 
 
+def test_check_spd_rejects_numerically_singular():
+    C = np.diag([1.0, 1e-14])  # lambda_min > 0 but indistinguishable from singular
+    with pytest.raises(NotSPDError, match="numerically singular"):
+        check_spd(C)
+    check_spd(np.diag([1.0, 1e-6]))
+    check_spd(C, max_condition=1e15)
+
+
+def test_rank_deficient_data_raises():
+    rng = np.random.default_rng(4)
+    X = rng.standard_normal((200, 3))
+    X = np.c_[X, X[:, 0] + X[:, 1]]  # exactly collinear channel
+    with pytest.raises(NotSPDError):
+        estimate_covariance(X)
+
+
 def test_check_spd_accepts_batches():
     check_spd(np.stack([np.eye(3), 2 * np.eye(3)]))
     with pytest.raises(NotSPDError):

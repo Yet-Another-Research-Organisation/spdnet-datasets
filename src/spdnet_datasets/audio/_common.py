@@ -38,9 +38,10 @@ from ..core import (
     channel_mean,
     class_weights,
     dataset_path,
+    download,
     estimate_covariance,
     geometric_scale,
-    verify_local,
+    get_cache_dir,
 )
 
 EXCLUDED_COLUMNS = ["id", "label", "reason"]
@@ -60,14 +61,16 @@ def evenly_spaced(n, limit):
     return np.unique(np.linspace(0, n - 1, int(limit)).round().astype(int))
 
 
-def check_local(data_dir, verify, required=()):
-    """Verify a read-only local copy against its manifest; raise on any mismatch."""
-    report = verify_local(data_dir, verify=verify, required=required)
-    bad = report.missing + report.wrong_size + report.wrong_md5
-    if bad:
-        raise OSError(f"{len(bad)} file(s) of {data_dir} differ from MANIFEST_NAS.tsv, "
-                      f"e.g. {bad[:5]}")
-    return report
+def download_files(files, raw_dir):
+    """Download every ``url -> sha256`` of ``files`` into ``raw_dir`` (``raw_fn`` of a fetch).
+
+    Each file is named after the last component of its URL. A complete file is
+    not downloaded again (only re-hashed, see :func:`~spdnet_datasets.core.fetch.download`).
+    """
+    raw_dir = Path(raw_dir)
+    for url, sha256 in files.items():
+        download(url, raw_dir / url.rsplit("/", 1)[-1], checksum=sha256)
+    return raw_dir
 
 
 def write_processed(out_dir, features, index, excluded, p):
@@ -212,8 +215,8 @@ class SequenceCovarianceDataset(BaseDataset):
         Name of the split in :attr:`full_splits` that defines ``subset`` and the
         training set used to fit the normalisation.
     subset : {"train", "val", "test", None}
-        Part of the split exposed by the dataset; ``None`` (or ``"all"``)
-        exposes every sample, and :attr:`splits` then indexes the dataset (use
+        Part of the split exposed by the dataset; ``None`` (default, or
+        ``"all"``) exposes every sample, and :attr:`splits` then indexes the dataset (use
         it with :func:`~spdnet_datasets.base.create_dataloaders`).
     fold : int
         Test fold (1-based) of the k-fold protocols.
@@ -242,11 +245,19 @@ class SequenceCovarianceDataset(BaseDataset):
 
     DOMAIN = NAME = None
     COARSE_MAP = None
+    DOWNLOADABLE = False  # True: a missing ``data_dir`` is downloaded by the fetch
 
-    def __init__(self, data_dir=None, *, split="recommended", subset="train", fold=1,
+    def __init__(self, data_dir=None, *, split="recommended", subset=None, fold=1,
                  cache_dir=None, keep=None, force=False, verify="size", limit=None,
                  **kwargs):
-        super().__init__(data_dir=dataset_path(self.DOMAIN, self.NAME, data_dir), **kwargs)
+        root = dataset_path(self.DOMAIN, self.NAME, data_dir)
+        if root.exists() or not self.DOWNLOADABLE:
+            super().__init__(data_dir=root, **kwargs)
+        else:  # the fetch downloads the sources into the cache
+            cache = Path(cache_dir) if cache_dir else get_cache_dir()
+            cache.mkdir(parents=True, exist_ok=True)
+            super().__init__(data_dir=cache, **kwargs)
+            self.data_dir = root
         if subset == "all":
             subset = None
         if subset not in (None, "train", "val", "test"):
@@ -305,7 +316,7 @@ class SequenceCovarianceDataset(BaseDataset):
         if parts is not None and self.balance is not None:
             train = parts["train"]
             if self.balance == "weights":
-                self.class_weights = class_weights(labels[train])
+                self.class_weights = class_weights(labels[train], n_classes=len(self.classes))
             else:
                 parts["train"] = train[balance_indices(labels[train], self.balance,
                                                        seed=self.seed)]
@@ -355,6 +366,6 @@ class SequenceCovarianceDataset(BaseDataset):
         return x, int(self._labels_all[j])
 
 
-__all__ = ["CSV", "SequenceCovarianceDataset", "check_local", "estimate_stage",
+__all__ = ["CSV", "SequenceCovarianceDataset", "estimate_stage",
            "evenly_spaced", "folds_to_split", "kfold_assignment", "load_result",
            "save_covariances", "write_processed"]

@@ -6,7 +6,7 @@ the covariances from the skeletons in a cache, with the official X-Sub /
 X-Setup splits; the name ``"ntu120"`` of the DatasetManager points to it.
 
 This legacy class only reads covariance matrices precomputed under
-``<data_dir>/cov/`` (former ``utils/ntu120_covariance_precompute.py``).
+``<data_dir>/cov/`` (written by the former ``utils/ntu120_covariance_precompute.py``, removed; use ``NTURGBD120Dataset``).
 """
 
 import warnings
@@ -68,7 +68,7 @@ class NTU120Dataset(BaseDataset):
         if not cov_dir.exists():
             raise FileNotFoundError(
                 f"Covariance directory not found: {cov_dir}. "
-                "Run ntu120_covariance_precompute.py first."
+                "Use spdnet_datasets.skeleton.NTURGBD120Dataset, which builds its covariances in the cache."
             )
 
         if self.verbose:

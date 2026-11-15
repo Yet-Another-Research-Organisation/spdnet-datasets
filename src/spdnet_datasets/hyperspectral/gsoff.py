@@ -24,6 +24,11 @@ Split (atlas recommendation): StratifiedGroupKFold(5) over 96 x 96 pixel
 blocks, test = fold ``fold``, val = fold ``fold + 1``; val/test windows that
 overlap a training window (and test windows overlapping a val window) are
 removed.
+
+Download (manual): the scene comes from the Baidu Pan link of the authors'
+repository (licence unknown, see ``source/README.md``). Copy
+``source/`` and the prepared windows and place it under ``data_dir`` (default
+``<data root>/HYPERSPECTRAL/GSOFF``).
 """
 
 from pathlib import Path
@@ -33,7 +38,7 @@ import pandas as pd
 
 from ..core.config import dataset_path
 from ..core.estimators import check_sample_size
-from ..core.fetch import Bunch, run_pipeline, verify_local
+from ..core.fetch import Bunch, check_local, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     HSIDataset,
@@ -90,11 +95,11 @@ def fetch_gsoff(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
     (``"spatial"`` = ``"recommended"``), ``window``, ``processed_path``.
     """
     root = dataset_path(DOMAIN, NAME, data_dir)
-    verify_local(root, verify=verify, required=(SCENE, GROUND_TRUTH))
+    check_local(root, verify=verify, required=(SCENE, GROUND_TRUTH))
     bands = band_index(N_BANDS, band_step)
     check_sample_size(window * window, len(bands))
     params = {"window": window, "band_step": band_step, "threshold": threshold,
-              "estimator": estimator, "version": 2}
+              "source": str(root.resolve()), "version": 2}
 
     def process(_, out_dir):
         import tifffile
@@ -109,6 +114,7 @@ def fetch_gsoff(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
         covariance_stage(proc_dir, out_dir, window_pixels, estimator)
 
     res = run_pipeline(NAME, params=params, process_fn=process, covariance_fn=covariance,
+                       covariance_params={"estimator": estimator},
                        cache_dir=cache_dir, keep=keep, force=force)
     out = load_covariance_dir(res.covariance_dir)
     meta, full = out.meta, out.meta_all

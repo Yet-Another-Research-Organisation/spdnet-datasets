@@ -11,20 +11,27 @@ spdnet-datasets ──▶ yetanotherspdnet (models) ──▶ spdnet-training (t
    synthetic data         batch normalization
 ```
 
-Every loader is reached through one entry point, a configuration dictionary
-that also comes out of the Hydra configs of `spdnet-training`:
+A dataset is a PyTorch dataset whose samples are covariances, optionally with
+their channel means and the raw data they come from ({doc}`guide/outputs`):
+
+```python
+from spdnet_datasets import PastisRDataset, create_dataloaders
+
+ds = PastisRDataset(scenario="C", estimator="ledoit_wolf", return_mean=True)
+train, val, test = create_dataloaders(ds, split="official", batch_size=64)
+(cov, mean), y = next(iter(train))      # cov: (64, 16, 16) SPD, mean: (64, 16)
+```
+
+The configuration-dictionary entry point used by the Hydra configs of
+`spdnet-training` is kept ({doc}`guide/loading`):
 
 ```python
 from spdnet_datasets import DatasetManager
 
 train, val, test, n_classes = DatasetManager.create_dataloaders({
-    "name": "hdm05",              # registered dataset name
-    "path": "/DATA", "subdir": "HDM05",
-    "scaling_factor": 190.0,      # dataset-specific option
-    "batch_size": 16, "val_ratio": 0.15, "test_ratio": 0.15,
-    "stratified": True, "seed": 0,
+    "name": "pastis_r", "scenario": "A", "split_strategy": "official",
+    "batch_size": 64,
 })
-x, y = next(iter(train))          # x: (16, 93, 93) SPD matrices, y: (16,) labels
 ```
 
 ## Install
@@ -36,9 +43,9 @@ git clone https://github.com/Yet-Another-Research-Organisation/spdnet-datasets.g
 cd spdnet-datasets && pip install -e ".[dev,test,docs]"
 ```
 
-The datasets themselves are not distributed with the package: point `path`
-at the directory holding them (for instance `/DATA`); each loader documents
-the layout it expects ({doc}`guide/datasets`).
+The datasets themselves are not distributed with the package: they are read
+from `$SPDNET_DATA_ROOT/<DOMAIN>/<Name>` (default `/DATA/DATASET`) or fetched
+into `$SPDNET_CACHE_DIR` ({doc}`guide/fetch`).
 
 ## Contents
 

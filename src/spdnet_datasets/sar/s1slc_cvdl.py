@@ -29,6 +29,9 @@ Splits: ``"loco_<City>"`` (leave one city out; validation = 10 % of the
 training cities, stratified), groups = city. ``"recommended"`` = ``"loco_Houston"``.
 Patch positions are not provided: no spatial split within a city is possible
 (a random split would put neighbouring patches on both sides).
+
+Download (manual): IEEE DataPort (account required). Download ``complex_HHHV.zarr``
+and place it under ``data_dir`` (default ``<data root>/SAR/S1SLC_CVDL``).
 """
 
 import hashlib
@@ -41,7 +44,7 @@ import torch
 
 from ..base import BaseDataset
 from ..core.config import dataset_path, get_cache_dir
-from ..core.fetch import Bunch, verify_local
+from ..core.fetch import Bunch, check_local
 from ..manager import DatasetManager
 from ._common import finalize_labels
 
@@ -70,7 +73,7 @@ def fetch_s1slc_cvdl(data_dir=None, *, verify="size", val_size=0.1, seed=0):
     from sklearn.model_selection import train_test_split
 
     root = dataset_path(DOMAIN, NAME, data_dir)
-    verify_local(root, verify=verify, required=(STORE,))
+    check_local(root, verify=verify, required=(STORE,))
     z = _open(root)
     frames = []
     for city in CITIES:

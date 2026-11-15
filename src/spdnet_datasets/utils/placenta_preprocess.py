@@ -261,14 +261,14 @@ def main():
     parser.add_argument(
         '--data-dir',
         type=str,
-        default='/media/mgallet/BACK UP/DATASET/Hyperspectral_Placenta_Dataset',
-        help='Directory containing Placenta folders'
+        required=True,
+        help='Directory containing Placenta folders (read only)'
     )
     parser.add_argument(
         '--output-dir',
         type=str,
-        default='/media/mgallet/BACK UP/DATASET/Hyperspectral_Placenta_Dataset/imagettes',
-        help='Output directory for extracted windows'
+        required=True,
+        help='Output directory for extracted windows (outside the read-only dataset copy)'
     )
 
     args = parser.parse_args()

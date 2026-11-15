@@ -28,6 +28,10 @@ Outputs: raw or mean only (``OUTPUTS = ("raw", "mean")``).
   slightly non-square) and, with ``standardize=True``, standardised per chip;
 - mean: per-channel mean of the ``log1p`` resized chip (before
   standardisation, which would make it zero).
+
+Download (manual): distributed by Fudan University (see the article and
+``ReadMe.txt``; copyright Fudan University, no direct URL or checksum registered). Copy the class folders and ``meta`` files and place it under
+``data_dir`` (default ``<data root>/SAR/FUSAR_Ship1.0``).
 """
 
 from pathlib import Path
@@ -39,7 +43,7 @@ import torch.nn.functional as F
 
 from ..base import BaseDataset
 from ..core.config import dataset_path
-from ..core.fetch import Bunch, verify_local
+from ..core.fetch import Bunch, check_local
 from ..manager import DatasetManager
 from ._common import check_split_groups, finalize_labels, group_kfold_splits
 
@@ -80,7 +84,7 @@ def fetch_fusar_ship(data_dir=None, *, class_level="basic", min_samples_per_clas
     if class_level not in ("basic", "fine"):
         raise ValueError(f"class_level must be 'basic' or 'fine', got {class_level}")
     root = dataset_path(DOMAIN, NAME, data_dir)
-    verify_local(root, verify=verify)
+    check_local(root, verify=verify)
     rows = []
     for path in sorted(root.glob("*/*/*.tif*")):
         cat, sub = path.relative_to(root).parts[:2]

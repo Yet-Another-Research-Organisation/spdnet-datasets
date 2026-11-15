@@ -44,7 +44,7 @@ usable split in the paper (or it leaks), a grouped split is provided instead.
 | BirdSet_XCM | StratifiedGroupKFold(5) | proposed | recordist | no shared recordist | partial copy (21 shards) |
 | HDM05 | stratified 5 folds | proposed | — (no actor id in the copy) | — | **actor leakage cannot be removed**; documented |
 | NTU RGB+D 120 | X-Sub, X-Setup | paper | subject / setup | no shared subject / setup | — |
-| CI4R | GroupKFold(4) = leave-one-participant-out | proposed | participant (inferred from file names) | no shared participant, MD5 duplicates removed | three codes confound class and participant |
+| CI4R | GroupKFold(4) by participant (leave-one-participant-out for 77 GHz; xethru folds group 7 participants) | proposed | participant (inferred from file names) | no shared participant, MD5 duplicates removed | three codes confound class and participant |
 | MVDoppler | 4 official folds | paper | subject | no shared subject in test | 50 % overlapping snapshots within a recording |
 | DopNet | official train / test, `person0..5` | paper / proposed | person (LOPO) | MD5 test∈train duplicates removed | the official split is intra-person |
 | PASTIS-R | folds 1–3 / 4 / 5, `cv1..cv5` | paper | patch | no shared patch | neighbouring patches across folds (official design) |

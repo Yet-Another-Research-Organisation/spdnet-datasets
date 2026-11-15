@@ -6,6 +6,15 @@ local copy is a Hugging Face export in parquet files (columns ``filename``,
 ``fold``, ``target``, ``category``, ``esc10``, ``src_file``, ``take``,
 ``audio``).
 
+Download
+--------
+The local copy is the Hugging Face dataset ``ashraq/esc50`` (two parquet
+shards, 773 MB; the sha256 of :data:`FILES` are the Hugging Face LFS
+identifiers, equal to those of the local copy). When ``data_dir`` does not
+exist, the two shards of the pinned revision :data:`HF_REVISION` are
+downloaded into ``<cache_dir>/esc50/raw/`` and checked. Clips: CC BY-NC 3.0
+(Freesound).
+
 Covariances
 -----------
 One covariance per clip over its non-silent frames (``n`` = number of frames,
@@ -28,11 +37,11 @@ categories: animals, natural soundscapes, human non-speech, domestic, urban).
 
 from functools import partial
 
-from ..core import dataset_path, run_pipeline
+from ..core import check_local, dataset_path, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     SequenceCovarianceDataset,
-    check_local,
+    download_files,
     estimate_stage,
     evenly_spaced,
     folds_to_split,
@@ -41,7 +50,14 @@ from ._common import (
 from ._features import iter_parquet_rows, process_recordings
 
 DOMAIN, NAME = "AUDIO", "ESC-50"
-FILES = {}  # local copy; download registry filled by the fetch phase
+HF_REPO, HF_REVISION = "ashraq/esc50", "e3e2a63ffff66b9a9735524551e3818e96af03ee"
+_HF = f"https://huggingface.co/datasets/{HF_REPO}/resolve/{HF_REVISION}/data/"
+FILES = {  # url -> sha256 (Hugging Face LFS oid, identical to the local copy)
+    _HF + "train-00000-of-00002-2f1ab7b824ec751f.parquet":
+        "01fafd618bad0813b1c844466c35d0aea4ee02aeb0ffcde6e012ca48dcd38dbb",
+    _HF + "train-00001-of-00002-27425e5c1846b494.parquet":
+        "57786179368a444868a98430314ce762876e170bed9636845773762b9e3ad62d",
+}
 N_FOLDS = 5
 COARSE_NAMES = ("animals", "natural_soundscapes", "human_non_speech", "domestic", "urban")
 META_COLUMNS = ["filename", "fold", "target", "category", "esc10", "src_file", "take"]
@@ -63,6 +79,7 @@ def _index(root):
 
 
 def _process(source, out_dir, *, root, limit, features, n_mfcc, n_mels):
+    root = root if source is None else source  # downloaded shards
     index = _index(root)
     keep = evenly_spaced(len(index), limit)
 
@@ -89,7 +106,8 @@ def fetch_esc50(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
     Parameters
     ----------
     data_dir : path, optional
-        Read-only copy (default ``<data root>/AUDIO/ESC-50``).
+        Read-only copy (default ``<data root>/AUDIO/ESC-50``). If the folder does
+        not exist, the Hugging Face shards are downloaded (see :data:`FILES`).
     cache_dir : path, optional
         Cache of the processed features and covariances.
     keep : {"keep_processed", "keep_covariance", "keep_full"}, optional
@@ -115,11 +133,15 @@ def fetch_esc50(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
         ``covariance_path``.
     """
     root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify)
-    params = {"data_dir": str(root.resolve()), "features": features, "n_mfcc": n_mfcc,
+    if root.is_dir():
+        check_local(root, verify=verify)
+        raw_fn, source = None, str(root.resolve())
+    else:
+        raw_fn, source = partial(download_files, FILES), f"hf:{HF_REPO}@{HF_REVISION}"
+    params = {"data_dir": source, "features": features, "n_mfcc": n_mfcc,
                   "n_mels": n_mels, "limit": limit}
     run = run_pipeline(
-        "esc50", params={**params, "estimator": estimator},
+        "esc50", params=params, covariance_params={"estimator": estimator}, raw_fn=raw_fn,
         process_fn=partial(_process, root=root, limit=limit, features=features,
                            n_mfcc=n_mfcc, n_mels=n_mels),
         covariance_fn=partial(estimate_stage, estimator=estimator),
@@ -141,6 +163,7 @@ class ESC50Dataset(SequenceCovarianceDataset):
     """
 
     DOMAIN, NAME = DOMAIN, NAME
+    DOWNLOADABLE = True
 
     def __init__(self, data_dir=None, *, features="mfcc", n_mfcc=20, n_mels=64, **kwargs):
         self.feature_kwargs = {"features": features, "n_mfcc": n_mfcc, "n_mels": n_mels}

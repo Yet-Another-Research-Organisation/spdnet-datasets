@@ -1,0 +1,63 @@
+{
+ "name": "ci4r",
+ "kwargs": {
+  "mode": "xethru"
+ },
+ "split": "fold0",
+ "p": 32,
+ "n_samples": 633,
+ "classes": [
+  "Away",
+  "Bend",
+  "Crawl",
+  "Kneel",
+  "Limp",
+  "Pick",
+  "SStep",
+  "Scissor",
+  "Sit",
+  "Toes",
+  "Towards"
+ ],
+ "counts": {
+  "train": [
+   41,
+   38,
+   42,
+   27,
+   39,
+   41,
+   44,
+   36,
+   34,
+   38,
+   42
+  ],
+  "val": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "test": [
+   19,
+   21,
+   19,
+   22,
+   20,
+   17,
+   16,
+   21,
+   18,
+   20,
+   18
+  ]
+ }
+}

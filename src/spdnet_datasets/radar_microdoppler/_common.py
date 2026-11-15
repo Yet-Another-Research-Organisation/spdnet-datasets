@@ -17,7 +17,6 @@ part of the selected split when the dataset is instantiated.
 """
 
 import json
-import warnings
 from pathlib import Path
 
 import numpy as np
@@ -26,22 +25,9 @@ import torch
 
 from ..base import BaseDataset
 from ..core.estimators import channel_mean, estimate_covariance
-from ..core.fetch import Bunch, verify_local
+from ..core.fetch import Bunch
 from ..core.normalize import geometric_scale
 from ..core.tasks import apply_task, balance_indices, class_weights
-
-
-def check_local(dataset_dir, verify="size", required=()):
-    """``verify_local`` on a read-only copy; warn when the manifest disagrees."""
-    report = verify_local(dataset_dir, verify=verify, required=required)
-    bad = report.missing + report.wrong_size + report.wrong_md5
-    if bad:
-        warnings.warn(
-            f"{dataset_dir}: {len(report.missing)} missing, {len(report.wrong_size)} wrong size, "
-            f"{len(report.wrong_md5)} wrong md5 files w.r.t. MANIFEST_NAS.tsv (e.g. {bad[:3]})",
-            UserWarning, stacklevel=3,
-        )
-    return report
 
 
 def write_processed(out_dir, spectrograms, meta, info):
@@ -85,7 +71,7 @@ def covariance_stage(estimator):
         processed_dir, out_dir = Path(processed_dir), Path(out_dir)
         raw = np.load(processed_dir / "raw.npy", mmap_mode="r")
         offsets = np.load(processed_dir / "offsets.npy")
-        meta = pd.read_csv(processed_dir / "meta.csv")
+        meta = pd.read_csv(processed_dir / "meta.csv", dtype={"group": str, "participant": str})
         meta["raw_index"] = np.arange(len(meta))
         p = raw.shape[1]
         covs, means, kept = [], [], []
@@ -158,8 +144,8 @@ class RadarCovarianceDataset(BaseDataset):
     weights. ``subset="train"|"val"|"test"`` restricts the instance to one part
     of that split (``splits`` is then emptied).
 
-    Only the covariances are scaled by the normalisation; ``mean`` and ``raw``
-    stay in the units of the preprocessed spectrogram.
+    With ``normalize=True`` the covariances are multiplied by the geometric
+    scale ``s`` of the training part, ``mean`` and ``raw`` by ``sqrt(s)``.
     """
 
     COARSE_MAP = None
@@ -212,7 +198,8 @@ class RadarCovarianceDataset(BaseDataset):
                 tr = parts["train"]
                 parts["train"] = tr[balance_indices(self.labels[tr], self.balance, self.seed)]
         train = splits[self.split]["train"]
-        self.class_weights = class_weights(self.labels[train]) if len(train) else None
+        self.class_weights = (class_weights(self.labels[train], n_classes=len(self.classes))
+                              if len(train) else None)
         self.scale = 1.0
         if self.normalize and len(train):
             self.scale = geometric_scale(b.covariances[idx[np.unique(train)]])
@@ -242,10 +229,14 @@ class RadarCovarianceDataset(BaseDataset):
         j = int(self._index[i])
         b = self._bunch
         cov = torch.from_numpy(b.covariances[j] * self.scale)
-        mean = torch.from_numpy(b.means[j]) if self.return_mean else None
+        root = np.sqrt(self.scale)
+        mean = torch.from_numpy(b.means[j] * root) if self.return_mean else None
         raw = None
         if self.return_raw:
             r = int(b.meta["raw_index"].iat[j])
             a, e = self._offsets[r], self._offsets[r + 1]
-            raw = torch.from_numpy(np.array(self._raw[a:e], dtype=np.float32))
-        return self._pack(cov, mean, raw), int(self.labels[i])
+            raw = torch.from_numpy((np.asarray(self._raw[a:e]) * root).astype(np.float32))
+        x = self._pack(cov, mean, raw)
+        if self.transform is not None:
+            x = self.transform(x)
+        return x, int(self.labels[i])

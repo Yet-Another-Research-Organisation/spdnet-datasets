@@ -24,6 +24,11 @@ physical fruit). The official v2 split cannot be used: the VIS cubes of
 and have no ``cov_VIS`` file, so ripeness mode holds the 384 annotated VIS
 cubes of ``train_only_labeled_v2`` only (it would also leak: 46 of the 140
 test cubes have the other face of their fruit in train).
+
+Download (manual): see https://github.com/cogsys-tuebingen/deephs_fruit (226 GB,
+links given by the authors). The ``cov_VIS/*.pt`` covariances read here are a local
+precomputation; copy the fruit folders, ``annotations/`` and ``cov_VIS/`` and place
+it under ``data_dir`` (default ``<data root>/HYPERSPECTRAL/DeepHS-Fruit``).
 """
 
 import json
@@ -35,11 +40,12 @@ import pandas as pd
 import torch
 
 from ..core.config import dataset_path
-from ..core.fetch import Bunch, verify_local
+from ..core.fetch import Bunch, check_local
 from ..manager import DatasetManager
 from ._common import HSIDataset, group_kfold_split
 
 DOMAIN, NAME = "HYPERSPECTRAL", "DeepHS-Fruit"
+FILES = {}  # manual download (see the module docstring)
 FRUIT_CLASSES = ["Avocado", "Kaki", "Kiwi", "Mango", "Papaya"]
 RIPENESS = {"unripe": "unripe", "perfect": "perfect", "ripe": "perfect",
             "overripe": "overripe"}
@@ -84,8 +90,8 @@ def fetch_deephsfruit(data_dir=None, verify="size", *, classification_mode="frui
     if classification_mode not in ("fruit", "ripeness"):
         raise ValueError("classification_mode must be 'fruit' or 'ripeness'")
     root = dataset_path(DOMAIN, NAME, data_dir)
-    verify_local(root, verify=verify,
-                 required=("cov_VIS", "annotations/merged_annotations.json"))
+    check_local(root, verify=verify,
+                required=("cov_VIS", "annotations/merged_annotations.json"))
     merged = json.loads((root / "annotations/merged_annotations.json").read_text())
     records = {r["id"]: r for r in merged["records"]}
     ripeness, official = {}, {}

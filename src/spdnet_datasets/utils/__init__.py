@@ -7,10 +7,11 @@ Preprocessing scripts (run as standalone or via CLI):
 The Chikusei, GSOFF, UAV-HSI-Crop and Kaggle wheat scripts were replaced by the
 ``fetch_<dataset>()`` functions of :mod:`spdnet_datasets.hyperspectral`.
 
-Covariance precomputation:
-    - base_covariance_precompute: Base class for covariance matrix precomputation
-    - covariance_precompute: Unified precomputation for HyperLeaf, Rices90, UAV,
-      GSOFF, Chikusei, Placenta, and DeepHS-Fruit datasets
+The covariance precomputation scripts (``covariance_precompute``,
+``base_covariance_precompute``, ``ci4r`` / ``dopnet`` / ``mvdoppler`` /
+``ntu120_covariance_precompute``) wrote ``cov/`` inside the dataset directories;
+they were removed: every ``fetch_<dataset>()`` now builds its covariances in
+the cache (``SPDNET_CACHE_DIR``).
 
 Placenta utilities (placenta_utils sub-package):
     - spectral_tiffs: Read/write spectral TIFF image cubes and mask bitmaps

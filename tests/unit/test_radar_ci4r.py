@@ -103,6 +103,43 @@ def test_dataset_outputs_normalisation_and_registry(data, tmp_path):
     assert len(tr.dataset) + len(te.dataset) == len(ds) and len(va.dataset) == 0
 
 
+def test_cache_key_has_source_and_estimator_only_in_covariances(data, tmp_path):
+    cache = tmp_path / "cache"
+    a = fetch_ci4r(data, cache, band=0.5, p=P, verify=None)
+    b = fetch_ci4r(make_ci4r(tmp_path / "copy"), cache, band=0.5, p=P, verify=None)
+    assert a.covariance_path != b.covariance_path
+    lw = fetch_ci4r(data, cache, estimator="ledoit_wolf", band=0.5, p=P, verify=None)
+    assert lw.processed_path == a.processed_path and lw.covariance_path != a.covariance_path
+
+
+def test_normalisation_scales_mean_and_raw_by_sqrt_s(data, tmp_path):
+    kw = {"band": 0.5, "p": P, "cache_dir": tmp_path / "cache", "verify": None, "verbose": False}
+    ds = CI4RDataset(data, return_mean=True, return_raw=True, **kw)
+    (cov, mean, raw), _ = ds[0]
+    (cov0, mean0, raw0), _ = CI4RDataset(data, normalize=False, return_mean=True, return_raw=True, **kw)[0]
+    s = ds.scale
+    assert s != 1.0
+    np.testing.assert_allclose(cov.numpy(), s * cov0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(mean.numpy(), np.sqrt(s) * mean0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(raw.numpy(), np.sqrt(s) * raw0.numpy(), rtol=1e-6)
+
+
+def test_fold_out_of_range_raises(data, tmp_path):
+    kw = {"band": 0.5, "p": P, "verify": None}
+    with pytest.raises(ValueError, match="fold=4 is out of range: 4 folds"):
+        fetch_ci4r(data, tmp_path / "cache", fold=4, **kw)
+    with pytest.raises(ValueError, match="fold=4 is out of range: 4 folds"):
+        fetch_ci4r(data, tmp_path / "cache", n_folds=6, fold=4, **kw)  # 4 participants
+    assert "fold3" in fetch_ci4r(data, tmp_path / "cache", n_folds=6, fold=3, **kw).splits
+
+
+def test_transform_is_applied(data, tmp_path):
+    kw = {"band": 0.5, "p": P, "cache_dir": tmp_path / "cache", "verify": None, "verbose": False}
+    ds = CI4RDataset(data, **kw)
+    doubled = CI4RDataset(data, transform=lambda x: 2 * x, **kw)
+    torch.testing.assert_close(doubled[0][0], 2 * ds[0][0])
+
+
 def test_class_selection_and_limits(data, tmp_path):
     kw = {"band": 0.5, "p": P, "cache_dir": tmp_path / "cache", "verify": None, "verbose": False}
     ds = CI4RDataset(data, classes=["Crawl", "Away"], **kw)
