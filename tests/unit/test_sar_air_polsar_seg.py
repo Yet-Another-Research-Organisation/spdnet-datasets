@@ -39,6 +39,7 @@ def test_mosaic_is_rebuilt_and_cells_are_unique(air_dir, tmp_path):
     rel = pos.loc["train/AIR-PolarSAR-Seg-2", ["py", "px"]] - pos.loc["train/AIR-PolarSAR-Seg-1", ["py", "px"]]
     assert tuple(rel) == (0, 40)
     assert len(ds.overlaps) == 3  # A-B, A-C, B-C
+    assert ds.label_conflicts == 0
     # union of the first component: 104 x 104 minus the empty corner, plus D (64 x 64): 8 px cells
     n_cells = (13 * 13 - 5 * 5) + 8 * 8  # rows and cols 64..104 are not covered
     assert len(ds) == n_cells

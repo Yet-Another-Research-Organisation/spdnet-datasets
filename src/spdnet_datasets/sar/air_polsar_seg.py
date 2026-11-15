@@ -11,8 +11,9 @@ The patches overlap massively (1 241 pairs share identical pixels, 43 of the
 150 official test patches overlap a training patch) and the file names
 ``1..150`` exist in both folders for different images. This module therefore
 **rebuilds the mosaic** from the exact overlaps (hashes of 16-pixel row
-segments vote for displacements, every candidate is checked on its whole
-overlap and the four polarisations), then cuts it into non-overlapping
+segments, probed on a regular grid, vote for displacements; every candidate is
+checked on its whole overlap and the four polarisations; the rebuilt mosaic is
+checked against every patch), then cuts it into non-overlapping
 ``cell x cell`` cells: a cell is kept if it is fully covered, at least
 ``min_annotated`` of its pixels are annotated and its majority class holds
 ``purity`` of them (atlas: 57 358 cells of 32 x 32 px).
@@ -84,19 +85,26 @@ def _segment_hash(x):
     return h
 
 
-def find_overlaps(amps, *, n_probes=2000, row_step=8, seed=0):
-    """Exact overlaps between patches: list of ``(a, b, dy, dx)`` with ``a[y, x] == b[y - dy, x - dx]``."""
+def find_overlaps(amps, *, step=8):
+    """Exact overlaps between patches: list of ``(a, b, dy, dx)`` with ``a[y, x] == b[y - dy, x - dx]``.
+
+    The segments of every ``step``-th row of each patch are indexed; each patch
+    is probed at every row and every ``step``-th column, so any overlap at
+    least ``2 step`` px high and ``SEG + 2 step`` px wide gets two votes or
+    more (deterministic). Candidates are checked on their whole overlap and the
+    four polarisations.
+    """
     n, _, H, W = amps.shape
     hh = amps[:, 0]
-    index = _segment_hash(hh[:, ::row_step])  # rows multiple of row_step only
+    index = _segment_hash(hh[:, ::step])
     flat = index.ravel()
     order = np.argsort(flat, kind="stable")
     keys = flat[order]
     w = W - SEG + 1
-    rng = np.random.default_rng(seed)
+    grid_y, grid_x = np.meshgrid(np.arange(H), np.arange(0, w, step), indexing="ij")
     votes = Counter()
     for a in range(n):
-        ys, xs = rng.integers(0, H, n_probes), rng.integers(0, w, n_probes)
+        ys, xs = grid_y.ravel(), grid_x.ravel()
         seg = hh[a, ys[:, None], xs[:, None] + np.arange(SEG)]
         informative = seg.max(1) != seg.min(1)  # constant segments (zeros...) match anywhere
         q = _segment_hash(seg)[:, 0]
@@ -106,7 +114,7 @@ def find_overlaps(amps, *, n_probes=2000, row_step=8, seed=0):
                 b, r = divmod(int(pos), index.shape[1] * w)
                 yb, xb = divmod(r, w)
                 if b != a:
-                    votes[(a, b, int(ys[j] - yb * row_step), int(xs[j] - xb))] += 1
+                    votes[(a, b, int(ys[j] - yb * step), int(xs[j] - xb))] += 1
     pairs = []
     for (a, b, dy, dx), v in votes.items():
         if v < 2 or a > b:
@@ -151,7 +159,7 @@ def _process(root, out_dir, *, cell, purity, min_annotated, macro):
     pairs = find_overlaps(amps)
     comp, pos = place_patches(len(names), pairs)
     S = amps.shape[-1]
-    cells, rows = [], []
+    cells, rows, conflicts = [], [], 0
     for k in np.unique(comp):
         members = np.flatnonzero(comp == k)
         Hc, Wc = pos[members].max(0) + S
@@ -161,8 +169,14 @@ def _process(root, out_dir, *, cell, purity, min_annotated, macro):
         for i in members:
             y, x = pos[i]
             mosaic[:, y:y + S, x:x + S] = amps[i]
-            lab[y:y + S, x:x + S] = np.maximum(lab[y:y + S, x:x + S], labels[i])
+            win = lab[y:y + S, x:x + S]
+            conflicts += int(((win > 0) & (labels[i] > 0) & (win != labels[i])).sum())
+            lab[y:y + S, x:x + S] = np.where(labels[i] > 0, labels[i], win)
             cover[y:y + S, x:x + S] = True
+        for i in members:  # every patch must be read back unchanged from the mosaic
+            y, x = pos[i]
+            if not np.array_equal(mosaic[:, y:y + S, x:x + S], amps[i]):
+                raise ValueError(f"Patch {names[i]} disagrees with the rebuilt mosaic")
         for r in range(Hc // cell):
             for c in range(Wc // cell):
                 sl = (slice(r * cell, (r + 1) * cell), slice(c * cell, (c + 1) * cell))
@@ -182,6 +196,7 @@ def _process(root, out_dir, *, cell, purity, min_annotated, macro):
     pd.DataFrame({"name": names, "component": comp, "py": pos[:, 0], "px": pos[:, 1]}).to_csv(
         out_dir / "positions.csv", index=False)
     pd.DataFrame(pairs, columns=["a", "b", "dy", "dx"]).to_csv(out_dir / "overlaps.csv", index=False)
+    (out_dir / "label_conflicts.txt").write_text(str(conflicts))
 
 
 def _guard(meta, keep, ref, gap):
@@ -201,16 +216,17 @@ def fetch_air_polsar_seg(data_dir=None, cache_dir=None, keep=None, force=False, 
     Returns
     -------
     Bunch with ``meta`` (component, row, col, label, block), ``positions``
-    (patch placement in the mosaic), ``overlaps``, ``splits`` and
+    (patch placement in the mosaic), ``overlaps``, ``label_conflicts`` (pixels
+    labelled differently by two overlapping patches), ``splits`` and
     ``processed_dir`` (``cells.npy``, uint16 amplitudes ``(N, cell, cell, 4)``).
     """
     root = dataset_path(DOMAIN, NAME, data_dir)
     verify_local(root, verify=verify, required=("train_set", "test_set"))
     opts = {"cell": cell, "purity": purity, "min_annotated": min_annotated, "macro": macro}
-    params = dict(opts, source=str(root.resolve()))
+    params = dict(opts, source=str(root.resolve()), version=3)  # bump when the processing changes
 
     def covariance_fn(proc, out):  # raw/mean dataset: the stage only records the cell metadata
-        for f in ("meta.csv", "positions.csv", "overlaps.csv"):
+        for f in ("meta.csv", "positions.csv", "overlaps.csv", "label_conflicts.txt"):
             (Path(out) / f).write_bytes((Path(proc) / f).read_bytes())
 
     if keep == "keep_covariance":
@@ -227,6 +243,7 @@ def fetch_air_polsar_seg(data_dir=None, cache_dir=None, keep=None, force=False, 
     splits["recommended"] = splits["macro1024_fold0"]
     return Bunch(meta=meta, positions=pd.read_csv(cdir / "positions.csv"),
                  overlaps=pd.read_csv(cdir / "overlaps.csv"), splits=splits,
+                 label_conflicts=int((cdir / "label_conflicts.txt").read_text()),
                  processed_dir=res.processed_dir, root=root)
 
 
@@ -260,7 +277,7 @@ class AIRPolSARSegDataset(BaseDataset):
         keep = finalize_labels(self, b.meta["label"].to_numpy(), b.meta["block"].to_numpy(), b.splits)
         check_split_groups(self.splits, self.groups)
         self.meta = b.meta.iloc[keep].reset_index(drop=True)
-        self.positions, self.overlaps = b.positions, b.overlaps
+        self.positions, self.overlaps, self.label_conflicts = b.positions, b.overlaps, b.label_conflicts
         self._cells = np.load(Path(b.processed_dir) / "cells.npy", mmap_mode="r")
         self._keep = keep
         self.samples = list(range(len(keep)))
