@@ -60,6 +60,20 @@ firmness.
 - Repository: <https://github.com/cogsys-tuebingen/deephs_fruit> (URL not
   verified). Licence: see the authors' repository (not verified).
 
+## Getting the data
+
+Manual, and outside the selection: the `cov_VIS/*.pt` covariances read here
+are a local precomputation that no download provides, so the sources of the
+authors (226 GB, links in <https://github.com/cogsys-tuebingen/deephs_fruit>;
+servers unreachable on 2026-11-15) cannot feed this loader. Without a local copy,
+`fetch_deephsfruit()` opens the repository page and raises
+`ManualDownloadRequired`; `archive=` accepts a copy with the local layout
+(`cov_VIS/`, `annotations/`).
+
+```python
+fetch_deephsfruit(archive="~/copies/DeepHS-Fruit")
+```
+
 ## Raw data
 
 Cubes are stored as `<Fruit>/<VIS|NIR|VIS_COR>/<day>/<fruit>_<day>_<k>_<front|back>.{hdr,bin}`,
