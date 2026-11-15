@@ -72,7 +72,13 @@ import torch
 
 from ..base import BaseDataset
 from ..core.config import dataset_path
-from ..core.estimators import check_sample_size, check_spd, estimate_covariance
+from ..core.estimators import (
+    InsufficientSamplesError,
+    NotSPDError,
+    check_sample_size,
+    check_spd,
+    estimate_covariance,
+)
 from ..core.fetch import Bunch, check_local, run_pipeline
 from ..core.normalize import apply_scale
 from ..manager import DatasetManager
@@ -194,26 +200,48 @@ def t6_matrix(params):
 
 
 def _covariances(proc, out, *, representation, estimator):
+    """Covariance stage; cells failing the ``n >= 2p`` or SPD check are rejected.
+
+    The rejected cells are listed in ``rejected.csv`` (``proc_index``, ``path``,
+    ``row``, ``col``, ``reason``); ``meta.csv`` keeps the others with their
+    ``proc_index`` (row in the processed stage).
+    """
     proc, out = Path(proc), Path(out)
     masks = np.load(proc / "masks.npy")
+    meta = pd.read_csv(proc / "meta.csv")
+    meta["proc_index"] = np.arange(len(meta))
     if representation == "logpower":
         raw = np.load(proc / "raw.npy", mmap_mode="r")
         obs = [np.asarray(raw[k])[masks[k]].astype(np.float64) for k in range(len(masks))]
-        covs = np.stack([estimate_covariance(x, estimator) for x in obs])
         means = np.stack([x.mean(0) for x in obs])
     else:
         prm = np.load(proc / "t6.npy")  # (N, bands, 36)
         nb = prm.shape[1]
-        covs = np.zeros((len(prm), 12 * nb, 12 * nb))
+        t6 = np.zeros((len(prm), 12 * nb, 12 * nb))
         for b in range(nb):
-            covs[:, 12 * b:12 * (b + 1), 12 * b:12 * (b + 1)] = realify(t6_matrix(prm[:, b]))
-        for k in range(len(prm)):
-            check_sample_size(int(masks[k].sum()), covs.shape[-1])
-        check_spd(covs)
+            t6[:, 12 * b:12 * (b + 1), 12 * b:12 * (b + 1)] = realify(t6_matrix(prm[:, b]))
         means = prm.reshape(len(prm), -1)
-    np.save(out / "covariances.npy", covs)
-    np.save(out / "means.npy", means)
-    (out / "meta.csv").write_bytes((proc / "meta.csv").read_bytes())
+    covs, kept, rejected = [], [], []
+    for k in range(len(masks)):
+        try:
+            if representation == "logpower":
+                C = estimate_covariance(obs[k], estimator)
+            else:
+                check_sample_size(int(masks[k].sum()), t6.shape[-1])
+                check_spd(t6[k])
+                C = t6[k]
+        except (InsufficientSamplesError, NotSPDError) as exc:  # rejected and counted
+            rejected.append({"proc_index": k, "path": meta["path"].iat[k], "row": meta["row"].iat[k],
+                             "col": meta["col"].iat[k], "reason": f"{type(exc).__name__}: {exc}"})
+            continue
+        covs.append(C)
+        kept.append(k)
+    p = means.shape[1] if representation == "logpower" else 12 * nb
+    np.save(out / "covariances.npy", np.stack(covs) if covs else np.zeros((0, p, p)))
+    np.save(out / "means.npy", means[kept])
+    meta.iloc[kept].to_csv(out / "meta.csv", index=False)
+    pd.DataFrame(rejected, columns=["proc_index", "path", "row", "col", "reason"]).to_csv(
+        out / "rejected.csv", index=False)
 
 
 def _guard(coords, keep_idx, ref_idx, gap):
@@ -281,7 +309,8 @@ def fetch_pol_insar_island(data_dir=None, cache_dir=None, keep=None, estimator="
     Returns
     -------
     Bunch with ``covariances`` (unscaled), ``means``, ``labels``, ``groups``
-    (512 m blocks), ``meta``, ``splits`` and ``processed_dir``.
+    (512 m blocks), ``meta``, ``splits``, ``rejected`` (cells whose estimate
+    failed the ``n >= 2p`` or SPD check, DataFrame) and ``processed_dir``.
     """
     if representation not in ("logpower", "t6"):
         raise ValueError("representation must be 'logpower' or 't6'")
@@ -299,7 +328,7 @@ def fetch_pol_insar_island(data_dir=None, cache_dir=None, keep=None, estimator="
     opts = {"cell": cell, "purity": purity, "min_labelled": min_labelled, "block": block, "bands": bands, "cells": cells,
             "representation": representation}
     params = dict(opts, estimator=estimator, source=str(root.resolve()))
-    res = run_pipeline("pol_insar_island", params=params,
+    res = run_pipeline("pol_insar_island", params=params, covariance_params={"version": 2},
                        process_fn=lambda _src, out: _process(root, out, **opts),
                        covariance_fn=lambda a, b: _covariances(a, b, representation=representation,
                                                                estimator=estimator),
@@ -307,6 +336,7 @@ def fetch_pol_insar_island(data_dir=None, cache_dir=None, keep=None, estimator="
     cdir = Path(res.covariance_dir)
     meta = pd.read_csv(cdir / "meta.csv")
     return Bunch(covariances=np.load(cdir / "covariances.npy"), means=np.load(cdir / "means.npy"),
+                 rejected=pd.read_csv(cdir / "rejected.csv"),
                  labels=meta["label"].to_numpy(str), groups=meta["block"].to_numpy(str), meta=meta,
                  splits=make_splits(meta, cell=cell), processed_dir=res.processed_dir,
                  covariance_dir=cdir)
@@ -359,8 +389,9 @@ class PolInSARIslandDataset(BaseDataset):
         check_split_groups({k: v for k, v in self.splits.items() if k.startswith("spatial")}, self.groups)
         self.meta = b.meta.iloc[keep].reset_index(drop=True)
         self.covariances, self.means = b.covariances[keep], b.means[keep]
+        self.rejected = b.rejected
         self.scale = train_scale(self.covariances, self.splits, self.split) if self.normalize else 1.0
-        self._processed, self._keep = b.processed_dir, keep
+        self._processed = b.processed_dir
         self.samples = list(range(len(keep)))
         if self.verbose:
             print(f"Pol-InSAR-Island ({self._fetch['representation']}, {self._fetch['cells']} cells): "
@@ -376,7 +407,7 @@ class PolInSARIslandDataset(BaseDataset):
         if self.return_raw:
             if not hasattr(self, "_raw"):
                 self._raw = np.load(Path(self._processed) / "raw.npy", mmap_mode="r")
-            raw = torch.from_numpy((np.asarray(self._raw[self._keep[idx]])
+            raw = torch.from_numpy((np.asarray(self._raw[int(self.meta["proc_index"].iat[idx])])
                                     * np.sqrt(self.scale)).astype(np.float32))
         x = self._pack(cov, mean, raw)
         if self.transform is not None:

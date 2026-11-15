@@ -60,7 +60,12 @@ import torch
 
 from ..base import BaseDataset
 from ..core.config import dataset_path, get_cache_dir
-from ..core.estimators import channel_mean, estimate_covariance
+from ..core.estimators import (
+    InsufficientSamplesError,
+    NotSPDError,
+    channel_mean,
+    estimate_covariance,
+)
 from ..core.fetch import Bunch, check_local, download, run_pipeline
 from ..core.normalize import apply_scale
 from ..manager import DatasetManager
@@ -165,14 +170,25 @@ def _covariances(proc_dir, out_dir, *, estimator):
     proc_dir, out_dir = Path(proc_dir), Path(out_dir)
     pixels = np.load(proc_dir / "pixels.npy", mmap_mode="r")
     off = np.load(proc_dir / "offsets.npy")
-    blocks = [np.asarray(pixels[a:b]) for a, b in zip(off[:-1], off[1:], strict=True)]
     p = pixels.shape[1]
-    covs = np.stack([estimate_covariance(x, estimator) for x in blocks]) if blocks else np.zeros((0, p, p))
-    means = np.stack([channel_mean(x) for x in blocks]) if blocks else np.zeros((0, p))
-    np.save(out_dir / "covariances.npy", covs)
-    np.save(out_dir / "means.npy", means)
-    for f in ("meta.csv", "info.json"):
-        (out_dir / f).write_bytes((proc_dir / f).read_bytes())
+    meta = pd.read_csv(proc_dir / "meta.csv", dtype={"site": str, "class": str})
+    meta["proc_index"] = np.arange(len(meta))
+    info = json.loads((proc_dir / "info.json").read_text())
+    covs, means, kept, info["rejected"] = [], [], [], []
+    for k, (a, b) in enumerate(zip(off[:-1], off[1:], strict=True)):
+        x = np.asarray(pixels[a:b])
+        try:
+            covs.append(estimate_covariance(x, estimator))
+        except (InsufficientSamplesError, NotSPDError) as exc:  # rejected and counted
+            info["rejected"].append({"proc_index": k, "site": meta["site"].iat[k],
+                                     "reason": f"{type(exc).__name__}: {exc}"})
+            continue
+        means.append(channel_mean(x))
+        kept.append(k)
+    np.save(out_dir / "covariances.npy", np.stack(covs) if covs else np.zeros((0, p, p)))
+    np.save(out_dir / "means.npy", np.stack(means) if means else np.zeros((0, p)))
+    meta.iloc[kept].to_csv(out_dir / "meta.csv", index=False)
+    (out_dir / "info.json").write_text(json.dumps(info))
 
 
 def fetch_cpazmal(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
@@ -205,7 +221,9 @@ def fetch_cpazmal(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
     -------
     Bunch with ``covariances`` (B, p, p, unscaled), ``means`` (B, p), ``labels``
     (class names), ``groups`` (parcel), ``meta`` (DataFrame), ``dates``,
-    ``excluded`` (parcel -> reason), ``splits`` and ``processed_dir``.
+    ``excluded`` (parcel -> reason), ``rejected`` (samples whose estimate
+    failed the ``n >= 2p`` or SPD check: list of ``proc_index``, ``site``,
+    ``reason``), ``splits`` and ``processed_dir``.
     """
     if orbit not in ("ASC", "DSC"):
         raise ValueError("orbit must be 'ASC' or 'DSC'")
@@ -231,7 +249,8 @@ def fetch_cpazmal(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
     def process_fn(source, out_dir):
         _process(source if source is not None else local, out_dir, **opts)
 
-    res = run_pipeline("cpazmal", params=params, covariance_params={"estimator": estimator},
+    res = run_pipeline("cpazmal", params=params,
+                       covariance_params={"estimator": estimator, "version": 2},
                        raw_fn=raw_fn, process_fn=process_fn,
                        covariance_fn=lambda a, b: _covariances(a, b, estimator=estimator),
                        cache_dir=cache_dir, keep=keep, force=force)
@@ -245,7 +264,7 @@ def fetch_cpazmal(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
         splits["recommended"] = splits["sgkf5_fold0"]
     return Bunch(covariances=np.load(cdir / "covariances.npy"), means=np.load(cdir / "means.npy"),
                  labels=labels, groups=groups, meta=meta, dates=info["dates"],
-                 excluded=info["excluded"], splits=splits, processed_dir=res.processed_dir,
+                 excluded=info["excluded"], rejected=info["rejected"], splits=splits, processed_dir=res.processed_dir,
                  covariance_dir=cdir)
 
 
@@ -293,7 +312,7 @@ class CPAZMaLDataset(BaseDataset):
         keep = finalize_labels(self, b.labels, b.groups, b.splits)
         check_split_groups(self.splits, self.groups)
         self.meta = b.meta.iloc[keep].reset_index(drop=True)
-        self.dates, self.excluded = b.dates, b.excluded
+        self.dates, self.excluded, self.rejected = b.dates, b.excluded, b.rejected
         self.covariances = b.covariances[keep]
         self.means = b.means[keep]
         self.scale = 1.0
@@ -302,7 +321,6 @@ class CPAZMaLDataset(BaseDataset):
         elif self.normalize:
             warnings.warn("No split available: covariances are not normalised", UserWarning, stacklevel=2)
         self._processed = b.processed_dir
-        self._keep = keep
         self.samples = list(range(len(keep)))
         if self.verbose:
             print(f"CPAZMaL ({self._fetch_kwargs['orbit']}, p={self.covariances.shape[-1]}): "
@@ -313,7 +331,7 @@ class CPAZMaLDataset(BaseDataset):
         if not hasattr(self, "_pixels"):
             self._pixels = np.load(Path(self._processed) / "pixels.npy", mmap_mode="r")
             self._offsets = np.load(Path(self._processed) / "offsets.npy")
-        j = self._keep[i]
+        j = int(self.meta["proc_index"].iat[i])
         return np.array(self._pixels[self._offsets[j]:self._offsets[j + 1]], dtype=np.float32)
 
     def __getitem__(self, idx):

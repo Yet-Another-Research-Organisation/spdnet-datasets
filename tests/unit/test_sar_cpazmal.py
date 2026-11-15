@@ -4,8 +4,9 @@ import h5py
 import numpy as np
 import pytest
 
-from spdnet_datasets.core.estimators import check_spd
+from spdnet_datasets.core.estimators import NotSPDError, check_spd
 from spdnet_datasets.core.splits import assert_no_leakage
+from spdnet_datasets.sar import cpazmal
 from spdnet_datasets.sar.cpazmal import CPAZMaLDataset, fetch_cpazmal, select_dates
 
 HH_DATES = [f"2020{m:02d}{d:02d}" for m in range(1, 13) for d in (5, 20)]  # 24 dates
@@ -112,6 +113,25 @@ def test_normalisation_scales_mean_and_raw_by_sqrt_s(cpaz_dir, tmp_path):
     np.testing.assert_allclose(cov.numpy(), s * cov0.numpy(), rtol=1e-12)
     np.testing.assert_allclose(mean.numpy(), np.sqrt(s) * mean0.numpy(), rtol=1e-12)
     np.testing.assert_allclose(raw.numpy(), np.sqrt(s) * raw0.numpy(), rtol=1e-6)
+
+
+def test_non_spd_sample_is_rejected_and_counted(cpaz_dir, tmp_path, monkeypatch):
+    real = cpazmal.estimate_covariance
+
+    def estimate(x, estimator):
+        if estimate.calls == 0:
+            estimate.calls += 1
+            raise NotSPDError("forced")
+        return real(x, estimator)
+
+    estimate.calls = 0
+    monkeypatch.setattr(cpazmal, "estimate_covariance", estimate)
+    ds = _make(cpaz_dir, tmp_path, return_mean=True, return_raw=True, normalize=False)
+    assert len(ds) == 14 and len(ds.rejected) == 1
+    assert ds.rejected[0]["proc_index"] == 0 and "NotSPDError" in ds.rejected[0]["reason"]
+    assert ds.rejected[0]["site"] not in set(ds.meta["site"])
+    (cov, mean, raw), _ = ds[0]  # raw pixels still aligned with the kept sample
+    np.testing.assert_allclose(mean.numpy(), raw.numpy().astype(float).mean(0), rtol=1e-5)
 
 
 def test_select_dates_and_task_options(cpaz_dir, tmp_path):
