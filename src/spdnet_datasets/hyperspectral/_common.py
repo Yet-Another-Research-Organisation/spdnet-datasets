@@ -352,7 +352,7 @@ class HSIDataset(BaseDataset):
         covs = bunch.covariances
         train_idx = np.unique(splits[split]["train"])
         self.scale = (geometric_scale(np.asarray(covs[index[train_idx]]))
-                      if self.normalize and len(train_idx) else 1.0)
+                      if self.normalize and covs is not None and len(train_idx) else 1.0)
 
         if subset is not None:
             if subset not in splits[split]:
@@ -376,7 +376,7 @@ class HSIDataset(BaseDataset):
         ]
         if self.verbose:
             print(f"{type(self).__name__}: {len(self)} samples, "
-                  f"{len(self.classes)} classes, p={covs.shape[-1]}, split={split!r}")
+                  f"{len(self.classes)} classes, split={split!r}")
 
     def _load_raw(self, k):
         """Preprocessed observations of sample ``k`` (row of the fetched data).
