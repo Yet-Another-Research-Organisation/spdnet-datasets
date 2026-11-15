@@ -29,7 +29,7 @@ def _check_spd_sample(dataset, expected_dim: int | None = None) -> None:
 
 class TestCI4RDataset:
     def test_77ghz_modality(self):
-        data_dir = dataset_dir("CI4R-MULTI3")
+        data_dir = dataset_dir("RADAR_DOPPLER", "CI4R-MULTI3")
         skip_if_missing(data_dir / "cov")  # loaders read precomputed covariances
         ds = CI4RDataset(data_dir=str(data_dir), modality="77GHz", verbose=False)
         # Actual precomputed matrices are 236x236, not the 471x471 the
@@ -37,14 +37,14 @@ class TestCI4RDataset:
         _check_spd_sample(ds)
 
     def test_xethru_modality(self):
-        data_dir = dataset_dir("CI4R-MULTI3")
+        data_dir = dataset_dir("RADAR_DOPPLER", "CI4R-MULTI3")
         skip_if_missing(data_dir / "cov")  # loaders read precomputed covariances
         ds = CI4RDataset(data_dir=str(data_dir), modality="Xethru", verbose=False)
         _check_spd_sample(ds)
 
     def test_ci4r_explicit_classes_and_limits(self):
         """The `classes` and `max_samples_per_class` kwargs are honoured."""
-        data_dir = dataset_dir("CI4R-MULTI3")
+        data_dir = dataset_dir("RADAR_DOPPLER", "CI4R-MULTI3")
         skip_if_missing(data_dir / "cov")  # loaders read precomputed covariances
         full = CI4RDataset(data_dir=str(data_dir), modality="77GHz", verbose=False)
         subset = sorted(full.classes)[:2]
@@ -62,13 +62,13 @@ class TestCI4RDataset:
 
 class TestDopNetDataset:
     def test_train_split(self):
-        data_dir = dataset_dir("Dop-NET")
+        data_dir = dataset_dir("RADAR_DOPPLER", "Dop-NET")
         skip_if_missing(data_dir / "cov")  # loaders read precomputed covariances
         ds = DopNetDataset(data_dir=str(data_dir), split="train", verbose=False)
         _check_spd_sample(ds)
 
     def test_test_split(self):
-        data_dir = dataset_dir("Dop-NET")
+        data_dir = dataset_dir("RADAR_DOPPLER", "Dop-NET")
         skip_if_missing(data_dir / "cov")  # loaders read precomputed covariances
         ds = DopNetDataset(data_dir=str(data_dir), split="test", verbose=False)
         _check_spd_sample(ds)
@@ -76,7 +76,7 @@ class TestDopNetDataset:
 
 class TestMVDopplerDataset:
     def test_load(self):
-        data_dir = dataset_dir("MVDoppler")
+        data_dir = dataset_dir("RADAR_DOPPLER", "MVDoppler")
         skip_if_missing(data_dir / "cov")  # loaders read precomputed covariances
         ds = MVDopplerDataset(data_dir=str(data_dir), verbose=False)
         _check_spd_sample(ds, expected_dim=96)
@@ -84,7 +84,7 @@ class TestMVDopplerDataset:
 
 class TestNTU120Dataset:
     def test_load(self):
-        data_dir = dataset_dir("NTU_RGBD_120")
+        data_dir = dataset_dir("SKELETON", "NTU_RGBD_120")
         skip_if_missing(data_dir / "cov")  # loaders read precomputed covariances
         ds = NTU120Dataset(data_dir=str(data_dir), verbose=False)
         _check_spd_sample(ds, expected_dim=75)
@@ -94,7 +94,7 @@ class TestExplicitClasses:
     def test_explicit_classes_subset(self):
         """BaseDataset._limit_classes: an explicit `classes` list is honored
         (currently wired only into Rices90Dataset, see CI4R test above)."""
-        data_dir = dataset_dir("Rices_90")
+        data_dir = dataset_dir("HYPERSPECTRAL", "Rices_90")
         skip_if_missing(data_dir)
         full = Rices90Dataset(data_dir=str(data_dir), verbose=False)
         two_classes = sorted(full.classes)[:2]
@@ -106,7 +106,7 @@ class TestExplicitClasses:
         assert len(subset) < len(full)
 
     def test_explicit_classes_rejects_unknown_class(self):
-        data_dir = dataset_dir("Rices_90")
+        data_dir = dataset_dir("HYPERSPECTRAL", "Rices_90")
         skip_if_missing(data_dir)
         import pytest
 
