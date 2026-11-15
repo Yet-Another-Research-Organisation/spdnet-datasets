@@ -1,10 +1,17 @@
-"""Pol-InSAR-Island (F-SAR, DLR; L and S bands over Baltrum; Hochstuhl et al., 2023) as ViT-like series of covariances."""
+"""Pol-InSAR-Island (F-SAR, DLR; L and S bands over Baltrum; Hochstuhl et al., 2023) as ViT-like series of covariances.
+
+Normalisation statistics (band powers, feature standardisation) are fitted on the cells selected by ``fit_mask``:
+a boolean (N,) array in the output order, or a callable ``fit_mask(labels, groups) -> mask`` evaluated once the
+cells are known (e.g. the training blocks of a grouped split). ``None`` fits them on every cell, test included,
+with a warning.
+"""
 
 import re
 
 import numpy as np
 
-POLINSAR_ROOT = "/DATA/DATASET/SAR/Pol-InSAR-Island"
+from .series import covariance, data_root, resolve_fit_mask
+
 POLINSAR_CLASSES = ["tidal flat", "water", "coastal shrub", "dense high vegetation", "white dune", "peat bog", "grey dune",
                     "couch grass", "upper saltmarsh", "lower saltmarsh", "sand", "settlement"]
 
@@ -44,9 +51,9 @@ def realify(hermitian: np.ndarray) -> np.ndarray:
     return np.concatenate([np.concatenate([re_, -im], -1), np.concatenate([im, re_], -1)], -2)
 
 
-def polinsar_island_series(root: str = POLINSAR_ROOT, cell: int = 32, patch: int = 8, purity: float = 0.75,
-                           block: int = 512, bands: tuple[str, ...] = ("L", "S"), stack_bands: bool = False
-                           ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def polinsar_island_series(root: str | None = None, cell: int = 32, patch: int = 8, purity: float = 0.75,
+                           block: int = 512, bands: tuple[str, ...] = ("L", "S"), stack_bands: bool = False,
+                           fit_mask=None) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """ViT-like series: each labelled cell of ``cell`` x ``cell`` pixels (1 m) is cut into (cell / patch)^2 patches in
     raster order, and each patch gives one token per band: the T6 coherency matrix averaged over its patch^2 pixels,
     in its real 12 x 12 form. Returns (N, T = bands * (cell / patch)^2, 12, 12) with the tokens of a patch adjacent
@@ -54,7 +61,9 @@ def polinsar_island_series(root: str = POLINSAR_ROOT, cell: int = 32, patch: int
     the two flight paths, which overlap: a block never crosses the splits).
     Cells: non-overlapping, official train and test labels merged, kept when at least half the pixels are labelled and
     the majority class holds ``purity`` of them (definition of the atlas). Each band is divided by its mean power over
-    all the kept tokens (one scalar per band, no label used), and tokens get a relative ridge of 1e-6."""
+    the tokens of the ``fit_mask`` cells (one scalar per band, no label used), and tokens get a relative ridge of
+    1e-6."""
+    root = data_root(root, "SAR", "Pol-InSAR-Island")
     side = cell // patch
     data, labels, groups = [], [], []
     for path in ("FP1", "FP2"):
@@ -73,16 +82,18 @@ def polinsar_island_series(root: str = POLINSAR_ROOT, cell: int = 32, patch: int
                 x, y = east + (c + 0.5) * cell, north - (r + 0.5) * cell
                 groups.append(int(x // block) * 100000 + int(y // block))
     data = np.stack(data)
+    labels, groups = np.array(labels), np.unique(groups, return_inverse=True)[1]
+    fit = resolve_fit_mask(fit_mask, len(data), labels, groups)
     n_bands = len(bands)
     for b in range(n_bands):
-        data[:, b::n_bands] /= np.trace(data[:, b::n_bands], axis1=-2, axis2=-1).mean() / 12
+        data[:, b::n_bands] /= np.trace(data[fit, b::n_bands], axis1=-2, axis2=-1).mean() / 12
     data += 1e-6 * (np.trace(data, axis1=-2, axis2=-1) / 12)[..., None, None] * np.eye(12)
     if stack_bands:  # one token per patch: block-diagonal of its bands, (N, T / bands, 12 * bands, 12 * bands)
         stacked = np.zeros((data.shape[0], data.shape[1] // n_bands, 12 * n_bands, 12 * n_bands))
         for b in range(n_bands):
             stacked[:, :, 12 * b:12 * (b + 1), 12 * b:12 * (b + 1)] = data[:, b::n_bands]
         data = stacked
-    return data, np.array(labels), np.full(len(labels), patch * patch), np.unique(groups, return_inverse=True)[1]
+    return data, labels, np.full(len(labels), patch * patch), groups
 
 
 def calvo_oller(mean: np.ndarray, covariance: np.ndarray) -> np.ndarray:
@@ -96,18 +107,17 @@ def calvo_oller(mean: np.ndarray, covariance: np.ndarray) -> np.ndarray:
     return out
 
 
-def polinsar_logpower_series(root: str = POLINSAR_ROOT, cell: int = 32, patch: int = 8, purity: float = 0.75,
-                             block: int = 512, bands: tuple[str, ...] = ("L", "S"), mean: bool = False
-                             ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+def polinsar_logpower_series(root: str | None = None, cell: int = 32, patch: int = 8, purity: float = 0.75,
+                             block: int = 512, bands: tuple[str, ...] = ("L", "S"), mean: bool = False,
+                             fit_mask=None) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Variant C of the atlas, ViT-like: the features of a pixel are the log-powers of the 6 diagonal terms of T6 in
     each band (12 real features: the bands are IN the covariance, with true cross-band terms); each patch of
     ``patch`` x ``patch`` pixels of a cell gives one token, the Ledoit-Wolf covariance of its pixels (12 x 12).
     With ``mean``, the token is the Calvo-Oller embedding of (patch mean, covariance), 13 x 13: the centred covariance
-    alone forgets the backscatter level. Features are standardised by their mean and std over the pixels of the kept
-    cells (no label used). Same cells, labels and groups as ``polinsar_island_series``, in the same order.
-    Returns (N, (cell / patch)^2, p, p), labels 0..11, pixels per token, spatial groups."""
-    from .series_breizhcrops import _ledoit_wolf
-
+    alone forgets the backscatter level. Features are standardised by their mean and std over the pixels of the
+    ``fit_mask`` cells (no label used). Same cells, labels and groups as ``polinsar_island_series``, in the same
+    order. Returns (N, (cell / patch)^2, p, p), labels 0..11, pixels per token, spatial groups."""
+    root = data_root(root, "SAR", "Pol-InSAR-Island")
     side = cell // patch
     pixels, labels, groups = [], [], []
     for path in ("FP1", "FP2"):
@@ -128,9 +138,10 @@ def polinsar_logpower_series(root: str = POLINSAR_ROOT, cell: int = 32, patch: i
                 labels.append(counts.argmax() - 1)
                 groups.append(int((east + (c + 0.5) * cell) // block) * 100000 + int((north - (r + 0.5) * cell) // block))
     pixels = np.stack(pixels)  # (N, T, n, f)
-    pixels = (pixels - pixels.mean((0, 1, 2))) / pixels.std((0, 1, 2))
+    labels, groups = np.array(labels), np.unique(groups, return_inverse=True)[1]
+    fit = resolve_fit_mask(fit_mask, len(pixels), labels, groups)
+    pixels = (pixels - pixels[fit].mean((0, 1, 2))) / pixels[fit].std((0, 1, 2))
     centre = pixels.mean(2)
-    covariance = np.stack([np.stack([_ledoit_wolf(token - m) for token, m in zip(series, means)])
-                           for series, means in zip(pixels, centre)])
-    data = calvo_oller(centre, covariance) if mean else covariance
-    return data, np.array(labels), np.full(len(labels), patch * patch), np.unique(groups, return_inverse=True)[1]
+    tokens = np.stack([np.stack([covariance(token) for token in series]) for series in pixels])
+    data = calvo_oller(centre, tokens) if mean else tokens
+    return data, labels, np.full(len(labels), patch * patch), groups

@@ -6,10 +6,16 @@ import os
 import numpy as np
 import pytest
 
-from spdnet_datasets.real.series_ntu import NTU120_TRAIN_SUBJECTS, ntu_frame_series, ntu_joint_series
+from spdnet_datasets.core.config import dataset_path
+from spdnet_datasets.real.series_ntu import (
+    NTU120_TRAIN_SUBJECTS,
+    ntu_frame_series,
+    ntu_joint_series,
+)
 
-ROOT = "/DATA/NTU_RGBD_120/npy_skeletons_by_class"
-pytestmark = pytest.mark.skipif(not os.path.isdir(ROOT), reason="NTU RGB+D 120 not available")
+ROOT = str(dataset_path("SKELETON", "NTU_RGBD_120") / "npy_skeletons_by_class")
+pytestmark = [pytest.mark.real_data,
+              pytest.mark.skipif(not os.path.isdir(ROOT), reason="NTU RGB+D 120 not available")]
 
 
 @pytest.fixture(scope="module")
@@ -29,7 +35,7 @@ def root(tmp_path_factory):
 
 @pytest.fixture(scope="module")
 def both(root):
-    kwargs = dict(root=root, n_classes=2, max_per_class=None, val_fraction=0.5)
+    kwargs = {"root": root, "n_classes": 2, "max_per_class": None, "val_fraction": 0.5}
     return ntu_joint_series(**kwargs), ntu_frame_series(n_windows=12, **kwargs)
 
 

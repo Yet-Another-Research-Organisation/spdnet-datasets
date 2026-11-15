@@ -12,14 +12,18 @@ Both return the same samples in the same order: single-person actions ``NTU_CLAS
 actions; drink / eat / brush teeth / brush hair are close to each other), body 0 only, sequences of at least
 ``min_frames`` frames, cross-subject protocol (official NTU-120 training subjects) with a validation split of
 20 % of the training subjects, at most ``max_per_class`` sequences per class and split (random, seeded).
+
+The standardisations of :func:`ntu_part_series`, :func:`ntu_jointcov_series` and :func:`ntu_axis_series` are
+fitted on the training sequences only (``split == 0``) and applied to every split.
 """
 
 import glob
+import math
 import os
 
 import numpy as np
 
-from ..estimator.covariance import EstimateCovariance
+from .series import covariance, data_root
 
 NTU_CLASSES = ["drink water", "eat meal", "brush teeth", "brush hair", "drop", "pick up", "throw", "sit down",
                "stand up", "clapping"]  # A001-A010
@@ -29,7 +33,7 @@ NTU120_TRAIN_SUBJECTS = [1, 2, 4, 5, 8, 9, 13, 14, 15, 16, 17, 18, 19, 25, 27, 2
 
 
 def ntu_skeletons(
-    root: str = "/DATA/NTU_RGBD_120/npy_skeletons_by_class",
+    root: str | None = None,
     n_classes: int = 10,
     max_per_class: int | None = 300,
     min_frames: int = 24,
@@ -41,6 +45,7 @@ def ntu_skeletons(
     """Centred skeletons (T, 24, 3) (root joint subtracted then dropped), labels, {"split": 0 train / 1 val /
     2 test, "subject", "camera"}."""
     # ``classes``: action numbers Axxx (labels = their rank); default: the first ``n_classes`` actions
+    root = data_root(root, "SKELETON", "NTU_RGBD_120", "npy_skeletons_by_class")
     actions = list(classes) if classes is not None else list(range(1, n_classes + 1))
     paths = [(label, path) for label, action in enumerate(actions)
              for path in sorted(glob.glob(os.path.join(root, f"A{action:03d}", "*.npy")))]
@@ -50,7 +55,7 @@ def ntu_skeletons(
     rng = np.random.default_rng(seed)
     val_subjects = set(rng.choice(train, round(val_fraction * len(train)), replace=False).tolist())
     candidates = []  # (path, label, split, subject, camera)
-    for (label, path), subject in zip(paths, subjects):
+    for (label, path), subject in zip(paths, subjects, strict=True):
         split = (1 if subject in val_subjects else 0) if subject in NTU120_TRAIN_SUBJECTS else 2
         candidates.append((path, label, split, subject, int(os.path.basename(path)[5:8])))
     kept, taken = [], {}
@@ -73,19 +78,11 @@ def ntu_skeletons(
     return skeletons, labels, {"split": split, "subject": subjects, "camera": cameras}
 
 
-def load(covariances: np.ndarray, value: float = 1e-6) -> np.ndarray:
-    """Diagonal loading C + value * tr(C) / p * I of a stack of covariances (..., p, p)."""
-    p = covariances.shape[-1]
-    trace = np.trace(covariances, axis1=-2, axis2=-1)[..., None, None] / p
-    return covariances + value * trace * np.eye(p)
-
-
 def ntu_joint_series(**kwargs) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
     """(n, 24, 3, 3) covariances of each joint trajectory over all frames, labels, frames per sequence (n
     observations of every token), {"split", "subject", "camera"}. Arguments of :func:`ntu_skeletons`."""
     skeletons, labels, extra = ntu_skeletons(**kwargs)
-    estimator = EstimateCovariance("scm", remove_mean=True, exclude_zero=False)
-    data = np.stack([load(np.stack([estimator(x[:, j]) for j in range(x.shape[1])])) for x in skeletons])
+    data = np.stack([np.stack([covariance(x[:, j], "scm") for j in range(x.shape[1])]) for x in skeletons])
     return data, labels, np.array([len(x) for x in skeletons]), extra
 
 
@@ -93,11 +90,10 @@ def ntu_frame_series(n_windows: int = 12, **kwargs) -> tuple[np.ndarray, np.ndar
     """(n, n_windows, 3, 3) covariances of all joint positions in equal consecutive windows of frames, labels,
     observations of the smallest window (24 joints x its frames), {"split", "subject", "camera"}."""
     skeletons, labels, extra = ntu_skeletons(**kwargs)
-    estimator = EstimateCovariance("scm", remove_mean=True, exclude_zero=False)
     data, n_obs = [], []
     for x in skeletons:
         windows = np.array_split(x, n_windows)  # lengths differ by at most one frame
-        data.append(load(np.stack([estimator(w.reshape(-1, 3)) for w in windows])))
+        data.append(np.stack([covariance(w.reshape(-1, 3), "scm") for w in windows]))
         n_obs.append(min(w.shape[0] * w.shape[1] for w in windows))
     return np.stack(data), labels, np.array(n_obs), extra
 
@@ -116,16 +112,17 @@ def ntu_part_series(parts: dict | None = None, n_windows: int = 6, width: float 
     """(n, n_windows * len(parts), p, p) with p = 3 x joints per part (+ 1 when ``mean``): one token per time
     window and per body part, in time order (window, then part). The token is the Ledoit-Wolf covariance, over the
     frames of the window, of the root-centred coordinates of the joints of the part; coordinates are standardised
-    with the statistics of the whole dataset (no label used). ``n_windows`` windows of ``width`` x the sequence
-    length, evenly spread (they overlap). ``mean=True``: Calvo-Oller embedding of (window mean, covariance), which
-    keeps the mean pose that a covariance removes. Other arguments: :func:`ntu_skeletons`."""
-    from .series_breizhcrops import _ledoit_wolf
+    with the statistics of the training sequences (``split == 0``, no label used). ``n_windows`` windows of
+    ``width`` x the sequence length, evenly spread (they overlap). ``mean=True``: Calvo-Oller embedding of (window
+    mean, covariance), which keeps the mean pose that a covariance removes. ``min_frames`` defaults to
+    ceil(2p / ``width``), so that every window has n >= 2p frames. Other arguments: :func:`ntu_skeletons`."""
     from .series_sar import calvo_oller
 
     groups = [list(group) for group in (parts or NTU_PARTS).values()]
+    kwargs.setdefault("min_frames", math.ceil(2 * 3 * max(len(g) for g in groups) / width))
     skeletons, labels, extra = ntu_skeletons(centre=False, **kwargs)
     skeletons = [x - x[:, :1] for x in skeletons]
-    sample = np.concatenate([x[::4] for x in skeletons])
+    sample = np.concatenate([x[::4] for x, split in zip(skeletons, extra["split"], strict=True) if split == 0])
     location, scale = sample.mean(0), sample.std(0) + 1e-12
     data, n_obs = [], []
     for x in skeletons:
@@ -135,8 +132,8 @@ def ntu_part_series(parts: dict | None = None, n_windows: int = 6, width: float 
         for start in np.round(np.linspace(0, len(z) - w, n_windows)).astype(int):
             for group in groups:
                 v = z[start:start + w][:, group].reshape(w, -1)
-                covariance = _ledoit_wolf(v)
-                tokens.append(calvo_oller(v.mean(0), covariance) if mean else covariance)
+                token = covariance(v)
+                tokens.append(calvo_oller(v.mean(0), token) if mean else token)
         data.append(np.stack(tokens))
         n_obs.append(w)
     return np.stack(data), labels, np.array(n_obs), extra
@@ -154,14 +151,14 @@ def ntu_jointcov_series(joints: tuple[int, ...] = NTU_JOINTS_16, n_windows: int 
     request, 14/11). Variables = the J joints, observations = the frames of the window; the three axes are pooled
     as three observations of the same J-dimensional variable, C_jk = mean over frames and axes of the centred
     coordinates of joints j and k (model Sigma_joints (x) I_3, invariant to a rotation of the body or the camera):
-    n = 3 x frames per window. Coordinates are centred on the root joint, each joint is scaled by its global standard
-    deviation (no label used), the mean over the window is removed per joint and axis (no mean embedding).
-    ``n_windows`` windows of ``width`` x the sequence length, evenly spread (they overlap). Ledoit-Wolf."""
-    from .series_breizhcrops import _ledoit_wolf
-
+    n = 3 x frames per window. Coordinates are centred on the root joint, each joint is scaled by its standard
+    deviation over the training sequences (``split == 0``, no label used), the mean over the window is removed per
+    joint and axis (no mean embedding). ``n_windows`` windows of ``width`` x the sequence length, evenly spread
+    (they overlap). Ledoit-Wolf. ``min_frames`` defaults to ceil(2J / (3 ``width``)) (n >= 2p)."""
+    kwargs.setdefault("min_frames", math.ceil(2 * len(joints) / (3 * width)))
     skeletons, labels, extra = ntu_skeletons(centre=False, **kwargs)
     skeletons = [(x - x[:, :1])[:, list(joints)] for x in skeletons]
-    sample = np.concatenate([x[::4] for x in skeletons])
+    sample = np.concatenate([x[::4] for x, split in zip(skeletons, extra["split"], strict=True) if split == 0])
     scale = np.sqrt(sample.var(0).mean(-1))[:, None] + 1e-12  # (J, 1): one isotropic scale per joint
     data, n_obs = [], []
     for x in skeletons:
@@ -171,7 +168,7 @@ def ntu_jointcov_series(joints: tuple[int, ...] = NTU_JOINTS_16, n_windows: int 
         for start in np.round(np.linspace(0, len(z) - w, n_windows)).astype(int):
             v = z[start:start + w]
             v = (v - v.mean(0)).transpose(0, 2, 1).reshape(-1, len(joints))  # (3 w, J)
-            tokens.append(_ledoit_wolf(v))
+            tokens.append(covariance(v))
         data.append(np.stack(tokens))
         n_obs.append(3 * w)
     return np.stack(data), labels, np.array(n_obs), extra
@@ -205,22 +202,19 @@ def ntu_axis_series(classes: tuple[int, ...] = NTU_LONG_ACTIONS, min_frames: int
     floor(``width`` x length) frames, so that frames >= 2 J in every token (96 frames, a third: 32 frames for
     J = 16). Windows evenly spread (they overlap when n_windows x width > 1). All sequences of the actions
     ``classes`` (numbers Axxx), no cap. Skeleton centred on the root joint and rotated into the body frame
-    (:func:`body_frame`), each coordinate scaled by its global standard deviation, window mean removed, Ledoit-Wolf.
-    Extra output "frames": length of each sequence."""
-    from .series_breizhcrops import _ledoit_wolf
-
+    (:func:`body_frame`), each coordinate scaled by its standard deviation over the training sequences
+    (``split == 0``), window mean removed, Ledoit-Wolf. Extra output "frames": length of each sequence."""
     skeletons, labels, extra = ntu_skeletons(centre=False, classes=classes, min_frames=min_frames,
                                              max_per_class=None, **kwargs)
     skeletons = [body_frame(x - x[:, :1])[:, list(joints)] for x in skeletons]
-    scale = np.concatenate([x[::4] for x in skeletons]).std(0) + 1e-12  # (J, 3)
+    scale = np.concatenate([x[::4] for x, split in zip(skeletons, extra["split"], strict=True) if split == 0]).std(0) + 1e-12
     data, n_obs = [], []
     for x in skeletons:
         z = x / scale
         w = int(len(z) * width)
-        assert w >= 2 * len(joints), (len(z), w)
         tokens = []
         for start in np.round(np.linspace(0, len(z) - w, n_windows)).astype(int):
-            tokens += [_ledoit_wolf(z[start:start + w, :, axis]) for axis in range(3)]
+            tokens += [covariance(z[start:start + w, :, axis]) for axis in range(3)]
         data.append(np.stack(tokens))
         n_obs.append(w)
     return np.stack(data), labels, np.array(n_obs), {**extra, "frames": np.array([len(x) for x in skeletons])}
