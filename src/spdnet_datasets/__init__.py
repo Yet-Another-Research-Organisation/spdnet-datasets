@@ -37,9 +37,9 @@ from .sar import (
     PolInSARIslandDataset,
     S1SLCCVDLDataset,
 )
+from .sar.s1_iceland import S1IcelandDataset, fetch_s1_iceland
 from .sits import PastisRDataset, fetch_pastis_r
 from .skeleton import HDM05Dataset, NTURGBD120Dataset
-from .sar.s1_iceland import S1IcelandDataset, fetch_s1_iceland
 
 __version__ = "0.1.0"
 
