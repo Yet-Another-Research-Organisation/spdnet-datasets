@@ -21,23 +21,36 @@ Splits:
 - ``"dye_transfer"``: train red_blue images, test ICG images (the ICG images
   were taken after the red/blue injection on the same placentas).
 
-Download (manual): the source images are on Zenodo, record 8045940 (CC BY-NC-SA 4.0
-on Zenodo; md5 of every zip in the record metadata). The ``imagettes/`` windows
-read here are a LISTIC extraction (purity >= 0.9) that this package does not
-rebuild from the zips, so nothing is downloaded automatically: copy ``imagettes/``
-under ``data_dir`` (default ``<data root>/HYPERSPECTRAL/Hyperspectral_Placenta_Dataset``).
+Download
+--------
+Direct (Zenodo record 8045940, doi:10.5281/zenodo.8045940, CC BY-NC-SA 4.0, no
+account). Without a local ``imagettes/``, ``fetch_placenta`` downloads the four
+zips of the annotated images P007-P101 (7.86 GB, md5 of the Zenodo record checked)
+into ``<cache_dir>/Hyperspectral_Placenta_Dataset/downloads/``, extracts each into a
+folder named after it and rebuilds the windows with
+:func:`spdnet_datasets.utils.placenta_preprocess.build_windows` (same rule as the
+LISTIC extraction; checked on BERTHA: same 77 203 windows of 81 images, and the 24 519
+windows of P007-P030 are bit-identical to the local
+``imagettes/``). The other files of the record (P001-P006 without dye, dye samples,
+references, raw measurements: 16.7 GB) are not used. Already downloaded::
+
+    fetch_placenta(archive="~/Downloads/placenta")   # folder with the four zips
+                                                     # (or the four extracted folders)
 """
 
 import json
+import urllib.parse
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from ..core.access import extract_archive
 from ..core.config import dataset_path
 from ..core.estimators import check_sample_size
-from ..core.fetch import Bunch, check_local, run_pipeline
+from ..core.fetch import Bunch, check_local, download, md5sum, run_pipeline
 from ..manager import DatasetManager
+from ..utils.sources import check_size, downloads_dir
 from ._common import (
     HSIDataset,
     band_index,
@@ -50,23 +63,69 @@ from ._common import (
 )
 
 DOMAIN, NAME = "HYPERSPECTRAL", "Hyperspectral_Placenta_Dataset"
-FILES = {}  # Zenodo 8045940 holds the source zips, not the windows: manual copy
+ZENODO = "https://zenodo.org/records/8045940/files/"
+ZIPS = {  # name: (md5 of the Zenodo record, size in bytes)
+    "Placenta P007 - P030 red blue.zip": ("424092bd80e52b117b23fdb67daa5a47", 1_793_559_251),
+    "Placenta P031 - P053 red blue.zip": ("44964f1b1cd8c928075a7b1d768f3b8d", 1_708_014_267),
+    "Placenta P054 - P077 ICG.zip": ("de8e2a710ca67a1f86ec2be9888c1a5b", 1_791_566_682),
+    "Placenta P078 - P101 ICG.zip": ("c32c51efd4726fabb7f6fbcf8639c4bd", 2_566_835_106),
+}
+FILES = {ZENODO + urllib.parse.quote(name) + "?download=1": md5 for name, (md5, _) in ZIPS.items()}
 WINDOWS = "imagettes/placenta_windows_data.npy"
 METADATA = "imagettes/placenta_windows_metadata.json"
 N_BANDS = 37
 
 
+def _download_root(cache_dir, archive):
+    """Folder with ``imagettes/`` rebuilt in the cache from the Zenodo zips."""
+    from ..utils.placenta_preprocess import build_windows
+
+    out = downloads_dir(NAME, cache_dir)
+    if (out / WINDOWS).exists() and (out / METADATA).exists():
+        return out
+    given = Path(archive).expanduser() if archive is not None else None
+    if given is not None and not given.is_dir():
+        raise NotADirectoryError(f"archive must be a folder holding {list(ZIPS)} "
+                                 "or their extracted folders")
+    if given is not None and all((given / z[:-4]).is_dir() for z in ZIPS):
+        src = given  # extracted folders, read in place
+    else:
+        src = out
+        for name, (md5, size) in ZIPS.items():
+            if (out / name[:-4] / ".extracted").exists():
+                continue
+            if given is not None:
+                z = check_size(given / name, size)
+                if md5sum(z) != md5:
+                    raise OSError(f"Checksum mismatch for {z}")
+            else:
+                z = download(ZENODO + urllib.parse.quote(name) + "?download=1", out / name,
+                             checksum=md5, algo="md5")
+            extract_archive(z, out / name[:-4])
+    build_windows(src, out / "imagettes")
+    return out
+
+
 def fetch_placenta(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
-                   verify="size", *, band_step=1, n_splits=5, fold=0, seed=0):
+                   verify="size", *, band_step=1, n_splits=5, fold=0, seed=0, archive=None):
     """Window covariances of the placenta dataset.
+
+    Parameters
+    ----------
+    archive : path, optional
+        Folder holding the four Zenodo zips (or their extracted folders), used
+        instead of downloading them (see "Download" in the module docstring).
 
     Returns
     -------
     Bunch with ``covariances`` (B, p, p) unscaled, ``means``, ``labels``,
-    ``groups`` (``sample_id``), ``meta``, ``info`` and ``splits``
-    (``"by_image"`` = ``"recommended"``, ``"dye_transfer"``).
+    ``groups`` (``sample_id``), ``meta``, ``info``, ``splits``
+    (``"by_image"`` = ``"recommended"``, ``"dye_transfer"``) and ``root``
+    (dataset folder, to pass as ``data_dir`` to :class:`PlacentaDataset`).
     """
     root = dataset_path(DOMAIN, NAME, data_dir)
+    if not ((root / WINDOWS).exists() and (root / METADATA).exists()):
+        root = _download_root(cache_dir, archive)
     check_local(root, verify=verify, required=(WINDOWS, METADATA))
     windows = np.load(root / WINDOWS, mmap_mode="r")
     if windows.shape[-1] != N_BANDS:
@@ -117,7 +176,7 @@ def fetch_placenta(data_dir=None, cache_dir=None, keep=None, estimator="scm", fo
                 "dye_transfer": {"train": np.flatnonzero(dye == "red_blue"),
                                  "val": np.zeros(0, int),
                                  "test": np.flatnonzero(dye == "ICG")}},
-        covariance_path=res.covariance_dir,
+        covariance_path=res.covariance_dir, root=root,
     )
 
 

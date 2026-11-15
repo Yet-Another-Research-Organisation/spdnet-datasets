@@ -42,6 +42,14 @@ CDs (compact discs), radio and other recordings.
 - Local copy: Hugging Face export, parquet files under
   `<data root>/AUDIO/GTZAN` (columns `file`, `audio`, `genre`).
 
+## Getting the data
+
+Direct access, no account. Without a local copy, `fetch_gtzan()` downloads the three
+parquet shards (1.3 GB) of the Hugging Face dataset `sanchit-gandhi/gtzan` at a
+pinned revision and checks their sha256; `fetch_gtzan(archive=...)` takes shards
+already downloaded (folder, zip or tar). The original server no longer answers.
+No explicit licence (research use only).
+
 ## Raw data
 
 The copy holds 999 excerpts: `jazz.00054` is missing (a known corrupted

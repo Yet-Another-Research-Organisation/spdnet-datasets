@@ -38,17 +38,44 @@ Snapshots of one recording overlap by 50 %: never split them at random.
 Files without the HDF5 signature and ``.h5`` files absent from
 ``design_table.csv`` are skipped and counted.
 
-Download (manual): the data are on the authors' Google Drive, linked from
-https://github.com/soheilhr/MVDoppler (no stable direct URL or checksum). Download
-``Data/`` and ``Labels_and_metadata/`` and place it under ``data_dir`` (default
-``<data root>/RADAR_DOPPLER/MVDoppler``).
+Download
+--------
+Access: **manual** for the snapshots, direct for the labels. The data are on the
+authors' Google Drive (:data:`DRIVE_FOLDER`, linked from
+https://github.com/soheilhr/MVDoppler and https://mvdoppler.github.io/):
+
+- ``Labels_and_metadata/design_table.csv`` (11.5 MB) and ``meta_data.json``
+  (1 kB) are downloaded directly; their sha256 (:data:`FILES`) were computed on
+  the local copy and match the Drive files;
+- ``Data/snapshots.zip`` (about 25 GB, Drive id :data:`SNAPSHOTS_ID`, no
+  published checksum) holds the ``<pattern>_<ID>.h5`` snapshots. Drive often
+  refuses large downloads (quota): download it from the browser, then pass
+  ``archive=``. With ``gdown=True`` the optional ``gdown`` package
+  (``pip install spdnet-datasets[gdrive]``) tries the download instead.
+
+Licence: ambiguous, the "License agreement" document of the Drive states both
+CC BY 4.0 and CC BY-NC-ND (the code is Apache-2.0). Resolution order:
+
+1. ``data_dir`` (default ``<data root>/RADAR_DOPPLER/MVDoppler``) exists: read in
+   place;
+2. ``archive=`` given: ``snapshots.zip`` (extracted into
+   ``<cache_dir>/mvdoppler/downloads/``, kept) or a folder of ``.h5`` files;
+3. ``gdown=True``: ``snapshots.zip`` is downloaded with ``gdown``, then as 2;
+4. otherwise the Drive folder is opened and
+   :class:`~spdnet_datasets.core.access.ManualDownloadRequired` explains what to
+   download.
+
+Example: ``fetch_mvdoppler(archive="~/Downloads/snapshots.zip")``.
 """
+
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from ..audio._common import downloads_dir
 from ..core.config import dataset_path
-from ..core.fetch import check_local, run_pipeline
+from ..core.fetch import check_local, download, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     RadarCovarianceDataset,
@@ -58,7 +85,19 @@ from ._common import (
 )
 
 DOMAIN, NAME = "RADAR_DOPPLER", "MVDoppler"
-FILES = {}  # Google Drive of the authors: manual download (see the dataset page)
+DRIVE_FOLDER = "https://drive.google.com/drive/folders/1Mde8sfxKl8L0OwG4UVQR7IE5Tg-bSosR"
+SNAPSHOTS_ID = "1slKM0AzsXBTFjRtpjzFea9lV27UDd-mI"  # Data/snapshots.zip
+_DRIVE = "https://drive.usercontent.google.com/download?export=download&id="
+LABEL_FILES = {  # file name -> Drive id
+    "design_table.csv": "1oQBKBxftLbnSSLFvFLnR48mhqAfWH62-",
+    "meta_data.json": "1wygIDUoebcdFh-8ewOjYWuM9alSkxggR",
+}
+FILES = {  # url -> sha256 (local copy, identical to the Drive files on 2026-11-15)
+    _DRIVE + LABEL_FILES["design_table.csv"]:
+        "a9c5ca209eedd97a0e61ffaecc15bc864377e846c368a4a213fb6dd24992a14f",
+    _DRIVE + LABEL_FILES["meta_data.json"]:
+        "f6dc2d109478f039f46f29dc9f74b67a0974b5c5b2240d03a757fe59dea1ffbb",
+}
 CLASSES = ["normal", "phone_call", "pockets", "texting"]
 N_FRAMES, N_BINS, POOL = 256, 128, 4
 P = 2 * N_BINS // POOL  # 64
@@ -71,6 +110,56 @@ def _readable(path):
             return f.read(8) == _HDF5_SIGNATURE
     except OSError:
         return False
+
+
+def _gdown_snapshots(dest):
+    """Download ``snapshots.zip`` with the optional ``gdown`` package."""
+    try:
+        import gdown
+    except ImportError as exc:
+        raise ImportError("gdown=True needs the 'gdown' package: "
+                          "pip install spdnet-datasets[gdrive]") from exc
+    out = Path(dest) / "snapshots.zip"
+    if not out.exists():
+        out.parent.mkdir(parents=True, exist_ok=True)
+        part = out.with_name(out.name + ".part")
+        message = ("gdown could not download snapshots.zip (Drive quota?): download it from "
+                   f"{DRIVE_FOLDER} and pass archive=")
+        try:
+            gdown.download(id=SNAPSHOTS_ID, output=str(part), quiet=False, resume=True)
+        except Exception as exc:  # gdown raises its own errors (quota, permission...)
+            raise OSError(message) from exc
+        if not part.is_file():
+            raise OSError(message)
+        part.rename(out)
+    return out
+
+
+def download_mvdoppler(cache_dir=None, archive=None, gdown=False):
+    """Assemble ``<cache_dir>/mvdoppler/downloads/MVDoppler/`` (see "Download").
+
+    ``Labels_and_metadata/`` is downloaded and checked; ``Data`` is a link to the
+    folder holding the ``.h5`` snapshots of ``archive`` (extracted ``snapshots.zip``
+    or a folder). Returns the ``MVDoppler`` folder.
+    """
+    from ..core.access import manual_source
+
+    dest = downloads_dir(cache_dir, "mvdoppler")
+    root = dest / NAME
+    if not (root / "Data").is_dir():
+        if archive is None and gdown:
+            archive = _gdown_snapshots(dest)
+        out = manual_source(NAME, page_url=DRIVE_FOLDER, dest_dir=dest / "snapshots",
+                            archive=archive, expected="Data/snapshots.zip (about 25 GB)")
+        found = next(Path(out).rglob("*.h5"), None)
+        if found is None:
+            raise FileNotFoundError(f"No .h5 snapshot in {out}")
+        root.mkdir(parents=True, exist_ok=True)
+        (root / "Data").symlink_to(found.parent.resolve(), target_is_directory=True)
+    for url, sha256 in FILES.items():
+        name = next(n for n, i in LABEL_FILES.items() if url.endswith(i))
+        download(url, root / "Labels_and_metadata" / name, checksum=sha256)
+    return root
 
 
 def index_mvdoppler(data_dir=None, limit=None):
@@ -121,7 +210,7 @@ def official_folds(meta):
 
 
 def fetch_mvdoppler(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
-                    verify="size", *, fold=0, limit=None):
+                    verify="size", *, fold=0, limit=None, archive=None, gdown=False):
     """Joint two-view 64 x 64 covariances ("C2") of the MVDoppler snapshots.
 
     Parameters
@@ -138,17 +227,26 @@ def fetch_mvdoppler(data_dir=None, cache_dir=None, keep=None, estimator="scm", f
         Official fold used as test set by ``splits["official"]``.
     limit : int, optional
         At most ``limit`` snapshots per (fold, pattern) (quick tests).
+    archive : path, optional
+        ``snapshots.zip`` or a folder of ``.h5`` files, used when ``data_dir``
+        does not exist (see "Download" in the module docstring).
+    gdown : bool
+        Without ``archive``, try to download ``snapshots.zip`` with ``gdown``.
 
     Returns
     -------
     Bunch with ``covariances`` (B, 64, 64) unscaled, ``means``, ``labels``,
     ``class_names``, ``groups`` (subject), ``meta``, ``info``, ``splits``,
-    ``covariance_path`` and ``processed_path``.
+    ``covariance_path``, ``processed_path`` and ``source_dir``.
     """
     import h5py
 
     root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify=verify, required=("Labels_and_metadata/design_table.csv", "Data"), strict=False)
+    if root.is_dir():
+        check_local(root, verify=verify, required=("Labels_and_metadata/design_table.csv", "Data"),
+                    strict=False)
+    else:
+        root = download_mvdoppler(cache_dir, archive, gdown)
 
     def process_fn(_source, out_dir):
         meta, info = index_mvdoppler(root, limit)
@@ -169,6 +267,7 @@ def fetch_mvdoppler(data_dir=None, cache_dir=None, keep=None, estimator="scm", f
                          covariance_params={"estimator": estimator}, cache_dir=cache_dir,
                          keep=keep, force=force)
     bunch = load_bunch(paths, CLASSES)
+    bunch.source_dir = root
     bunch.splits = official_folds(bunch.meta)
     bunch.splits["official"] = bunch.splits[f"fold{fold}"]
     return bunch
@@ -184,7 +283,7 @@ class MVDopplerDataset(RadarCovarianceDataset):
     Parameters
     ----------
     data_dir : path, optional
-    fold, limit, cache_dir, keep, force, verify
+    fold, limit, cache_dir, keep, force, verify, archive, gdown
         See :func:`fetch_mvdoppler`.
     split : str
         ``"official"`` (fold ``fold``) or ``"fold<k>"``.
@@ -195,9 +294,9 @@ class MVDopplerDataset(RadarCovarianceDataset):
 
     def __init__(self, data_dir=None, *, fold=0, limit=None, split="official", subset=None,
                  cache_dir=None, keep=None, force=False, verify="size", estimator="scm",
-                 **kwargs):
+                 archive=None, gdown=False, **kwargs):
         root = dataset_path(DOMAIN, NAME, data_dir)
         bunch = fetch_mvdoppler(root, cache_dir, keep, estimator, force, verify, fold=fold,
-                                limit=limit)
-        super().__init__(bunch, split=split, subset=subset, data_dir=root,
+                                limit=limit, archive=archive, gdown=gdown)
+        super().__init__(bunch, split=split, subset=subset, data_dir=bunch.source_dir,
                          estimator=estimator, **kwargs)

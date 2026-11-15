@@ -45,10 +45,15 @@ sits = ["geopandas>=0.14"]
 sar = ["zarr>=3.0", "rasterio>=1.3", "Pillow>=9.0"]
 # CI4R spectrograms are PNG images
 radar = ["Pillow>=9.0"]
+# optional download of the MVDoppler snapshots from Google Drive
+gdrive = ["gdown>=5.0"]
+# 7z archives (ATRNet-STAR volumes) when the 7z command is not installed
+archives = ["py7zr>=0.20", "multivolumefile>=0.2"]
 # MOABB adapter (spdnet_datasets.moabb), tested with moabb 1.7.2
 moabb = ["moabb>=1.7.2"]
 dev = ["ruff>=0.1.0", "pre-commit>=3.4.0"]
-docs = ["sphinx>=7.2.0", "myst-parser>=2.0.0", "furo>=2024.8.6", "sphinx-copybutton>=0.5.0"]
+docs = ["sphinx>=7.2.0", "myst-parser>=2.0.0", "furo>=2024.8.6", "sphinx-copybutton>=0.5.0",
+        "sphinx-design>=0.6.0", "sphinx-gallery>=0.17.0", "matplotlib>=3.7"]
 
 [project.urls]
 Repository = "https://github.com/Yet-Another-Research-Organisation/spdnet-datasets"

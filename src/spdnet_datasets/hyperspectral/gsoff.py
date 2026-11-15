@@ -25,10 +25,21 @@ blocks, test = fold ``fold``, val = fold ``fold + 1``; val/test windows that
 overlap a training window (and test windows overlapping a val window) are
 removed.
 
-Download (manual): the scene comes from the Baidu Pan link of the authors'
-repository (licence unknown, see ``source/README.md``). Copy
-``source/`` and the prepared windows and place it under ``data_dir`` (default
-``<data root>/HYPERSPECTRAL/GSOFF``).
+Download
+--------
+Manual. ``SOURCES.json`` listed the source as unknown, but the authors' repository
+above (cloned in the local ``source/``) gives a Baidu Pan link
+(https://pan.baidu.com/s/1MW8Wz3_I7xf_5isV8osS9A, extraction code ``77ws``; licence
+not stated, no checksum; Baidu needs an account). Its content was not checked
+against the local copy: if the scene cannot be obtained there, contact the
+maintainer of this package. Without a local copy, ``fetch_gsoff()`` opens the
+repository page and raises
+:class:`~spdnet_datasets.core.access.ManualDownloadRequired`; then pass a zip or a
+folder holding ``data/testarea2_new/sg_quac_test2.tif`` and
+``sg_quac_test2_gt.tif`` (the ground truth is produced from ``tree_species.shp``
+by ``1vector2raster.py`` of the repository if it is missing)::
+
+    fetch_gsoff(archive="~/Downloads/gsoff")
 """
 
 from pathlib import Path
@@ -40,6 +51,7 @@ from ..core.config import dataset_path
 from ..core.estimators import check_sample_size
 from ..core.fetch import Bunch, check_local, run_pipeline
 from ..manager import DatasetManager
+from ..utils.sources import downloads_dir, expose_as, source_dir
 from ._common import (
     HSIDataset,
     band_index,
@@ -54,7 +66,9 @@ from ._common import (
 )
 
 DOMAIN, NAME = "HYPERSPECTRAL", "GSOFF"
-FILES = {}  # local dataset (Baidu Pan download, see source/README.md)
+PAGE = ("https://github.com/Bin-Zh/Three-dimensional-convolutional-neural-network-model-"
+        "for-tree-species-classification-using-airborne-")
+FILES = {}  # manual: Baidu Pan link of the repository README (code 77ws), no checksum
 SCENE = "source/data/testarea2_new/sg_quac_test2.tif"
 GROUND_TRUTH = "source/data/testarea2_new/sg_quac_test2_gt.tif"
 N_BANDS = 125
@@ -84,18 +98,34 @@ def _extract_windows(cube, gt, out_dir, *, window, threshold, bands):
 
 def fetch_gsoff(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
                 verify="size", *, window=15, band_step=2, threshold=0.8, block=96,
-                n_splits=5, fold=0, seed=0):
+                n_splits=5, fold=0, seed=0, archive=None):
     """Windows covariances of GSOFF, recomputed from the source scene.
+
+    Parameters
+    ----------
+    archive : path, optional
+        Zip or folder holding ``data/testarea2_new/sg_quac_test2{,_gt}.tif``
+        (see "Download" in the module docstring).
 
     Returns
     -------
     Bunch with ``covariances`` (B, p, p) unscaled, ``means`` (B, p),
     ``labels`` (``"code k"``), ``groups`` (96-pixel block), ``positions``
     (top-left row, column), ``meta``, ``info``, ``splits``
-    (``"spatial"`` = ``"recommended"``), ``window``, ``processed_path``.
+    (``"spatial"`` = ``"recommended"``), ``window``, ``processed_path`` and
+    ``root`` (dataset folder, to pass as ``data_dir`` to :class:`GSOFFDataset`).
     """
     root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify=verify, required=(SCENE, GROUND_TRUTH))
+    if (root / SCENE).exists() and (root / GROUND_TRUTH).exists():
+        check_local(root, verify=verify, required=(SCENE, GROUND_TRUTH))  # MANIFEST_NAS.tsv
+    else:
+        source = source_dir(
+            NAME, root / "source",
+            required=tuple(p.removeprefix("source/") for p in (SCENE, GROUND_TRUTH)),
+            page_url=PAGE, cache_dir=cache_dir, archive=archive, verify=verify,
+            expected="data/testarea2_new/sg_quac_test2.tif (Baidu Pan link of the README, "
+                     "code 77ws); source otherwise unknown: contact the package maintainer")
+        root = expose_as(source, "source", downloads_dir(NAME, cache_dir) / "root")
     bands = band_index(N_BANDS, band_step)
     check_sample_size(window * window, len(bands))
     params = {"window": window, "band_step": band_step, "threshold": threshold,
@@ -130,7 +160,7 @@ def fetch_gsoff(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
         groups=(positions[:, 0] // block) * 10**6 + positions[:, 1] // block,
         positions=positions, window=window, meta=meta, info=out.info,
         splits={"spatial": spatial, "recommended": spatial},
-        processed_path=res.processed_dir, covariance_path=res.covariance_dir,
+        processed_path=res.processed_dir, covariance_path=res.covariance_dir, root=root,
     )
 
 

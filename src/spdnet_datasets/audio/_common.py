@@ -43,6 +43,7 @@ from ..core import (
     geometric_scale,
     get_cache_dir,
 )
+from ..core.fetch import sha256sum
 
 EXCLUDED_COLUMNS = ["id", "label", "reason"]
 CSV = {"keep_default_na": False, "na_values": [""]}  # "NA" is a valid group name
@@ -71,6 +72,39 @@ def download_files(files, raw_dir):
     for url, sha256 in files.items():
         download(url, raw_dir / url.rsplit("/", 1)[-1], checksum=sha256)
     return raw_dir
+
+
+def downloads_dir(cache_dir, name):
+    """``<cache_dir>/<name>/downloads``: persistent downloads, outside the ``keep`` policy."""
+    return (Path(cache_dir) if cache_dir else get_cache_dir()) / name / "downloads"
+
+
+def ingest_archive(name, archive, dest_dir, pattern, *, page_url, expected, files=None):
+    """Folder holding the ``pattern`` files of a user-provided archive or folder.
+
+    ``archive`` (zip / tar file, or an extracted folder used in place) goes
+    through :func:`~spdnet_datasets.core.access.manual_source`, which extracts
+    it into ``dest_dir/<archive name>/`` (with ``archive=None`` it opens
+    ``page_url`` and raises
+    :class:`~spdnet_datasets.core.access.ManualDownloadRequired`). Files named
+    like the last URL component of a ``url -> sha256`` entry of ``files`` are
+    checked.
+    """
+    from ..core.access import manual_source
+
+    if archive is not None:  # one extraction folder per archive
+        dest_dir = Path(dest_dir) / Path(archive).expanduser().name
+    root = manual_source(name, page_url=page_url, expected=expected, dest_dir=dest_dir,
+                         archive=archive)
+    found = sorted(Path(root).rglob(pattern))
+    if not found:
+        raise FileNotFoundError(f"No {pattern} file in {root} (expected: {expected})")
+    folder = found[0].parent
+    for url, sha256 in (files or {}).items():
+        path = folder / url.rsplit("/", 1)[-1]
+        if path.exists() and sha256sum(path) != sha256:
+            raise OSError(f"Checksum mismatch for {path}")
+    return folder
 
 
 def write_processed(out_dir, features, index, excluded, p):
@@ -223,6 +257,9 @@ class SequenceCovarianceDataset(BaseDataset):
     cache_dir, keep, force, verify, limit
         Passed to the fetch function (``limit``: at most that many sequences,
         evenly spread, for quick tests).
+    archive : path, optional
+        Downloaded archive or folder, passed to the fetch (see its "Download"
+        section) when ``data_dir`` does not exist.
     **kwargs
         :class:`~spdnet_datasets.base.BaseDataset` arguments (``classes``,
         ``max_classes``, ``max_samples_per_class``, ``return_mean``,
@@ -249,9 +286,9 @@ class SequenceCovarianceDataset(BaseDataset):
 
     def __init__(self, data_dir=None, *, split="recommended", subset=None, fold=1,
                  cache_dir=None, keep=None, force=False, verify="size", limit=None,
-                 **kwargs):
+                 archive=None, **kwargs):
         root = dataset_path(self.DOMAIN, self.NAME, data_dir)
-        if root.exists() or not self.DOWNLOADABLE:
+        if root.exists() or not (self.DOWNLOADABLE or archive is not None):
             super().__init__(data_dir=root, **kwargs)
         else:  # the fetch downloads the sources into the cache
             cache = Path(cache_dir) if cache_dir else get_cache_dir()
@@ -265,6 +302,8 @@ class SequenceCovarianceDataset(BaseDataset):
         self.split, self.subset, self.fold = split, subset, fold
         self.fetch_kwargs = {"cache_dir": cache_dir, "keep": keep, "force": force,
                              "verify": verify, "limit": limit, "estimator": self.estimator}
+        if archive is not None:  # only the fetches with a manual / archive mode take it
+            self.fetch_kwargs["archive"] = archive
         self._load_data()
 
     # -- to implement -----------------------------------------------------

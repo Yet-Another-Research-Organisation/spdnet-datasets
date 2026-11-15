@@ -44,6 +44,25 @@ UHH, HSN, NBP, POW, SSW, SNE).
   CC BY-NC-SA 4.0, Attribution-NonCommercial-ShareAlike, where it is filled in).
 - Local copy: `<data root>/AUDIO/BirdSet_XCM/xcm_*.parquet`.
 
+## Getting the data
+
+Direct access, no account: Hugging Face `DBD-research-group/BirdSet`, branch `data`
+(pinned commit), folder `XCM/`: `XCM_metadata.parquet` (16.7 MB) and 182 tar.gz
+shards of Vorbis files (95.9 GB in total). The local `xcm_*.parquet` copy is a
+partial re-export with no published equivalent, so the published shards are read
+directly (labels and recordists from the metadata, audio from the tar members).
+Every file is checked against its registered sha256.
+
+```python
+fetch_birdset_xcm(data_dir="absent", shards=4)      # 4 shards evenly spread (~2 GB)
+fetch_birdset_xcm(data_dir="absent", shards=[1, 50])
+fetch_birdset_xcm(archive="~/hf/BirdSet/XCM")      # metadata + shards downloaded by hand
+```
+
+The shards are sorted by species: a few shards hold few species (a warning gives
+the number of shards used). Licence CC BY-NC 4.0, per-recording Creative Commons
+licences.
+
 ## Raw data
 
 Each row holds an Ogg Vorbis recording at 32 kHz (mono or stereo, averaged to

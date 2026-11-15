@@ -8,12 +8,22 @@ local copy is a Hugging Face export in parquet files (columns ``filename``,
 
 Download
 --------
-The local copy is the Hugging Face dataset ``ashraq/esc50`` (two parquet
-shards, 773 MB; the sha256 of :data:`FILES` are the Hugging Face LFS
-identifiers, equal to those of the local copy). When ``data_dir`` does not
-exist, the two shards of the pinned revision :data:`HF_REVISION` are
-downloaded into ``<cache_dir>/esc50/raw/`` and checked. Clips: CC BY-NC 3.0
-(Freesound).
+Access: direct (public Hugging Face repository, no account). The local copy is
+the Hugging Face dataset ``ashraq/esc50``, an unofficial mirror of
+https://github.com/karolpiczak/ESC-50: two parquet shards (773 MB) of the pinned
+revision :data:`HF_REVISION`, whose sha256 (:data:`FILES`) are the Hugging Face
+LFS identifiers, equal to those of the local copy. Licence CC BY-NC 3.0
+(Freesound clips; ESC-10 subset CC BY 3.0). Resolution order:
+
+1. ``data_dir`` (default ``<data root>/AUDIO/ESC-50``) exists: read in place;
+2. ``archive=`` given: a folder, zip or tar holding the two shards, extracted
+   into ``<cache_dir>/esc50/downloads/archive/`` (shards named as in :data:`FILES` are
+   checked);
+3. otherwise the shards are downloaded into ``<cache_dir>/esc50/raw/`` and
+   checked.
+
+The official GitHub archive (WAV files and ``meta/esc50.csv``) has another
+layout and is not read. Example: ``fetch_esc50(archive="~/Downloads/esc50/")``.
 
 Covariances
 -----------
@@ -42,9 +52,11 @@ from ..manager import DatasetManager
 from ._common import (
     SequenceCovarianceDataset,
     download_files,
+    downloads_dir,
     estimate_stage,
     evenly_spaced,
     folds_to_split,
+    ingest_archive,
     load_result,
 )
 from ._features import iter_parquet_rows, process_recordings
@@ -58,6 +70,7 @@ FILES = {  # url -> sha256 (Hugging Face LFS oid, identical to the local copy)
     _HF + "train-00001-of-00002-27425e5c1846b494.parquet":
         "57786179368a444868a98430314ce762876e170bed9636845773762b9e3ad62d",
 }
+HF_PAGE = f"https://huggingface.co/datasets/{HF_REPO}/tree/{HF_REVISION}/data"
 N_FOLDS = 5
 COARSE_NAMES = ("animals", "natural_soundscapes", "human_non_speech", "domestic", "urban")
 META_COLUMNS = ["filename", "fold", "target", "category", "esc10", "src_file", "take"]
@@ -100,7 +113,8 @@ def esc50_splits(meta, labels, groups, fold=1):
 
 
 def fetch_esc50(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
-                verify="size", features="mfcc", n_mfcc=20, n_mels=64, limit=None, fold=1):
+                verify="size", features="mfcc", n_mfcc=20, n_mels=64, limit=None, fold=1,
+                archive=None):
     """Covariances of the ESC-50 clips.
 
     Parameters
@@ -123,6 +137,9 @@ def fetch_esc50(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
         Process at most ``limit`` clips, evenly spread (quick tests).
     fold : int
         Official test fold (1..5) of the returned ``splits``.
+    archive : path, optional
+        Folder, zip or tar holding the parquet shards, used when ``data_dir``
+        does not exist (see "Download" in the module docstring).
 
     Returns
     -------
@@ -135,6 +152,12 @@ def fetch_esc50(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
     root = dataset_path(DOMAIN, NAME, data_dir)
     if root.is_dir():
         check_local(root, verify=verify)
+        raw_fn, source = None, str(root.resolve())
+    elif archive is not None:
+        root = ingest_archive(NAME, archive, downloads_dir(cache_dir, "esc50") / "archive",
+                              "*.parquet",
+                              page_url=HF_PAGE, expected="the two parquet shards of FILES",
+                              files=FILES)
         raw_fn, source = None, str(root.resolve())
     else:
         raw_fn, source = partial(download_files, FILES), f"hf:{HF_REPO}@{HF_REVISION}"

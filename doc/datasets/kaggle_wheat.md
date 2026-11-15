@@ -32,11 +32,26 @@ blue) patch of 64 × 64. Only the HS patches are used here.
   ICPR 2026 Competition on Beyond Visible Spectrum: AI for Agriculture,
   task 1, <https://han-research.gitlab.io/Agvision/>. This reference was
   found by a web search and is not verified.
-- Licence: competition terms (not verified). Kaggle account required; manual
-  download into `<data root>/HYPERSPECTRAL/Wheat_Disease_ICPR26`.
+- Licence: competition terms (not verified). Kaggle account required (see
+  [Getting the data](#getting-the-data)).
 - Train: 600 labelled patches, 200 per class, with the class in the file
   name. Validation: 300 unlabelled patches (the competition submission).
   Wavelengths and acquisition dates are not provided.
+
+## Getting the data
+
+Kaggle competition
+[`beyond-visible-spectrum-ai-for-agriculture-2026`](https://www.kaggle.com/competitions/beyond-visible-spectrum-ai-for-agriculture-2026/data).
+It needs Kaggle credentials (`KAGGLE_USERNAME` / `KAGGLE_KEY` or
+`~/.kaggle/kaggle.json`, see [Fetching](../guide/fetch.md)) and the competition
+rules accepted with the same account. Without a local copy,
+`fetch_kaggle_wheat()` downloads the competition archive into
+`<cache>/Wheat_Disease_ICPR26/downloads/` (no checksum published) and reads the
+folder holding `train/HS`.
+
+```python
+fetch_kaggle_wheat(archive="~/Downloads/beyond-visible-spectrum-ai-for-agriculture-2026.zip")
+```
 
 ## Raw data
 

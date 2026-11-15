@@ -45,6 +45,19 @@ coordinates per motion segment, in 117 action classes.
 - Local copy: `<data root>/SKELETON/HDM05`, 2 086 files
   `{id}_{frames}_{class}.npy`, each a symmetric 93×93 float64 matrix.
 
+## Getting the data
+
+- Default (`source="local"`), **manual**: the 2 086 `{id}_{frames}_{class}.npy`
+  matrices are an export without public source. Without a local copy the fetch
+  opens <https://resources.mpi-inf.mpg.de/HDM05/> and raises
+  `ManualDownloadRequired`; give the export with `fetch_hdm05(archive=...)`.
+- `source="eth"`, direct: `fetch_hdm05(source="eth")` downloads
+  `HDM05_SPDData.zip` (603 MB) of the SPDNet authors (ETH Zurich), checks its
+  sha256 (computed on 2026-11-15, none is published) and reads the `.mat`
+  matrices directly. These are **other data**: 19 491 matrices of 130 actions
+  (segments, grouped by sequence in the split), not the 2 086 local ones; only
+  `features="c93"`.
+
 ## Raw data
 
 The skeletons, the estimator used to build the matrices, the centring and the

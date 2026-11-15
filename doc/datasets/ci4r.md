@@ -37,6 +37,14 @@ IWR1443 77 GHz FMCW (frequency-modulated continuous wave) radar, an Ancortek
   is out of scope.
 - Local copy: `<data root>/RADAR_DOPPLER/CI4R-MULTI3/11_class_activity_data/{77GHz,Xethru}/<class>/*.png`.
 
+## Getting the data
+
+Direct access, no account. Without a local copy, `fetch_ci4r(mode=...)` lists the
+public Google Cloud Storage bucket `cross-frequency_dataset` and downloads the 653
+PNG images of the requested sensor (77 GHz 150 MB, xethru 26 MB), each checked
+against the MD5 of the listing. `fetch_ci4r(archive=...)` takes a folder, zip or
+tar holding `11_class_activity_data`. No licence is stated.
+
 ## Raw data
 
 Only micro-Doppler spectrograms rendered as jet-coloured PNG (Portable Network Graphics) images (no axes,
