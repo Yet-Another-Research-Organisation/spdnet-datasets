@@ -62,6 +62,7 @@ into `$SPDNET_CACHE_DIR` ({doc}`guide/fetch`).
 | {doc}`guide/adding` | registering a new dataset |
 | {doc}`guide/synthetic` | synthetic SPD datasets with controlled spectra |
 | {doc}`guide/covariance` | covariance estimators and precomputation scripts |
+| {doc}`guide/nilearn` | fMRI connectomes from nilearn datasets (ABIDE, ADHD-200, development) |
 | {doc}`reference/index` | API reference |
 
 ```{toctree}
@@ -78,6 +79,7 @@ guide/datasets
 guide/adding
 guide/synthetic
 guide/covariance
+guide/nilearn
 ```
 
 ```{toctree}
