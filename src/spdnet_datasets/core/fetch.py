@@ -29,7 +29,9 @@ import csv
 import hashlib
 import json
 import shutil
+import urllib.error
 import urllib.request
+import warnings
 from pathlib import Path
 
 from .config import get_cache_dir
@@ -74,7 +76,8 @@ def download(url, dest, checksum=None, algo="sha256", resume=True, timeout=60) -
 
     The file is written to ``dest.part`` and renamed when complete, so an
     interrupted download is resumed (HTTP Range) or restarted, never mistaken
-    for a finished one.
+    for a finished one. A ``416`` answer to a resume means that ``.part`` is
+    already complete: it is checked (``checksum``) and renamed.
     """
     dest = Path(dest)
     if dest.exists():
@@ -85,10 +88,15 @@ def download(url, dest, checksum=None, algo="sha256", resume=True, timeout=60) -
     part = dest.with_name(dest.name + ".part")
     start = part.stat().st_size if (resume and part.exists()) else 0
     req = urllib.request.Request(url, headers={"Range": f"bytes={start}-"} if start else {})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        mode = "ab" if start and getattr(resp, "status", 200) == 206 else "wb"
-        with open(part, mode) as out:
-            shutil.copyfileobj(resp, out, 1 << 20)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            mode = "ab" if start and getattr(resp, "status", 200) == 206 else "wb"
+            with open(part, mode) as out:
+                shutil.copyfileobj(resp, out, 1 << 20)
+    except urllib.error.HTTPError as exc:
+        # 416 on a resume: the range starts at the end of the file, .part is complete
+        if not (start and exc.code == 416):
+            raise
     if checksum and _hash_file(part, algo) != checksum:
         part.unlink()
         raise OSError(f"Checksum mismatch for {url}")
@@ -142,6 +150,35 @@ def verify_local(dataset_dir, manifest="MANIFEST_NAS.tsv", verify="size", requir
             report.wrong_size.append(rel)
         if verify == "md5" and row.get("md5") and md5sum(p) != row["md5"]:
             report.wrong_md5.append(rel)
+    return report
+
+
+def check_local(dataset_dir, *, required=(), verify="size", manifest="MANIFEST_NAS.tsv",
+                strict=True):
+    """:func:`verify_local`, then raise or warn if a file differs from the manifest.
+
+    Parameters
+    ----------
+    dataset_dir, required, verify, manifest
+        See :func:`verify_local`.
+    strict : bool
+        ``True``: raise ``OSError`` on a missing, wrong-size or wrong-md5 file;
+        ``False``: emit a ``UserWarning`` instead.
+
+    Returns
+    -------
+    Bunch
+        The report of :func:`verify_local`.
+    """
+    report = verify_local(dataset_dir, manifest=manifest, verify=verify, required=required)
+    bad = report.missing + report.wrong_size + report.wrong_md5
+    if bad:
+        msg = (f"{dataset_dir}: {len(report.missing)} missing, {len(report.wrong_size)} wrong "
+               f"size, {len(report.wrong_md5)} wrong md5 files w.r.t. {manifest} "
+               f"(e.g. {bad[:5]})")
+        if strict:
+            raise OSError(msg)
+        warnings.warn(msg, UserWarning, stacklevel=2)
     return report
 
 

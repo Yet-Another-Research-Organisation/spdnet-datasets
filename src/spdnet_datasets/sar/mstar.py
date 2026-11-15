@@ -24,6 +24,12 @@ Outputs: raw or mean only (``OUTPUTS = ("raw", "mean")``).
 - ``source="complex"``: ``(crop, crop, 2)`` real and imaginary parts.
 
 Mean = per-channel mean of the raw chip.
+
+Download (manual): public GitHub mirror https://github.com/omae11/MSTAR-dataset,
+commit ``d99007290d20ce52933c8bf0f8c3f461acd522ee`` (non-commercial academic use).
+The ``codeload`` archives are not byte-stable, so no sha256 is registered: clone the
+repository at that commit (git checks every blob) and place it under ``data_dir``
+(default ``<data root>/SAR/MSTAR_SOC``).
 """
 
 import re
@@ -36,7 +42,7 @@ import torch
 from ..base import BaseDataset
 from ..core.config import dataset_path
 from ..core.estimators import channel_mean
-from ..core.fetch import Bunch, verify_local
+from ..core.fetch import Bunch, check_local
 from ..manager import DatasetManager
 from ._common import finalize_labels
 
@@ -81,7 +87,7 @@ def fetch_mstar(data_dir=None, *, source="jpg", verify="size", val_size=0.1, see
         raise ValueError(f"source must be one of {SOURCES}")
     root = dataset_path(DOMAIN, NAME, data_dir)
     folder = "soc" if source == "jpg" else "soc_complex"
-    verify_local(root, verify=verify, required=(f"{folder}/train", f"{folder}/test"))
+    check_local(root, verify=verify, required=(f"{folder}/train", f"{folder}/test"))
     rows = []
     for part in ("train", "test"):
         for cls_dir in sorted((root / folder / part).iterdir()):

@@ -40,6 +40,11 @@ participants). Exact duplicates (``(copy)``/``(another copy)`` files, md5
 identical: 7 in 77 GHz, 19 in xethru) are removed. In xethru, codes 05, 11
 and 18 come from earlier sessions (February 2019) with few classes:
 participant and class are partly confounded.
+
+Download (manual): the spectrograms are linked from the README of
+https://github.com/ci4r/CI4R-Activity-Recognition-datasets (no direct URL or checksum
+registered). Download ``11_class_activity_data`` and place it
+under ``data_dir`` (default ``<data root>/RADAR_DOPPLER/CI4R-MULTI3``).
 """
 
 import hashlib
@@ -50,11 +55,10 @@ import numpy as np
 import pandas as pd
 
 from ..core.config import dataset_path
-from ..core.fetch import run_pipeline
+from ..core.fetch import check_local, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     RadarCovarianceDataset,
-    check_local,
     covariance_stage,
     group_folds,
     load_bunch,
@@ -188,7 +192,7 @@ def fetch_ci4r(data_dir=None, cache_dir=None, keep=None, estimator=None, force=F
     p = defaults["p"] if p is None else p
     estimator = estimator or defaults["estimator"]
     root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify=verify, required=(f"11_class_activity_data/{MODES[mode]}",))
+    check_local(root, verify=verify, required=(f"11_class_activity_data/{MODES[mode]}",), strict=False)
 
     def process_fn(_source, out_dir):
         from PIL import Image
@@ -205,12 +209,16 @@ def fetch_ci4r(data_dir=None, cache_dir=None, keep=None, estimator=None, force=F
                 "band": band, "p": p}
         write_processed(out_dir, spectrograms, kept, info)
 
-    params = {"mode": mode, "band": band, "p": p, "estimator": estimator, "version": 1}
+    params = {"mode": mode, "band": band, "p": p, "source": str(root.resolve()), "version": 1}
     paths = run_pipeline(f"ci4r_{mode}", params=params, process_fn=process_fn,
-                         covariance_fn=covariance_stage(estimator), cache_dir=cache_dir,
+                         covariance_fn=covariance_stage(estimator),
+                         covariance_params={"estimator": estimator}, cache_dir=cache_dir,
                          keep=keep, force=force)
     bunch = load_bunch(paths, CLASSES)
     bunch.splits = group_folds(bunch.groups, n_folds, bunch.labels)
+    if f"fold{fold}" not in bunch.splits:  # n_folds is capped by the number of participants
+        raise ValueError(f"fold={fold} is out of range: {len(bunch.splits)} folds "
+                         f"(n_folds={n_folds}, {len(np.unique(bunch.groups))} participants)")
     bunch.splits["recommended"] = bunch.splits[f"fold{fold}"]
     return bunch
 

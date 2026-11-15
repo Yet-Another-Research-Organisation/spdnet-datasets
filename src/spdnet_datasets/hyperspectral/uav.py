@@ -27,6 +27,11 @@ Splits (``positions`` are per scene; scenes never share a block):
 - ``"official"``: windows lying inside a single patch take the official split
   of that patch; windows straddling two patches are left out;
 - ``"scene_transfer"`` (when both are loaded): train MJK_N, test MJK_S.
+
+Download (manual): ScienceDB, doi:10.57760/sciencedb.01898 (download from the web
+page, no stable direct URL or checksum registered). Extract the archive into
+``source/`` (layout above) and place it under ``data_dir`` (default ``<data
+root>/HYPERSPECTRAL/UAV-HSI-Crop``).
 """
 
 import re
@@ -37,7 +42,7 @@ import pandas as pd
 
 from ..core.config import dataset_path
 from ..core.estimators import check_sample_size
-from ..core.fetch import Bunch, run_pipeline, verify_local
+from ..core.fetch import Bunch, check_local, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     HSIDataset,
@@ -106,11 +111,11 @@ def fetch_uav(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=F
     if not set(scenes) <= set(SCENES):
         raise ValueError(f"scenes must be among {SCENES}")
     root = dataset_path(DOMAIN, NAME, data_dir)
-    verify_local(root, verify=verify, required=("source/Test/gt", "source/Train/Training/gt"))
+    check_local(root, verify=verify, required=("source/Test/gt", "source/Train/Training/gt"))
     bands = band_index(N_BANDS, band_step)
     check_sample_size(window * window, len(bands))
     params = {"scenes": list(scenes), "window": window, "band_step": band_step,
-              "threshold": threshold, "estimator": estimator, "version": 2}
+              "threshold": threshold, "source": str(root.resolve()), "version": 2}
 
     def process(_, out_dir):
         patches = list_patches(root / "source")
@@ -141,6 +146,7 @@ def fetch_uav(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=F
 
     res = run_pipeline(NAME, params=params, process_fn=process,
                        covariance_fn=lambda p, o: covariance_stage(p, o, window_pixels, estimator),
+                       covariance_params={"estimator": estimator},
                        cache_dir=cache_dir, keep=keep, force=force)
     out = load_covariance_dir(res.covariance_dir)
     meta, full = out.meta, out.meta_all

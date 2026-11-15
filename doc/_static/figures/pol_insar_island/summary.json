@@ -1,0 +1,68 @@
+{
+ "name": "pol_insar_island",
+ "kwargs": {
+  "return_mean": true,
+  "return_raw": true
+ },
+ "split": "recommended",
+ "p": 12,
+ "n_samples": 5033,
+ "classes": [
+  "coastal shrub",
+  "couch grass",
+  "dense high vegetation",
+  "grey dune",
+  "lower saltmarsh",
+  "peat bog",
+  "sand",
+  "settlement",
+  "tidal flat",
+  "upper saltmarsh",
+  "water",
+  "white dune"
+ ],
+ "counts": {
+  "train": [
+   96,
+   153,
+   28,
+   511,
+   174,
+   53,
+   388,
+   164,
+   201,
+   270,
+   474,
+   188
+  ],
+  "val": [
+   3,
+   110,
+   13,
+   192,
+   91,
+   0,
+   150,
+   37,
+   90,
+   78,
+   174,
+   44
+  ],
+  "test": [
+   48,
+   108,
+   21,
+   215,
+   12,
+   0,
+   190,
+   88,
+   95,
+   66,
+   180,
+   84
+  ]
+ }
+}

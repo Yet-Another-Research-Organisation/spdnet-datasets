@@ -69,11 +69,19 @@ def build(name, kwargs, split, page, max_samples=600, seed=0):
     if "cov" not in cls.OUTPUTS:
         raise SystemExit(f"{name} has no covariance output; use make_figures_raw.py")
     # request the extra outputs at construction: some loaders open the raw data there
-    wanted = {"return_mean": "mean" in cls.OUTPUTS, "return_raw": "raw" in cls.OUTPUTS}
+    has_raw = "raw" in cls.OUTPUTS
+    wanted = {"return_mean": "mean" in cls.OUTPUTS, "return_raw": has_raw}
     ds = cls(**{**wanted, **kwargs})
+    # raw data are then read for the four displayed samples only (memory)
+    ds.return_raw = False
     rng = np.random.default_rng(seed)
     idx = rng.choice(len(ds), size=min(max_samples, len(ds)), replace=False)
-    covs, means, raws, ys = _samples(ds, idx)
+    covs, means, _, ys = _samples(ds, idx)
+    raws = []
+    if has_raw:
+        ds.return_raw = True
+        raws = _samples(ds, idx[:4])[2]
+        ds.return_raw = False
     covs = np.stack(covs)
     p = covs.shape[-1]
     names = list(getattr(ds, "classes", [])) or [str(c) for c in np.unique(ys)]
@@ -123,12 +131,12 @@ def build(name, kwargs, split, page, max_samples=600, seed=0):
     figs["class_hist"] = fig
 
     # cov_samples
-    k = min(4, len(covs))
+    k = min(4 if p <= 128 else 2, len(covs))  # fewer panels for large p (HTML size)
     fig = make_subplots(rows=1, cols=k, subplot_titles=[names[ys[j]] if ys[j] >= 0 else "?"
                                                         for j in range(k)])
     for j in range(k):
         d = np.sqrt(np.diag(covs[j]))
-        corr = covs[j] / np.outer(d, d)
+        corr = (covs[j] / np.outer(d, d)).astype(np.float32)
         fig.add_trace(go.Heatmap(z=corr, zmin=-1, zmax=1, colorscale=DIVERGING,
                                  showscale=j == k - 1,
                                  hovertemplate="(%{y}, %{x}) %{z:.2f}<extra></extra>"), 1, j + 1)
@@ -138,7 +146,7 @@ def build(name, kwargs, split, page, max_samples=600, seed=0):
 
     # eigen_spectrum
     logeig = np.log10(np.linalg.eigvalsh(covs)[:, ::-1])
-    q10, q50, q90 = np.percentile(logeig, [10, 50, 90], axis=0)
+    q10, q50, q90 = np.nanpercentile(logeig, [10, 50, 90], axis=0)  # NaN: non-SPD
     x = np.arange(1, p + 1)
     fig = go.Figure()
     fig.add_scatter(x=np.r_[x, x[::-1]], y=np.r_[q90, q10[::-1]], fill="toself",

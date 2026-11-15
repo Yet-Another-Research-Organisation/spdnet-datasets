@@ -87,7 +87,7 @@ def test_esc50_fetch_shapes_and_exclusion(esc50_dir, tmp_path):
 
 
 def test_esc50_outputs_and_normalisation(esc50_dir, tmp_path):
-    ds = _esc(esc50_dir, tmp_path)
+    ds = _esc(esc50_dir, tmp_path, subset="train")
     x, y = ds[0]
     assert x.shape == (20, 20) and x.dtype == torch.float64 and isinstance(y, int)
     train = np.stack([ds[i][0].numpy() for i in range(len(ds))])
@@ -101,6 +101,14 @@ def test_esc50_outputs_and_normalisation(esc50_dir, tmp_path):
     raw64 = raw.double().numpy()
     np.testing.assert_allclose(np.cov(raw64.T, bias=True), cov.numpy(), rtol=1e-4, atol=1e-6)
     np.testing.assert_allclose(raw64.mean(0), mean.numpy(), rtol=1e-4, atol=1e-6)
+
+
+def test_esc50_manager_official_split_by_default(esc50_dir, tmp_path):
+    train, val, test, n = DatasetManager.create_dataloaders({
+        "name": "esc50", "path": str(esc50_dir), "cache_dir": tmp_path / "cache",
+        "split_strategy": "official", "batch_size": 4, "num_workers": 0,
+        "persistent_workers": False, "pin_memory": False, "verbose": False})
+    assert n == 4 and len(train.dataset) + len(val.dataset) + len(test.dataset) == 39
 
 
 def test_esc50_official_folds_without_leakage(esc50_dir, tmp_path):

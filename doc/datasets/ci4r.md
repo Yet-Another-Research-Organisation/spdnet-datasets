@@ -77,9 +77,9 @@ Exact duplicates are removed: 7 files in 77 GHz and 19 in xethru, all named
   others have varying yet collinear bins and the fetch raises
   `NotSPDError`: keep Ledoit-Wolf for xethru.
 
-With `normalize=True` (default), the covariances (not the means and raw
-spectrograms) are multiplied by the scalar fitted on the training part of the
-chosen split (geometric mean of the eigenvalues = 1).
+With `normalize=True` (default), the covariances are multiplied by the
+scalar s fitted on the training part of the chosen split (geometric mean of the
+eigenvalues = 1), the means and raw spectrograms by √s.
 
 ## Splits
 

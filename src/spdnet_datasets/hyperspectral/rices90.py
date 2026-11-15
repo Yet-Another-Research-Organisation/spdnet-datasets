@@ -26,6 +26,10 @@ Splits (``groups`` = cube, i.e. variety and bundle):
   whose two bundles come from two sessions (17 varieties). For 73 varieties
   both bundles share their session, so variety and session are confounded:
   only this test is not.
+
+Download (manual): no public mirror identified (obtained from the authors). Copy the
+``Data-VIS-<session>`` folders and place it under ``data_dir`` (default ``<data
+root>/HYPERSPECTRAL/Rices_90``).
 """
 
 import os
@@ -35,7 +39,7 @@ import numpy as np
 import pandas as pd
 
 from ..core.config import dataset_path
-from ..core.fetch import Bunch, run_pipeline, verify_local
+from ..core.fetch import Bunch, check_local, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     HSIDataset,
@@ -108,9 +112,9 @@ def fetch_rices90(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
     if N_BANDS % band_bin:
         raise ValueError(f"band_bin must divide {N_BANDS}")
     root = dataset_path(DOMAIN, NAME, data_dir)
-    verify_local(root, verify=verify, required=("index.csv",))
+    check_local(root, verify=verify, required=("index.csv",))
     p = N_BANDS // band_bin
-    params = {"band_bin": band_bin, "estimator": estimator, "version": 2}
+    params = {"band_bin": band_bin, "source": str(root.resolve()), "version": 2}
 
     def process(_, out_dir):
         index = pd.read_csv(root / "index.csv")
@@ -144,6 +148,7 @@ def fetch_rices90(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
 
     res = run_pipeline(NAME, params=params, process_fn=process,
                        covariance_fn=lambda pr, o: covariance_stage(pr, o, pixels, estimator),
+                       covariance_params={"estimator": estimator},
                        cache_dir=cache_dir, keep=keep, force=force)
     out = load_covariance_dir(res.covariance_dir)
     meta = out.meta

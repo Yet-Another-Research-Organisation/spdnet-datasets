@@ -3,7 +3,8 @@
 import numpy as np
 import pytest
 
-from spdnet_datasets.core.estimators import check_spd
+from spdnet_datasets.core.estimators import NotSPDError, check_spd
+from spdnet_datasets.sar import pol_insar_island
 from spdnet_datasets.sar.pol_insar_island import (
     PolInSARIslandDataset,
     fetch_pol_insar_island,
@@ -70,6 +71,50 @@ def test_logpower_covariances(pol_dir, tmp_path):
     (cov, mean, raw), y = ds[0]
     assert raw.shape == (CELL, CELL, 12) and mean.shape == (12,)
     assert ds.classes == ["coastal shrub", "tidal flat", "water"]
+
+
+def test_normalisation_scales_mean_and_raw_by_sqrt_s(pol_dir, tmp_path):
+    ds = _make(pol_dir, tmp_path, return_mean=True, return_raw=True)
+    (cov, mean, raw), _ = ds[0]
+    (cov0, mean0, raw0), _ = _make(pol_dir, tmp_path, normalize=False, return_mean=True, return_raw=True)[0]
+    s = ds.scale
+    assert s != 1.0
+    np.testing.assert_allclose(cov.numpy(), s * cov0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(mean.numpy(), np.sqrt(s) * mean0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(raw.numpy(), np.sqrt(s) * raw0.numpy(), rtol=1e-6)
+
+
+@pytest.mark.parametrize("representation", ["logpower", "t6"])
+def test_non_spd_cell_is_rejected_and_counted(pol_dir, tmp_path, monkeypatch, representation):
+    name = "estimate_covariance" if representation == "logpower" else "check_spd"
+    real = getattr(pol_insar_island, name)
+
+    def fail_first(C, *a, **kw):
+        if fail_first.calls == 0:
+            fail_first.calls += 1
+            raise NotSPDError("forced")
+        return real(C, *a, **kw)
+
+    fail_first.calls = 0
+    monkeypatch.setattr(pol_insar_island, name, fail_first)
+    ds = _make(pol_dir, tmp_path, representation=representation, return_mean=True,
+               return_raw=representation == "logpower", normalize=False)
+    assert len(ds) == 2 * (6 * 8 - 1) - 1 and len(ds.rejected) == 1
+    assert ds.rejected["proc_index"].tolist() == [0] and ds.meta["proc_index"].iat[0] == 1
+    assert len(ds.means) == len(ds.covariances) == len(ds)
+    if representation == "logpower":
+        (cov, mean, raw), _ = ds[0]
+        X = raw.numpy().reshape(-1, 12)  # raw still aligned with the kept cell
+        np.testing.assert_allclose(mean.numpy(), X.astype(float).mean(0), rtol=1e-5)
+
+
+def test_t6_means_are_scaled_like_the_covariances(pol_dir, tmp_path):
+    ds = _make(pol_dir, tmp_path, representation="t6", return_mean=True)
+    (cov, mean), _ = ds[0]
+    (cov0, mean0), _ = _make(pol_dir, tmp_path, representation="t6", return_mean=True,
+                             normalize=False)[0]
+    np.testing.assert_allclose(cov.numpy(), ds.scale * cov0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(mean.numpy(), ds.scale * mean0.numpy(), rtol=1e-12)
 
 
 def test_t6_representation_is_realified_block_diagonal(pol_dir, tmp_path):

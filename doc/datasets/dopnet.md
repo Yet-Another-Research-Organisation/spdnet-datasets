@@ -87,9 +87,9 @@ Gesture durations differ by class: median T of the kept gestures is 131
 5. One symmetric positive definite (SPD) covariance over the T frames
    (`"scm"`, the sample covariance matrix, by default).
 
-With `normalize=True` (default), the covariances (not the means and raw data)
-are multiplied by the scalar fitted on the training part of the chosen split
-(geometric mean of the eigenvalues = 1).
+With `normalize=True` (default), the covariances are multiplied by the scalar
+s fitted on the training part of the chosen split (geometric mean of the
+eigenvalues = 1), the means and raw data by √s.
 
 ```{raw} html
 <iframe src="../_static/figures/dopnet/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>

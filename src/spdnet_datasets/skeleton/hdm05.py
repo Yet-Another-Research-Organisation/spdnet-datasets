@@ -29,6 +29,13 @@ fold ``fold``, validation = the next fold, train = the others.
    identifier: segments of one take and one actor fall in train and test,
    which inflates the scores compared with a cross-actor protocol. The SPDNet
    literature uses 10 random 50/50 splits, which has the same bias.
+
+Download (manual): the motion database is published at
+http://resources.mpi-inf.mpg.de/HDM05/ (free for research, C3D/AMC files). The
+``{id}_{frames}_{class}.npy`` covariances read here are a preprocessed export whose
+construction is not published, so this package cannot rebuild them from the original
+files; copy the export and place it under ``data_dir`` (default ``<data
+root>/SKELETON/HDM05``).
 """
 
 import re
@@ -42,7 +49,6 @@ import pandas as pd
 from ..audio._common import (
     CSV,
     SequenceCovarianceDataset,
-    check_local,
     evenly_spaced,
     exclusion,
     folds_to_split,
@@ -53,6 +59,7 @@ from ..audio._common import (
 from ..core import (
     InsufficientSamplesError,
     NotSPDError,
+    check_local,
     check_sample_size,
     check_spd,
     dataset_path,
@@ -150,7 +157,7 @@ def fetch_hdm05(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
     if features not in FEATURES:
         raise ValueError(f"features must be one of {FEATURES}, got {features!r}")
     root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify)
+    check_local(root, verify=verify)
     params = {"data_dir": str(root.resolve()), "features": features, "limit": limit}
     run = run_pipeline(
         "hdm05", params=params,

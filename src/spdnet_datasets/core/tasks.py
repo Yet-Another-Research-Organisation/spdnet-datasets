@@ -63,10 +63,14 @@ def balance_indices(y, mode=None, seed=0):
     return np.sort(np.concatenate(out))
 
 
-def class_weights(y) -> np.ndarray:
-    """Inverse-frequency weights ``n / (k * n_c)``, indexed by class (0..max(y))."""
+def class_weights(y, n_classes=None) -> np.ndarray:
+    """Inverse-frequency weights ``n / (k * n_c)``, indexed by class.
+
+    The result has ``max(n_classes, max(y) + 1)`` entries; a class absent from
+    ``y`` gets weight 0.
+    """
     y = np.asarray(y, dtype=np.int64)
-    counts = np.bincount(y)
+    counts = np.bincount(y, minlength=n_classes or 0)
     k = np.count_nonzero(counts)
     with np.errstate(divide="ignore"):
         w = np.where(counts > 0, len(y) / (k * counts), 0.0)

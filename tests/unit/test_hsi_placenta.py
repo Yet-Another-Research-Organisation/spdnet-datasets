@@ -8,6 +8,7 @@ import pytest
 from spdnet_datasets.core import InsufficientSamplesError, assert_no_leakage
 from spdnet_datasets.hyperspectral.placenta import (
     METADATA,
+    NAME,
     WINDOWS,
     PlacentaDataset,
     fetch_placenta,
@@ -40,6 +41,16 @@ def test_split_grouped_by_image(placenta_dir, tmp_path):
     assert set(b.meta.dye_type[dye["test"]]) == {"ICG"}
 
 
+def test_cache_key_has_source_and_estimator_only_in_covariances(placenta_dir, tmp_path):
+    cache = tmp_path / "c"
+    a = fetch_placenta(placenta_dir, cache_dir=cache)
+    b = fetch_placenta(_make(tmp_path / "copy"), cache_dir=cache)
+    assert a.covariance_path != b.covariance_path
+    fetch_placenta(placenta_dir, cache_dir=cache, estimator="ledoit_wolf")
+    assert len(list((cache / NAME / "processed").iterdir())) == 2  # one per source
+    assert len(list((cache / NAME / "covariance").iterdir())) == 3
+
+
 def test_raw_mode_returns_numpy_window(placenta_dir, tmp_path):
     """Regression: the former raw mode passed a torch tensor to a numpy estimator."""
     ds = PlacentaDataset(placenta_dir, cache_dir=tmp_path / "c", verbose=False,
@@ -48,6 +59,19 @@ def test_raw_mode_returns_numpy_window(placenta_dir, tmp_path):
     assert raw.shape == (24, 24, 37)
     X = raw.numpy().reshape(-1, 37).astype(float)
     np.testing.assert_allclose(cov.numpy(), np.cov(X.T, bias=True), rtol=1e-6)
+
+
+def test_normalisation_scales_mean_and_raw_by_sqrt_s(placenta_dir, tmp_path):
+    ds = PlacentaDataset(placenta_dir, cache_dir=tmp_path / "c", verbose=False, return_mean=True,
+                         return_raw=True)
+    (cov, mean, raw), _ = ds[0]
+    (cov0, mean0, raw0), _ = PlacentaDataset(placenta_dir, cache_dir=tmp_path / "c", verbose=False, normalize=False, return_mean=True,
+                         return_raw=True)[0]
+    s = ds.scale
+    assert s != 1.0
+    np.testing.assert_allclose(cov.numpy(), s * cov0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(mean.numpy(), np.sqrt(s) * mean0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(raw.numpy(), np.sqrt(s) * raw0.numpy(), rtol=1e-6)
 
 
 def test_small_windows_violate_n_ge_2p(tmp_path):

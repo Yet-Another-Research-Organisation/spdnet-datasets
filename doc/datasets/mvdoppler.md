@@ -84,9 +84,9 @@ The histogram shows `fold0`.
    (n = 256 = 4p) with the chosen estimator (`"scm"`, the sample covariance
    matrix, by default; with n / p = 4, `"ledoit_wolf"` is better conditioned).
 
-With `normalize=True` (default), the covariances (not the means and raw data)
-are multiplied by the scalar fitted on the training part of the chosen split
-(geometric mean of the eigenvalues = 1).
+With `normalize=True` (default), the covariances are multiplied by the scalar
+s fitted on the training part of the chosen split (geometric mean of the
+eigenvalues = 1), the means and raw data by √s.
 
 ```{raw} html
 <iframe src="../_static/figures/mvdoppler/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>

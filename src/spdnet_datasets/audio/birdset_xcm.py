@@ -28,6 +28,14 @@ Splits
 species grouped by recordist (seed 0); test = fold ``fold``, validation = the
 next fold, train = the others. One recordist often records the same individual
 or site, hence the grouping. Empty recordist names form one group ``"NA"``.
+
+Download (manual): Hugging Face ``DBD-research-group/BirdSet`` (CC BY-NC 4.0 card,
+per-recording licences), configuration ``XCM`` (branch ``data``, folder ``XCM/``:
+audio tar shards and ``XCM_metadata.parquet``). The local ``xcm_<k>.parquet`` shards
+are a partial re-export that matches no
+published file (the published XCM audio is in tar shards), so no checksum is registered: export the wanted shards with the
+``datasets`` library (same columns) and place it under ``data_dir`` (default ``<data
+root>/AUDIO/BirdSet_XCM``).
 """
 
 import json
@@ -37,11 +45,10 @@ from pathlib import PurePosixPath
 
 import numpy as np
 
-from ..core import dataset_path, run_pipeline
+from ..core import check_local, dataset_path, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     SequenceCovarianceDataset,
-    check_local,
     estimate_stage,
     evenly_spaced,
     folds_to_split,
@@ -144,7 +151,7 @@ def fetch_birdset_xcm(data_dir=None, cache_dir=None, keep=None, estimator="scm",
         ``covariance_path``.
     """
     root = dataset_path(DOMAIN, NAME, data_dir)
-    check_local(root, verify)
+    check_local(root, verify=verify)
     params = {"data_dir": str(root.resolve()), "features": features, "n_mfcc": n_mfcc,
                   "n_mels": n_mels, "limit": limit, "min_recordings": min_recordings, "crop_s": crop_s,
                   "estimator": estimator}

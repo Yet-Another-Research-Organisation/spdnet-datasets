@@ -1,0 +1,31 @@
+{
+ "name": "kaggle_wheat",
+ "kwargs": {
+  "verbose": false
+ },
+ "split": "stratified",
+ "p": 107,
+ "n_samples": 575,
+ "classes": [
+  "Health",
+  "Other",
+  "Rust"
+ ],
+ "counts": {
+  "train": [
+   114,
+   110,
+   120
+  ],
+  "val": [
+   39,
+   37,
+   40
+  ],
+  "test": [
+   38,
+   37,
+   40
+  ]
+ }
+}

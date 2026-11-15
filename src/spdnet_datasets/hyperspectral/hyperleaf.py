@@ -23,6 +23,11 @@ TS-LR cultivar 0.915 random vs 0.669 grouped).
 ``mode="image"`` keeps the former image mode: ``x`` is the image restricted to
 ``bands`` (default approximate R, G, B), standardised per channel, float32
 (C, 48, 352), for CNN backbones; no covariance is computed.
+
+Download (manual): Kaggle competition
+https://www.kaggle.com/competitions/hyperleaf2024 (Kaggle account and acceptance of
+the rules required). Download ``images/``, ``train.csv`` and ``test.csv`` and place
+it under ``data_dir`` (default ``<data root>/HYPERSPECTRAL/HyperLeaf2024``).
 """
 
 from pathlib import Path
@@ -32,7 +37,7 @@ import pandas as pd
 import torch
 
 from ..core.config import dataset_path
-from ..core.fetch import Bunch, run_pipeline, verify_local
+from ..core.fetch import Bunch, check_local, run_pipeline
 from ..manager import DatasetManager
 from ._common import (
     HSIDataset,
@@ -96,9 +101,9 @@ def fetch_hyperleaf(data_dir=None, cache_dir=None, keep=None, estimator="scm", f
     ``plot``, ``n_valid``), ``groups`` (plot), ``info`` and ``splits``.
     """
     root = dataset_path(DOMAIN, NAME, data_dir)
-    verify_local(root, verify=verify, required=("train.csv", "images"))
+    check_local(root, verify=verify, required=("train.csv", "images"))
     bands = band_index(N_BANDS, band_step)
-    params = {"band_step": band_step, "estimator": estimator, "version": 2}
+    params = {"band_step": band_step, "source": str(root.resolve()), "version": 2}
 
     def process(_, out_dir):
         # leaves with fewer than 2p pixels are dropped (and counted) at estimation
@@ -113,6 +118,7 @@ def fetch_hyperleaf(data_dir=None, cache_dir=None, keep=None, estimator="scm", f
 
     res = run_pipeline(NAME, params=params, process_fn=process,
                        covariance_fn=lambda p, o: covariance_stage(p, o, pixels, estimator),
+                       covariance_params={"estimator": estimator},
                        cache_dir=cache_dir, keep=keep, force=force)
     out = load_covariance_dir(res.covariance_dir)
     meta = out.meta
