@@ -28,6 +28,15 @@ from .real import (
 )
 from .sits import PastisRDataset, fetch_pastis_r
 from .skeleton import HDM05Dataset, NTURGBD120Dataset
+from .sar import (
+    AIRPolSARSegDataset,
+    ATRNetSTARDataset,
+    CPAZMaLDataset,
+    FUSARShipDataset,
+    MSTARDataset,
+    PolInSARIslandDataset,
+    S1SLCCVDLDataset,
+)
 
 __version__ = "0.1.0"
 
@@ -63,4 +72,13 @@ __all__ = [
     # SITS
     'PastisRDataset',
     'fetch_pastis_r',
+
+    # SAR datasets
+    'AIRPolSARSegDataset',
+    'ATRNetSTARDataset',
+    'CPAZMaLDataset',
+    'FUSARShipDataset',
+    'MSTARDataset',
+    'PolInSARIslandDataset',
+    'S1SLCCVDLDataset',
 ]
