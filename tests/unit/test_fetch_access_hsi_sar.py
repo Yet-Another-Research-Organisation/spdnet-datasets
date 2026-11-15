@@ -371,7 +371,10 @@ def test_pol_insar_island_downloads_the_bagit_tar(pol_dir, tmp_path, fake_net, m
     np.testing.assert_allclose(b.covariances, ref.covariances)
     assert not (tmp_path / "c" / "Pol-InSAR-Island" / "downloads" / "bag").exists()
     POL.fetch_pol_insar_island(tmp_path / "missing", cache_dir=tmp_path / "c", **kw)
-    assert calls == [POL.TAR_URL]  # downloaded once (the tar is kept)
+    assert calls == [POL.TAR_URL]
+    monkeypatch.setattr(POL, "TAR_MD5", "0" * 32)  # refused / corrupted download: manual
+    with pytest.raises(ManualDownloadRequired, match="automatic download failed"):
+        POL.fetch_pol_insar_island(tmp_path / "missing", cache_dir=tmp_path / "c3", **kw)  # downloaded once (the tar is kept)
     # the inner zip given by hand
     b2 = POL.fetch_pol_insar_island(tmp_path / "missing", cache_dir=tmp_path / "c2", archive=inner,
                                     **kw)

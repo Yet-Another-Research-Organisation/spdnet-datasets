@@ -66,7 +66,11 @@ https://radar.kit.edu/radar/en/dataset/IAzBEMXnbTndvIZG gives the archive URL
 ``<cache_dir>/Pol-InSAR-Island/downloads/``, checks its md5, extracts it, checks the
 md5 of the inner ``data/dataset/Pol-InSAR-Island_updated.zip``
 (``3d10bb4afa2eb4ece3da546df0f741fb``, ``manifest-md5.txt`` of the bag) and extracts
-it (the intermediate copy of the inner zip is then deleted). Already downloaded::
+it (the intermediate copy of the inner zip is then deleted). A HEAD request on the
+archive URL answers 401 while a GET is served without login: if the download is
+refused, the page is opened and
+:class:`~spdnet_datasets.core.access.ManualDownloadRequired` is raised. Already
+downloaded::
 
     fetch_pol_insar_island(archive="~/Downloads/10.35097-1700.tar")
 
@@ -84,7 +88,7 @@ import pandas as pd
 import torch
 
 from ..base import BaseDataset
-from ..core.access import extract_archive
+from ..core.access import extract_archive, manual_source
 from ..core.config import dataset_path
 from ..core.estimators import (
     InsufficientSamplesError,
@@ -105,6 +109,7 @@ from ._common import (
 )
 
 DOMAIN, NAME = "SAR", "Pol-InSAR-Island"
+PAGE = "https://radar.kit.edu/radar/en/dataset/IAzBEMXnbTndvIZG"
 TAR_URL = "https://www.radar-service.eu/radar-backend/archives/IAzBEMXnbTndvIZG/versions/1/content"
 TAR, TAR_MD5, TAR_SIZE = "10.35097-1700.tar", "9ba66a216b1ae441a5d4ef91e30a4aa8", 5_567_475_200
 INNER, INNER_MD5 = "data/dataset/Pol-InSAR-Island_updated.zip", "3d10bb4afa2eb4ece3da546df0f741fb"
@@ -125,7 +130,12 @@ def _download_root(cache_dir, archive):
         found = find_root(out, REQUIRED)
         if found is not None:
             return found
-        path = download(TAR_URL, out / TAR, checksum=TAR_MD5, algo="md5")
+        try:
+            path = download(TAR_URL, out / TAR, checksum=TAR_MD5, algo="md5")
+        except OSError as exc:  # access refused (terms, login), md5 mismatch, network...
+            manual_source(NAME, page_url=PAGE, dest_dir=out,
+                          expected=f"the archive of the page ({TAR_SIZE} bytes, md5 {TAR_MD5}; "
+                                   f"automatic download failed: {exc})")
     else:
         path = Path(archive).expanduser()
         if not path.exists():

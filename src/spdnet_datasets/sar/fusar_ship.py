@@ -69,7 +69,9 @@ URL = ("https://drive.usercontent.google.com/download?id=1SOEMud9oUq69gxbfcBkOvt
 FILES = {URL: ZIP_SHA256}
 EXPECTED = (f"{ZIP} ({ZIP_SIZE} bytes) from Google Drive "
             "(https://drive.google.com/file/d/1SOEMud9oUq69gxbfcBkOvtUkZ3LWEpZJ) or Baidu Pan "
-            "(https://pan.baidu.com/s/1JlaRUeFKq37flIjXZtQ0YQ, code c6ea)")
+            "(https://pan.baidu.com/s/1JlaRUeFKq37flIjXZtQ0YQ, code c6ea); "
+            "a zip from Baidu may differ from the Drive file: then pass the extracted "
+            "folder")
 
 
 def _download(dest_dir):
