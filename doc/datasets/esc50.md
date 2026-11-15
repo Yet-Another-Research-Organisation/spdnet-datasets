@@ -61,7 +61,7 @@ image.
 ## Classes
 
 The 50 classes have 40 clips each before exclusion; 21 clips are excluded
-(see *Covariance construction*), so a few classes have 37 to 39 clips. The bar chart gives the counts per
+(see *Covariance construction*), so 17 classes have 38 or 39 clips. The bar chart gives the counts per
 class in the train, validation and test parts of the official split with test
 fold 1. The second figure shows the mean MFCC profile of the first 8 classes.
 
