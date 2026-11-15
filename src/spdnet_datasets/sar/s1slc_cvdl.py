@@ -167,7 +167,7 @@ class S1SLCCVDLDataset(BaseDataset):
         self.meta = b.meta.iloc[keep].reset_index(drop=True)
         if self.split not in self.splits:
             raise ValueError(f"Unknown split {self.split!r}; available: {sorted(self.splits)}")
-        self.rms = {c: 1.0 for c in self.meta["city"].unique()}
+        self.rms = dict.fromkeys(self.meta["city"].unique(), 1.0)
         if self.normalize:
             self.rms = city_rms(self.data_dir, self.meta, self.splits[self.split]["train"],
                                 seed=self.seed, **self._opts)
