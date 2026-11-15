@@ -216,6 +216,9 @@ def fetch_ci4r(data_dir=None, cache_dir=None, keep=None, estimator=None, force=F
                          keep=keep, force=force)
     bunch = load_bunch(paths, CLASSES)
     bunch.splits = group_folds(bunch.groups, n_folds, bunch.labels)
+    if f"fold{fold}" not in bunch.splits:  # n_folds is capped by the number of participants
+        raise ValueError(f"fold={fold} is out of range: {len(bunch.splits)} folds "
+                         f"(n_folds={n_folds}, {len(np.unique(bunch.groups))} participants)")
     bunch.splits["recommended"] = bunch.splits[f"fold{fold}"]
     return bunch
 

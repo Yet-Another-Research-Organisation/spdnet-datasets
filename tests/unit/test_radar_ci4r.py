@@ -124,6 +124,15 @@ def test_normalisation_scales_mean_and_raw_by_sqrt_s(data, tmp_path):
     np.testing.assert_allclose(raw.numpy(), np.sqrt(s) * raw0.numpy(), rtol=1e-6)
 
 
+def test_fold_out_of_range_raises(data, tmp_path):
+    kw = {"band": 0.5, "p": P, "verify": None}
+    with pytest.raises(ValueError, match="fold=4 is out of range: 4 folds"):
+        fetch_ci4r(data, tmp_path / "cache", fold=4, **kw)
+    with pytest.raises(ValueError, match="fold=4 is out of range: 4 folds"):
+        fetch_ci4r(data, tmp_path / "cache", n_folds=6, fold=4, **kw)  # 4 participants
+    assert "fold3" in fetch_ci4r(data, tmp_path / "cache", n_folds=6, fold=3, **kw).splits
+
+
 def test_transform_is_applied(data, tmp_path):
     kw = {"band": 0.5, "p": P, "cache_dir": tmp_path / "cache", "verify": None, "verbose": False}
     ds = CI4RDataset(data, **kw)
