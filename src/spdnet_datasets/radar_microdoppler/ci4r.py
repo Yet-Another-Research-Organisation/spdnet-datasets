@@ -61,7 +61,8 @@ https://github.com/ci4r/CI4R-Activity-Recognition-datasets. Resolution order:
    ``<cache_dir>/ci4r/downloads/CI4R-MULTI3/`` (once per mode).
 
 The raw radar data (``Raw Data/raw_data.zip``, 93 GB) are not used. Example:
-``fetch_ci4r(data_dir="absent", mode="xethru")``.
+``fetch_ci4r(data_dir="absent", mode="xethru")`` or
+``fetch_ci4r(archive="~/Downloads/CI4R-MULTI3.zip")``.
 """
 
 import base64
