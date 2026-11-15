@@ -46,11 +46,30 @@ CLASSES = {"abide": ["control", "autism"], "adhd": ["control", "adhd"],
 META_COLUMNS = ["subject", "site", "label", "age", "sex", "n_timepoints"]
 
 
+def _plain(v):
+    """JSON form of a fetcher argument (NumPy arrays and scalars included) for the cache key."""
+    if isinstance(v, np.ndarray):
+        v = v.tolist()
+    if isinstance(v, np.generic):
+        return v.item()
+    if isinstance(v, (list, tuple)):
+        return [_plain(x) for x in v]
+    if isinstance(v, dict):
+        return {str(k): _plain(x) for k, x in sorted(v.items(), key=lambda kv: str(kv[0]))}
+    return v
+
+
 def _zscore(ts):
     """Z-score each region over time (ddof=1); constant regions are set to 0."""
     ts = np.asarray(ts, dtype=np.float64)
     std = ts.std(axis=0, ddof=1)
     return (ts - ts.mean(axis=0)) / np.where(std > 0, std, 1.0)
+
+
+def _read_csv(path):
+    """Read a cached table, keeping subject identifiers as strings (ADHD IDs start with 0)."""
+    return pd.read_csv(path, dtype={"subject": str, "site": str, "Subject": str,
+                                    "participant_id": str})
 
 
 def _extract_timeseries(func, confounds, atlas, data_dir, t_r):
@@ -298,7 +317,7 @@ class NilearnConnectomes(BaseDataset):
         return {"dataset": self.dataset, "atlas": self.atlas, "n_subjects": self.n_subjects,
                 "standardize": self.standardize,
                 "confounds": self.confounds if self.dataset != "abide" else None,
-                "fetcher_kwargs": {k: self.fetcher_kwargs[k] for k in sorted(self.fetcher_kwargs)},
+                "fetcher_kwargs": _plain(self.fetcher_kwargs),
                 "version": PIPELINE_VERSION}
 
     def _process(self, _source, out):
@@ -351,7 +370,7 @@ class NilearnConnectomes(BaseDataset):
         np.save(out / "n_excluded_short.npy", n_short)
         np.save(out / "n_excluded_not_spd.npy", n_not_spd)
         for name in ("metadata.csv", "phenotypic.csv"):
-            pd.read_csv(processed / name).iloc[kept].to_csv(out / name, index=False)
+            _read_csv(processed / name).iloc[kept].to_csv(out / name, index=False)
 
     @staticmethod
     def _split_series(stacked, lengths):
@@ -372,8 +391,8 @@ class NilearnConnectomes(BaseDataset):
         self.n_excluded_short = int(np.load(d / "n_excluded_short.npy"))
         self.n_excluded_not_spd = int(np.load(d / "n_excluded_not_spd.npy"))
         self.n_excluded = self.n_excluded_short + self.n_excluded_not_spd
-        self.metadata = pd.read_csv(d / "metadata.csv", dtype={"subject": str, "site": str})
-        self.phenotypic = pd.read_csv(d / "phenotypic.csv")
+        self.metadata = _read_csv(d / "metadata.csv")
+        self.phenotypic = _read_csv(d / "phenotypic.csv")
         if self.metadata["subject"].duplicated().any():
             raise AssertionError("a subject appears twice")
 

@@ -125,30 +125,38 @@ regions. In ABIDE, `T` is fixed by each site's scanning protocol: the median is
 176, with a range of 78 (OHSU) to 316. The rule therefore drops whole sites,
 not random subjects.
 
-The table below was measured on BERTHA on 2026-11-15. "T ≥ 2p" counts all 871
-quality-checked subjects (PCP `cpac`, `nofilt_noglobal`). "Constant ROI" and
-"Kept" come from a sample of 5 subjects per site (100 subjects). A region
-outside a subject's field of view has a constant (zero) signal, so its SCM is
-singular and the subject is excluded as not SPD. `T` was checked to be the same
-for every derivative of a subject.
+The table below was measured on BERTHA on 2026-11-15, on the 871
+quality-checked subjects (PCP `cpac`, `nofilt_noglobal`).
 
-| Atlas (`atlas=`) | p | 2p | T ≥ 2p (871) | Sites left | Constant ROI (sample) | Kept (sample) |
+- "T ≥ 2p" counts all 871 subjects. Its median T is that of the subjects
+  passing the rule; the median over all 871 is 176 for every atlas.
+- "Constant ROI" comes from a sample of 5 subjects per site (100 subjects). A
+  region outside a subject's field of view has a constant (zero) signal. Its
+  SCM is singular, so the subject is excluded as not SPD.
+- `T` was checked to be the same for every derivative of a subject.
+
+For the default atlas, the full cohort was run through `NilearnConnectomes`.
+It keeps **375 / 871 subjects (43.1 %)** from 12 sites: 447 are excluded for
+`T < 194` and 49 for a constant ROI. 194 are controls and 181 have autism, and
+the median T is 236.
+
+| Atlas (`atlas=`) | p | 2p | T ≥ 2p (871) | Median T (kept) | Sites left | Constant ROI (sample) |
 |---|---|---|---|---|---|---|
-| `tt` (Talairach) **default** | 97 | 194 | 424 (48.7 %) | 12 | 15 % | 40 / 100 |
-| `ho` (Harvard-Oxford) | 111 | 222 | 266 (30.5 %) | 7 | 36 % | 21 / 100 |
-| `aal` | 116 | 232 | 266 (30.5 %) | 7 | 10 % | 27 / 100 |
-| `ez` (Eickhoff-Zilles) | 116 | 232 | 266 (30.5 %) | 7 | 9 % | 27 / 100 |
-| `dosenbach160` | 161 | 322 | 0 | 0 | 9 % | 0 / 100 |
-| `cc200` (Craddock 200) | 200 | 400 | 0 | 0 | 6 % | 0 / 100 |
-| `cc400` (Craddock 400) | 392 | 784 | 0 | 0 | 12 % | 0 / 100 |
+| `tt` (Talairach) **default** | 97 | 194 | 424 (48.7 %) | 236 | 12 | 15 % |
+| `ho` (Harvard-Oxford) | 111 | 222 | 266 (30.5 %) | 246 | 7 | 36 % |
+| `aal` | 116 | 232 | 266 (30.5 %) | 246 | 7 | 10 % |
+| `ez` (Eickhoff-Zilles) | 116 | 232 | 266 (30.5 %) | 246 | 7 | 9 % |
+| `dosenbach160` | 161 | 322 | 0 | – | 0 | 9 % |
+| `cc200` (Craddock 200) | 200 | 400 | 0 | – | 0 | 6 % |
+| `cc400` (Craddock 400) | 392 | 784 | 0 | – | 0 | 12 % |
 
 T per site: OHSU 78; MAX_MUN, UCLA_1 and UCLA_2 116 (a few MAX_MUN at 196);
 KKI 152; CALTECH and TRINITY 146; NYU and SDSU 176; PITT, SBL and YALE 196;
 OLIN 206; CMU 202–316; USM 232–236; STANFORD 176–236; LEUVEN_1 and LEUVEN_2
 246; UM_1 and UM_2 296.
 
-The ABIDE default is therefore `tt`: it is the only ROI derivative that keeps
-about half the cohort, across 12 sites. The kept cohort is *site-selected*:
+The ABIDE default is therefore `tt`. It keeps the most subjects (43 %) and
+the most sites (12) of all ROI derivatives. The kept cohort is *site-selected*:
 the short-scan sites (NYU, UCLA, KKI, OHSU, ...) are gone. Results on it are
 not comparable with results on the full ABIDE.
 

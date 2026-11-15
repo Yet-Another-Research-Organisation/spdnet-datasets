@@ -175,6 +175,11 @@ def test_cache_key_covers_atlas_and_options(cache, abide):
     assert abide.calls == 5
     assert abide.kwargs[2] == {"SITE_ID": ["NYU", "UM_1", "USM"]}
     assert len(list((cache / "nilearn_abide" / "processed").iterdir())) == 5
+    # a NumPy array of IDs is keyed by value, not by its truncated repr
+    ids = np.arange(50000, 50000 + 10 * len(SITES), 10)
+    _make(cache, fetcher_kwargs={"SUB_ID": ids})
+    _make(cache, fetcher_kwargs={"SUB_ID": ids.tolist()})
+    assert abide.calls == 6
 
 
 def test_keep_covariance_forbids_raw(cache, abide):
@@ -265,6 +270,8 @@ def test_adhd_sites_and_labels(cache, monkeypatch):
     assert ds.atlas == "msdl" and len(ds) == n and tuple(ds[0][0].shape) == (39, 39)
     assert ds.classes == ["control", "adhd"] and ds.labels.tolist() == [0, 1] * 10
     assert set(ds.sites) == {"KKI", "NYU", "Peking", "OHSU"}  # Peking_* merged
+    assert ds.metadata["subject"].iloc[1] == "0000001"  # leading zeros kept
+    assert ds.phenotypic["Subject"].iloc[1] == "0000001"
     assert _fake_extract.confounds == [f"c{i}" for i in range(n)]
     sg = ds.splits["site_grouped"]
     assert_no_leakage(ds.sites[sg["train"]], ds.sites[sg["test"]], what="site")
