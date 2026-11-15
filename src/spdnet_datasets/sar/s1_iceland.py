@@ -75,7 +75,7 @@ COARSE_MAP = {"other_vegetation": "vegetation", "periodic_herbaceous": "vegetati
               "snow_ice": "snow_ice", "open_spaces": "open_spaces"}
 IGNORE = 255
 BLOCK_PX = 1000  # 10 km blocks of the official split on the 10 m grid
-VERSION = 1  # bump when the preprocessing changes (part of the cache key)
+VERSION = 2  # bump when the preprocessing or the cache key changes
 
 
 def _doy(d):
