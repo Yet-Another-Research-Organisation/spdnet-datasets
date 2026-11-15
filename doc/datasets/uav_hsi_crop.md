@@ -82,8 +82,8 @@ and `code 27` have 4 each. Each scene holds only part of the codes.
 5. **Estimator**: SCM (sample covariance matrix) by default. With n close
    to 2p, `estimator="ledoit_wolf"` is advisable.
 6. **Normalisation**: covariances are scaled on the training part of `split`
-   (geometric mean of the eigenvalues = 1). Means and raw windows are not
-   scaled.
+   (geometric mean of the eigenvalues = 1). Means and raw windows are
+   multiplied by √s.
 
 ```{raw} html
 <iframe src="../_static/figures/uav_hsi_crop/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>

@@ -105,8 +105,9 @@ The union cells, built on the train and test labels merged, number 5 033 in
 The mean output is the per-channel mean over the labelled pixels. For
 `logpower`, these are the p log-powers. For `t6`, they are the 36 real T6
 parameters per band: the diagonals, then the real and imaginary parts of the
-upper terms. At load time, the geometric scale of `core.normalize` is fitted
-on the training part.
+upper terms. At load time, the geometric scale s of `core.normalize` is fitted
+on the training part; means and raw features are multiplied by √s (the `t6`
+means, which are T6 entries, by s).
 
 ```{raw} html
 <iframe src="../_static/figures/pol_insar_island/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>

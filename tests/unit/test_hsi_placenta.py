@@ -61,6 +61,19 @@ def test_raw_mode_returns_numpy_window(placenta_dir, tmp_path):
     np.testing.assert_allclose(cov.numpy(), np.cov(X.T, bias=True), rtol=1e-6)
 
 
+def test_normalisation_scales_mean_and_raw_by_sqrt_s(placenta_dir, tmp_path):
+    ds = PlacentaDataset(placenta_dir, cache_dir=tmp_path / "c", verbose=False, return_mean=True,
+                         return_raw=True)
+    (cov, mean, raw), _ = ds[0]
+    (cov0, mean0, raw0), _ = PlacentaDataset(placenta_dir, cache_dir=tmp_path / "c", verbose=False, normalize=False, return_mean=True,
+                         return_raw=True)[0]
+    s = ds.scale
+    assert s != 1.0
+    np.testing.assert_allclose(cov.numpy(), s * cov0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(mean.numpy(), np.sqrt(s) * mean0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(raw.numpy(), np.sqrt(s) * raw0.numpy(), rtol=1e-6)
+
+
 def test_small_windows_violate_n_ge_2p(tmp_path):
     root = _make(tmp_path / "Small", size=8)  # 64 pixels < 2 * 37
     with pytest.raises(InsufficientSamplesError):

@@ -80,8 +80,8 @@ The construction follows the atlas recipe, as did the former `series_rices`:
 4. **Estimator**: SCM (sample covariance matrix) by default;
    `"ledoit_wolf"`, `"tyler"` or `"student"` are also available.
 5. **Normalisation**: covariances are scaled on the training part of `split`
-   (geometric mean of the eigenvalues = 1). Means and raw pixels are not
-   scaled.
+   (geometric mean of the eigenvalues = 1). Means and raw pixels are
+   multiplied by √s.
 
 The segmentation gives 8 803 grains. The atlas fiche gives 8 796 (48 to 54
 per cube): the small difference comes from the segmentation details.

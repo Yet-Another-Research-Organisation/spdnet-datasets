@@ -39,7 +39,9 @@ of border pixels hold interpolated negative values). A sample needs
 
 Outputs: covariance ``(p, p)``; mean = per-channel mean ``(p,)``; raw = the
 valid pixels ``(n_i, p)`` of the sample (parcels are irregular, so ``n_i``
-varies; there is no ``(N, M, p)`` grid).
+varies; there is no ``(N, M, p)`` grid). With ``normalize=True`` the
+covariances are multiplied by the geometric scale ``s``, the mean and raw by
+``sqrt(s)``.
 
 Splits: no official split. ``"sgkf5_fold{k}"`` are ``StratifiedGroupKFold(5)``
 folds grouped by parcel (site), with a grouped validation part;
@@ -316,8 +318,9 @@ class CPAZMaLDataset(BaseDataset):
 
     def __getitem__(self, idx):
         cov = torch.from_numpy(apply_scale(self.covariances[idx], self.scale))
-        mean = torch.from_numpy(self.means[idx])
-        raw = torch.from_numpy(self._raw(idx)) if self.return_raw else None
+        root = np.sqrt(self.scale)
+        mean = torch.from_numpy(self.means[idx] * root)
+        raw = torch.from_numpy((self._raw(idx) * root).astype(np.float32)) if self.return_raw else None
         x = self._pack(cov, mean, raw)
         if self.transform is not None:
             x = self.transform(x)

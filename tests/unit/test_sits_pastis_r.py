@@ -261,6 +261,18 @@ def test_output_tuples(pastis_dir, tmp_path):
     np.testing.assert_allclose(raw.numpy().mean(0), mean.numpy(), atol=1e-5)
 
 
+def test_normalisation_scales_mean_and_raw_by_sqrt_s(pastis_dir, tmp_path):
+    kw = {"cache_dir": tmp_path / "c", "ref_date": REF, "verbose": False}
+    ds = PastisRDataset(pastis_dir, return_mean=True, return_raw=True, **kw)
+    (cov, mean, raw), _ = ds[0]
+    (cov0, mean0, raw0), _ = PastisRDataset(pastis_dir, normalize=False, return_mean=True, return_raw=True, **kw)[0]
+    s = ds.scale
+    assert s != 1.0
+    np.testing.assert_allclose(cov.numpy(), s * cov0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(mean.numpy(), np.sqrt(s) * mean0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(raw.numpy(), np.sqrt(s) * raw0.numpy(), rtol=1e-6)
+
+
 def test_transform_is_applied(pastis_dir, tmp_path):
     kw = {"cache_dir": tmp_path / "c", "ref_date": REF, "verbose": False}
     ds = PastisRDataset(pastis_dir, **kw)

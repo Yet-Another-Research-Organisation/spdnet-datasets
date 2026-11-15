@@ -52,4 +52,7 @@ $$ s = \exp\!\Big(-\operatorname{mean}_{C \in \text{train}} \operatorname{mean}_
 
 so that the geometric mean of the training eigenvalues is 1. The scalar is
 fitted on the training split only and applied to every split. Cached
-covariances are stored unscaled.
+covariances are stored unscaled. The mean and the raw data are multiplied by
+$\sqrt{s}$, so that they stay consistent with the covariance (the covariance
+of $\sqrt{s}\,x$ is $s\,C$); the SAR datasets that only return raw data or
+means (no covariance) are not scaled.

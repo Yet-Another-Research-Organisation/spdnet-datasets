@@ -81,8 +81,8 @@ class, probably a filter change of the sensor.
    may keep them. The splits are drawn on the list of all windows, so two
    estimators share the same test images.
 4. **Normalisation**: covariances are scaled on the training part of `split`
-   (geometric mean of the eigenvalues = 1). Means and raw windows are not
-   scaled.
+   (geometric mean of the eigenvalues = 1). Means and raw windows are
+   multiplied by √s.
 
 ```{raw} html
 <iframe src="../_static/figures/placenta/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>

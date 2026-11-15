@@ -95,7 +95,7 @@ The construction follows the original preprocessing script; the window size is
 5. **Normalisation**: with `normalize=True` (the default), the covariances are
    multiplied by a scalar fitted on the training part of `split`, so that the
    geometric mean of their eigenvalues is 1. The cache keeps the unscaled
-   matrices. Means and raw windows are returned unscaled.
+   matrices. Means and raw windows are multiplied by √s.
 
 ```{raw} html
 <iframe src="../_static/figures/gsoff/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>

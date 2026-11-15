@@ -75,8 +75,8 @@ spectrum per class.
 3. **Estimator**: SCM (sample covariance matrix) of the centred pixels by
    default; `"ledoit_wolf"`, `"tyler"` or `"student"` are also available.
 4. **Normalisation**: covariances are scaled on the training part of `split`
-   (geometric mean of the eigenvalues = 1). Means and raw patches are not
-   scaled.
+   (geometric mean of the eigenvalues = 1). Means and raw patches are
+   multiplied by √s.
 
 The unlabelled validation set (300 patches: 11 zero and 1 short, so 288
 covariances) is available through `fetch_kaggle_wheat(part="val")`. Its labels

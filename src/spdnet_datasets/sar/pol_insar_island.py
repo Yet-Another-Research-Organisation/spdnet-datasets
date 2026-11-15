@@ -37,6 +37,9 @@ Outputs: covariance; mean = per-channel mean over the labelled pixels
 (``logpower``: ``p`` log-powers; ``t6``: the 36 real T6 parameters per band,
 diagonals then ``Re``/``Im`` of the upper terms); raw (``logpower``) = the
 ``(32, 32, p)`` features of every pixel of the cell (unlabelled ones included).
+With ``normalize=True`` the covariances are multiplied by the geometric scale
+``s``, the mean and raw by ``sqrt(s)`` (``t6`` means, which are T6 entries, by
+``s``).
 
 Splits
 ------
@@ -366,12 +369,15 @@ class PolInSARIslandDataset(BaseDataset):
 
     def __getitem__(self, idx):
         cov = torch.from_numpy(apply_scale(self.covariances[idx], self.scale))
-        mean = torch.from_numpy(self.means[idx])
+        # mean and raw x sqrt(s); "t6" means are T6 entries (second order): x s
+        t6 = self._fetch["representation"] == "t6"
+        mean = torch.from_numpy(self.means[idx] * (self.scale if t6 else np.sqrt(self.scale)))
         raw = None
         if self.return_raw:
             if not hasattr(self, "_raw"):
                 self._raw = np.load(Path(self._processed) / "raw.npy", mmap_mode="r")
-            raw = torch.from_numpy(np.array(self._raw[self._keep[idx]], dtype=np.float32))
+            raw = torch.from_numpy((np.asarray(self._raw[self._keep[idx]])
+                                    * np.sqrt(self.scale)).astype(np.float32))
         x = self._pack(cov, mean, raw)
         if self.transform is not None:
             x = self.transform(x)

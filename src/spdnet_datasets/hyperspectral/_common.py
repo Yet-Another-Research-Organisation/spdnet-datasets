@@ -305,6 +305,10 @@ class HSIDataset(BaseDataset):
     balancing (``"recommended"`` by default); ``subset`` (``"train"``,
     ``"val"``, ``"test"``) optionally restricts the dataset to one part of it
     (``splits`` is then emptied).
+
+    With ``normalize=True`` the covariances are multiplied by the geometric
+    scale ``s`` of the training part, the mean and the raw pixels by
+    ``sqrt(s)``.
     """
 
     COARSE_MAP = None
@@ -414,9 +418,10 @@ class HSIDataset(BaseDataset):
         k = int(self._index[i])
         cov = torch.from_numpy(np.asarray(self.bunch.covariances[k], dtype=np.float64)
                                * self.scale)
-        mean = torch.from_numpy(np.asarray(self.bunch.means[k], dtype=np.float64)) \
+        root = np.sqrt(self.scale)  # mean and raw x sqrt(s), so that cov(raw) x s
+        mean = torch.from_numpy(np.asarray(self.bunch.means[k], dtype=np.float64) * root) \
             if self.return_mean else None
-        raw = torch.from_numpy(np.array(self._load_raw(k), dtype=np.float32)) \
+        raw = torch.from_numpy((np.asarray(self._load_raw(k)) * root).astype(np.float32)) \
             if self.return_raw else None
         x = self._pack(cov, mean, raw)
         if self.transform is not None:

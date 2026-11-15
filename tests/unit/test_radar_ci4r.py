@@ -112,6 +112,18 @@ def test_cache_key_has_source_and_estimator_only_in_covariances(data, tmp_path):
     assert lw.processed_path == a.processed_path and lw.covariance_path != a.covariance_path
 
 
+def test_normalisation_scales_mean_and_raw_by_sqrt_s(data, tmp_path):
+    kw = {"band": 0.5, "p": P, "cache_dir": tmp_path / "cache", "verify": None, "verbose": False}
+    ds = CI4RDataset(data, return_mean=True, return_raw=True, **kw)
+    (cov, mean, raw), _ = ds[0]
+    (cov0, mean0, raw0), _ = CI4RDataset(data, normalize=False, return_mean=True, return_raw=True, **kw)[0]
+    s = ds.scale
+    assert s != 1.0
+    np.testing.assert_allclose(cov.numpy(), s * cov0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(mean.numpy(), np.sqrt(s) * mean0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(raw.numpy(), np.sqrt(s) * raw0.numpy(), rtol=1e-6)
+
+
 def test_transform_is_applied(data, tmp_path):
     kw = {"band": 0.5, "p": P, "cache_dir": tmp_path / "cache", "verify": None, "verbose": False}
     ds = CI4RDataset(data, **kw)

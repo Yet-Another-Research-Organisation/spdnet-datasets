@@ -51,7 +51,8 @@ def test_raw_is_the_band_subsampled_window(chikusei_dir, tmp_path):
     (cov, raw), y = ds[0]
     with h5py.File(chikusei_dir / PREPARED) as f:
         ref = f["w15/windows"][0][..., ::2]
-    assert raw.shape == (15, 15, 64) and np.array_equal(raw.numpy(), ref)
+    assert raw.shape == (15, 15, 64)
+    np.testing.assert_allclose(raw.numpy(), np.sqrt(ds.scale) * ref, rtol=1e-6)
     X = ref.reshape(-1, 64).astype(float)
     np.testing.assert_allclose(cov.numpy() / ds.scale, np.cov(X.T, bias=True), rtol=1e-10)
 

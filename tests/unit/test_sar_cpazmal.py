@@ -103,6 +103,17 @@ def test_splits_and_normalisation(cpaz_dir, tmp_path):
     assert abs(np.mean(np.log(np.linalg.eigvalsh(covs)))) < 1e-8
 
 
+def test_normalisation_scales_mean_and_raw_by_sqrt_s(cpaz_dir, tmp_path):
+    ds = _make(cpaz_dir, tmp_path, return_mean=True, return_raw=True)
+    (cov, mean, raw), _ = ds[0]
+    (cov0, mean0, raw0), _ = _make(cpaz_dir, tmp_path, normalize=False, return_mean=True, return_raw=True)[0]
+    s = ds.scale
+    assert s != 1.0
+    np.testing.assert_allclose(cov.numpy(), s * cov0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(mean.numpy(), np.sqrt(s) * mean0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(raw.numpy(), np.sqrt(s) * raw0.numpy(), rtol=1e-6)
+
+
 def test_select_dates_and_task_options(cpaz_dir, tmp_path):
     assert select_dates(HV_DATES, 20)[0] == HV_DATES[0] and select_dates(HV_DATES, 20)[-1] == HV_DATES[-1]
     with pytest.raises(ValueError):

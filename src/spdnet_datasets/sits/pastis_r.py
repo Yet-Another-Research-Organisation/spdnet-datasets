@@ -844,9 +844,11 @@ class PastisRDataset(BaseDataset):
         return ((X - self._mu) / self._sd).astype(np.float32)
 
     def __getitem__(self, i):
-        cov = torch.from_numpy(self.covariances[i])
-        mean = torch.from_numpy(self.means[i]) if self.return_mean else None
-        raw = torch.from_numpy(self.raw_pixels(i)) if self.return_raw else None
+        cov = torch.from_numpy(self.covariances[i])  # already multiplied by self.scale
+        root = np.sqrt(self.scale)
+        mean = torch.from_numpy(self.means[i] * root) if self.return_mean else None
+        raw = (torch.from_numpy((self.raw_pixels(i) * root).astype(np.float32))
+               if self.return_raw else None)
         x = self._pack(cov, mean, raw)
         if self.transform is not None:
             x = self.transform(x)

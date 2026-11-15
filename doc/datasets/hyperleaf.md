@@ -80,8 +80,8 @@ The figures show the cultivar counts and the mean spectrum per cultivar.
 3. **Estimator**: SCM (sample covariance matrix) by default;
    `"ledoit_wolf"`, `"tyler"` or `"student"` are also available.
 4. **Normalisation**: covariances are scaled on the training part of `split`
-   (geometric mean of the eigenvalues = 1). Means and raw images are not
-   scaled.
+   (geometric mean of the eigenvalues = 1). Means and raw images are
+   multiplied by √s.
 
 `mode="image"` keeps the former image mode. `x` is then the image restricted
 to `bands` (by default bands 81, 51 and 21, approximately red, green and blue),

@@ -72,6 +72,26 @@ def test_logpower_covariances(pol_dir, tmp_path):
     assert ds.classes == ["coastal shrub", "tidal flat", "water"]
 
 
+def test_normalisation_scales_mean_and_raw_by_sqrt_s(pol_dir, tmp_path):
+    ds = _make(pol_dir, tmp_path, return_mean=True, return_raw=True)
+    (cov, mean, raw), _ = ds[0]
+    (cov0, mean0, raw0), _ = _make(pol_dir, tmp_path, normalize=False, return_mean=True, return_raw=True)[0]
+    s = ds.scale
+    assert s != 1.0
+    np.testing.assert_allclose(cov.numpy(), s * cov0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(mean.numpy(), np.sqrt(s) * mean0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(raw.numpy(), np.sqrt(s) * raw0.numpy(), rtol=1e-6)
+
+
+def test_t6_means_are_scaled_like_the_covariances(pol_dir, tmp_path):
+    ds = _make(pol_dir, tmp_path, representation="t6", return_mean=True)
+    (cov, mean), _ = ds[0]
+    (cov0, mean0), _ = _make(pol_dir, tmp_path, representation="t6", return_mean=True,
+                             normalize=False)[0]
+    np.testing.assert_allclose(cov.numpy(), ds.scale * cov0.numpy(), rtol=1e-12)
+    np.testing.assert_allclose(mean.numpy(), ds.scale * mean0.numpy(), rtol=1e-12)
+
+
 def test_t6_representation_is_realified_block_diagonal(pol_dir, tmp_path):
     ds = _make(pol_dir, tmp_path, representation="t6", normalize=False)
     C = ds.covariances

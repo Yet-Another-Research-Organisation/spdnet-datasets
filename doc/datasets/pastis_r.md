@@ -165,7 +165,8 @@ standardised (mean 0, standard deviation 1). The statistics are pooled over the
 pixels of the **training folds of the chosen split** only, so Ledoit-Wolf
 shrinkage is not dominated by the S2 bands and no test statistic is used. The
 covariance cache therefore depends on `split`. At load time, the scalar
-geometric scale of `core.normalize` is fitted on the training covariances. The
+geometric scale s of `core.normalize` is fitted on the training covariances
+(means and raw pixels are multiplied by √s). The
 `NORM_*.json` files shipped with PASTIS are not used, because they do not cover
 NDVI, NDWI or the radar ratio.
 

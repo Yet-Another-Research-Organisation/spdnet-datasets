@@ -98,7 +98,7 @@ smallest:
 5. **Normalisation**: with `normalize=True` (the default), the covariances are
    multiplied by a scalar fitted on the training part of `split`, so that the
    geometric mean of their eigenvalues is 1. Means and raw windows are
-   returned unscaled.
+   multiplied by √s.
 
 The windows are not re-extracted from the source scene. The block assignment
 of the split exists only in `prepared_v2`, and a re-extraction gives the same

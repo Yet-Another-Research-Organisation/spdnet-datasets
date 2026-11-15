@@ -132,7 +132,8 @@ parcels have 317 to about 195 000 valid pixels, with a median of about
 10 000, so n/p is always above 7.
 
 **Normalisation.** The cache keeps unscaled covariances. At load time, the
-geometric scale of `core.normalize` is fitted on the training part of `split`.
+geometric scale s of `core.normalize` is fitted on the training part of `split`;
+means and raw pixels are multiplied by √s.
 The median condition number of the SCM (sample covariance matrix) covariances is about 90 (DSC) and 150
 (ASC) per parcel, and about 250 with 16 × 16 blocks.
 

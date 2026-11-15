@@ -144,8 +144,8 @@ class RadarCovarianceDataset(BaseDataset):
     weights. ``subset="train"|"val"|"test"`` restricts the instance to one part
     of that split (``splits`` is then emptied).
 
-    Only the covariances are scaled by the normalisation; ``mean`` and ``raw``
-    stay in the units of the preprocessed spectrogram.
+    With ``normalize=True`` the covariances are multiplied by the geometric
+    scale ``s`` of the training part, ``mean`` and ``raw`` by ``sqrt(s)``.
     """
 
     COARSE_MAP = None
@@ -229,12 +229,13 @@ class RadarCovarianceDataset(BaseDataset):
         j = int(self._index[i])
         b = self._bunch
         cov = torch.from_numpy(b.covariances[j] * self.scale)
-        mean = torch.from_numpy(b.means[j]) if self.return_mean else None
+        root = np.sqrt(self.scale)
+        mean = torch.from_numpy(b.means[j] * root) if self.return_mean else None
         raw = None
         if self.return_raw:
             r = int(b.meta["raw_index"].iat[j])
             a, e = self._offsets[r], self._offsets[r + 1]
-            raw = torch.from_numpy(np.array(self._raw[a:e], dtype=np.float32))
+            raw = torch.from_numpy((np.asarray(self._raw[a:e]) * root).astype(np.float32))
         x = self._pack(cov, mean, raw)
         if self.transform is not None:
             x = self.transform(x)
