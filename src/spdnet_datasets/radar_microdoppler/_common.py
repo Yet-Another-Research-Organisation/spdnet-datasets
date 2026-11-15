@@ -198,7 +198,8 @@ class RadarCovarianceDataset(BaseDataset):
                 tr = parts["train"]
                 parts["train"] = tr[balance_indices(self.labels[tr], self.balance, self.seed)]
         train = splits[self.split]["train"]
-        self.class_weights = class_weights(self.labels[train]) if len(train) else None
+        self.class_weights = (class_weights(self.labels[train], n_classes=len(self.classes))
+                              if len(train) else None)
         self.scale = 1.0
         if self.normalize and len(train):
             self.scale = geometric_scale(b.covariances[idx[np.unique(train)]])

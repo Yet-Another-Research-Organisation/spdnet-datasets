@@ -365,7 +365,8 @@ class HSIDataset(BaseDataset):
                 train = parts["train"]
                 parts["train"] = train[balance_indices(y[train], self.balance, seed=self.seed)]
         elif self.balance == "weights":
-            self.class_weights = class_weights(y[splits[split]["train"]])
+            self.class_weights = class_weights(y[splits[split]["train"]],
+                                               n_classes=len(self.classes))
         elif self.balance is not None:
             raise ValueError("balance must be None, 'undersample', 'oversample' or 'weights'")
 

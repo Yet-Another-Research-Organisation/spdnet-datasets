@@ -809,7 +809,7 @@ class PastisRDataset(BaseDataset):
             tr = parts["train"]
             parts["train"] = tr[balance_indices(y[tr], self.balance, seed=self.seed)]
         if self.balance == "weights":
-            self.class_weights = class_weights(y[parts["train"]])
+            self.class_weights = class_weights(y[parts["train"]], n_classes=len(class_names))
 
         self.covariances = b.covariances[idx]
         self.means = b.means[idx]

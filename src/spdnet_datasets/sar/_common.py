@@ -79,7 +79,7 @@ def finalize_labels(ds, labels, groups, splits, *, coarse_map=None):
     ds.class_to_idx = {c: i for i, c in enumerate(names)}
     ds.groups = np.asarray(groups)[keep]
     ds.splits = new_splits
-    ds.class_weights = class_weights(y) if len(y) else np.zeros(0)
+    ds.class_weights = class_weights(y, n_classes=len(names)) if len(y) else np.zeros(0)
     return keep
 
 

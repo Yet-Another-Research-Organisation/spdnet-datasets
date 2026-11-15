@@ -124,6 +124,11 @@ def test_balancing():
     assert w[1] / w[0] == pytest.approx(3.0)
 
 
+def test_class_weights_keep_classes_absent_from_train():
+    w = class_weights(np.array([0, 0, 2]), n_classes=4)
+    assert len(w) == 4 and w[1] == w[3] == 0 and w[2] / w[0] == pytest.approx(2.0)
+
+
 # --- splits -----------------------------------------------------------------
 
 

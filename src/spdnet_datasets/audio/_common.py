@@ -316,7 +316,7 @@ class SequenceCovarianceDataset(BaseDataset):
         if parts is not None and self.balance is not None:
             train = parts["train"]
             if self.balance == "weights":
-                self.class_weights = class_weights(labels[train])
+                self.class_weights = class_weights(labels[train], n_classes=len(self.classes))
             else:
                 parts["train"] = train[balance_indices(labels[train], self.balance,
                                                        seed=self.seed)]
