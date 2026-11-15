@@ -52,7 +52,12 @@ import torch
 
 from ..base import BaseDataset
 from ..core.config import dataset_path
-from ..core.estimators import NotSPDError, channel_mean, estimate_covariance
+from ..core.estimators import (
+    InsufficientSamplesError,
+    NotSPDError,
+    channel_mean,
+    estimate_covariance,
+)
 from ..core.fetch import Bunch, run_pipeline, verify_local
 from ..core.normalize import apply_scale, geometric_scale
 from ..core.tasks import apply_task, balance_indices, class_weights
@@ -166,11 +171,17 @@ def _load_raw(proc):
 
 
 def _covariances(proc, out, *, estimator):
-    """Covariances and means on the valid pixels; non-SPD samples are flagged."""
+    """Covariances and means on the valid pixels; failing samples are flagged.
+
+    A sample with too few valid pixels (:class:`InsufficientSamplesError`) or a
+    non-SPD covariance is flagged in ``spd_ok.npy``; the last error is raised
+    when no sample is left.
+    """
     raw, valid, info = _load_raw(proc)
     n, p = info["n"], info["p"]
     covs, means = np.zeros((n, p, p)), np.zeros((n, p))
     ok = np.ones(n, dtype=bool)
+    error = None
     for i in range(n):
         X = raw[i][valid[i]].astype(np.float64) / info["amp_scale"]
         means[i] = channel_mean(X)
@@ -179,8 +190,10 @@ def _covariances(proc, out, *, estimator):
             continue
         try:
             covs[i] = estimate_covariance(X, estimator=estimator)
-        except NotSPDError:
-            ok[i] = False
+        except (InsufficientSamplesError, NotSPDError) as exc:
+            ok[i], error = False, exc
+    if n and not ok.any() and error is not None:
+        raise error
     np.save(out / "covariances.npy", covs)
     np.save(out / "means.npy", means)
     np.save(out / "spd_ok.npy", ok)
@@ -214,8 +227,8 @@ def fetch_s1_iceland(data_dir=None, cache_dir=None, keep=None, estimator="scm", 
         ``covariances`` (N, 30, 30) unscaled, ``means`` (N, 30), ``labels`` (N,)
         indices into ``class_names``, ``groups`` (10 km block ids), ``meta``
         (DataFrame), ``splits`` ({"official": {"train", "val", "test"}}),
-        ``dates`` and ``dropped_dates`` per split, ``n_excluded`` (non-SPD
-        samples per split), ``amp_scale``, ``processed_path`` (or None) and
+        ``dates`` and ``dropped_dates`` per split, ``n_excluded`` (non-SPD or
+        too few valid pixels, per split), ``amp_scale``, ``processed_path`` (or None) and
         ``covariance_path``.
     """
     import pandas as pd
@@ -227,9 +240,10 @@ def fetch_s1_iceland(data_dir=None, cache_dir=None, keep=None, estimator="scm", 
         raise OSError(f"{len(bad)} files of {root} differ from MANIFEST_NAS.tsv, e.g. {bad[:3]}")
     sel = {"block": block, "min_labeled": min_labeled, "min_valid": min_valid,
            "min_purity": min_purity}
-    params = {"version": VERSION, "source": str(root), "estimator": estimator, **sel}
+    params = {"version": VERSION, "source": str(root), **sel}
     res = run_pipeline(
         "s1_iceland", params=params, cache_dir=cache_dir, keep=keep, force=force,
+        covariance_params={"estimator": estimator},
         process_fn=lambda _src, out: _process(root, out, **sel),
         covariance_fn=lambda proc, out: _covariances(proc, out, estimator=estimator))
     cdir = res.covariance_dir
@@ -285,7 +299,9 @@ class S1IcelandDataset(BaseDataset):
         (``"official"``; ``"recommended"`` is an alias).
     subset : {None, "train", "val", "test"}
         Keep only one part of ``split`` (default: all samples, use
-        ``dataset.splits`` or ``create_dataloaders(split="official")``).
+        ``dataset.splits`` or ``create_dataloaders(split="official")``). With a
+        subset, ``dataset.splits`` keeps ``split`` and ``"recommended"``, whose
+        ``subset`` part holds every sample and the other parts are empty.
     cache_dir, keep, force, verify, block, min_labeled, min_valid, min_purity
         Passed to :func:`fetch_s1_iceland`.
     task : {"fine", "coarse"}
@@ -306,7 +322,7 @@ class S1IcelandDataset(BaseDataset):
         self._fetch_kw = {"cache_dir": cache_dir, "keep": keep, "force": force,
                           "verify": verify, "block": block, "min_labeled": min_labeled,
                           "min_valid": min_valid, "min_purity": min_purity}
-        self._raw = None
+        self._raw = self._valid = None
         self._load_data()
 
     def _load_data(self):
@@ -328,12 +344,15 @@ class S1IcelandDataset(BaseDataset):
                 parts["train"] = tr[balance_indices(y[tr], self.balance, seed=self.seed)]
         splits["recommended"] = splits["official"]  # alias (PLAN template)
         train = splits[self.split]["train"]
-        self.scale = geometric_scale(covs[train]) if self.normalize else 1.0
+        # fitted on the distinct training samples, not on the oversampled indices
+        self.scale = geometric_scale(covs[np.unique(train)]) if self.normalize else 1.0
         self.class_weights = class_weights(y[train]) if self.balance == "weights" else None
         idx = np.arange(len(y))
         if self.subset is not None:
             idx = splits[self.split][self.subset]
-            splits = {self.split: {self.subset: np.arange(len(idx))}}
+            empty = np.array([], dtype=np.int64)
+            parts = {sp: np.arange(len(idx)) if sp == self.subset else empty for sp in SPLITS}
+            splits = {self.split: parts, "recommended": parts}
         self.covariances = apply_scale(covs[idx], self.scale)
         self.means = b.means[keep][idx]
         self.labels = y[idx]
@@ -351,9 +370,11 @@ class S1IcelandDataset(BaseDataset):
 
     def _raw_block(self, i):
         if self._raw is None:
-            self._raw = _load_raw(self._processed_path)[0]
-        block = self._raw[int(self.meta["raw_index"].iloc[i])]
-        return torch.from_numpy(block.astype(np.float32) / np.float32(self.amp_scale))
+            self._raw, self._valid, _ = _load_raw(self._processed_path)
+        k = int(self.meta["raw_index"].iloc[i])
+        block = self._raw[k].astype(np.float32) / np.float32(self.amp_scale)
+        block[~self._valid[k]] = 0  # invalid pixels at 0, as excluded from the covariance
+        return torch.from_numpy(block)
 
     def __getitem__(self, i):
         cov = torch.from_numpy(np.array(self.covariances[i]))

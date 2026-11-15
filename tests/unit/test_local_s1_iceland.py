@@ -147,7 +147,10 @@ def test_tasks_subset_and_registry(fake):
     root, cache = fake
     ds = S.S1IcelandDataset(root, cache_dir=cache, subset="test", task="coarse", verbose=False)
     assert len(ds) == 4 and set(ds.classes) <= {"vegetation", "water"}
-    assert list(ds.splits) == ["official"] and len(ds.splits["official"]["test"]) == 4
+    assert list(ds.splits) == ["official", "recommended"]
+    assert ds.splits["recommended"] is ds.splits["official"]
+    assert len(ds.splits["official"]["test"]) == 4
+    assert len(ds.splits["official"]["train"]) == len(ds.splits["official"]["val"]) == 0
     ds = S.S1IcelandDataset(root, cache_dir=cache, drop_classes=("water",), verbose=False)
     assert "water" not in ds.classes and len(ds) == sum(len(v) for v in ds.splits["official"].values())
     assert DatasetManager.DATASETS["s1_iceland"] is S.S1IcelandDataset
@@ -174,3 +177,54 @@ def test_manifest_mismatch_is_reported(fake):
     (root / "MANIFEST_NAS.tsv").write_text(f"path\tsize\tmtime\n{S.SEG}/.zgroup\t1\tx\n")
     with pytest.raises(OSError, match="MANIFEST"):
         S.fetch_s1_iceland(root, cache_dir=cache)
+
+
+def test_oversampled_train_does_not_bias_the_scale(fake):
+    root, cache = fake
+    ds = S.S1IcelandDataset(root, cache_dir=cache, balance="oversample", verbose=False)
+    tr = ds.splits["official"]["train"]
+    assert len(tr) > len(np.unique(tr))  # some samples are repeated
+    eig = np.linalg.eigvalsh(ds.covariances[np.unique(tr)])
+    assert abs(np.mean(np.log(eig))) < 1e-10
+
+
+def test_too_few_valid_pixels_are_excluded(fake, monkeypatch):
+    root, cache = fake
+    b = S.fetch_s1_iceland(root, cache_dir=cache)
+    real = S.estimate_covariance
+
+    def fail_first(X, **kw):  # the first estimated sub-patch has "too few" pixels
+        if not fail_first.done:
+            fail_first.done = True
+            raise InsufficientSamplesError("too few")
+        return real(X, **kw)
+
+    fail_first.done = False
+    monkeypatch.setattr(S, "estimate_covariance", fail_first)
+    c = S.fetch_s1_iceland(root, cache_dir=cache, force=True)
+    assert sum(c.n_excluded.values()) == sum(b.n_excluded.values()) + 1
+    assert len(c.labels) == len(b.labels) - 1 == len(c.meta) == len(c.covariances)
+
+
+def test_estimator_change_keeps_the_subpatches(fake, monkeypatch):
+    root, cache = fake
+    S.fetch_s1_iceland(root, cache_dir=cache)
+
+    def boom(*a, **k):
+        raise AssertionError("preprocessing redone")
+
+    monkeypatch.setattr(S, "_process", boom)
+    b = S.fetch_s1_iceland(root, cache_dir=cache, estimator="ledoit_wolf")
+    assert b.covariances.shape[1:] == (30, 30)
+
+
+def test_raw_block_zeroes_invalid_pixels(fake):
+    root, cache = fake
+    # 4 out-of-swath pixels in the first sub-patch of a plain training patch (kept)
+    zarr.open_group(str(root / S.SEG), mode="a")["train"]["X"][2, :, :, :2, :2] = 0
+    ds = S.S1IcelandDataset(root, cache_dir=cache, return_raw=True, verbose=False)
+    _, valid, _ = S._load_raw(ds._processed_path)
+    k = next(i for i in range(len(ds)) if not valid[ds.meta.raw_index[i]].all())
+    raw = ds[k][0][1].numpy()
+    v = valid[ds.meta.raw_index[k]]
+    assert (raw[~v] == 0).all() and (raw[v] > 0).all()
