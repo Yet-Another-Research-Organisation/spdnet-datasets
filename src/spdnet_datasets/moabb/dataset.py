@@ -7,7 +7,8 @@ here. This module only caches what it derives from the epochs, under
 :func:`spdnet_datasets.core.fetch.run_pipeline`::
 
     processed/<hash>/   epochs.npy (float32), labels.npy, metadata.csv
-    covariance/<hash>/  covariances.npy, means.npy, labels.npy, metadata.csv
+    covariance/<hash>/  covariances.npy, means.npy, labels.npy, metadata.csv,
+                        trial_index.npy, n_excluded.npy
 
 The covariance stage is keyed on the estimator only on top of the epochs key,
 so changing the estimator does not call ``paradigm.get_data`` again.
@@ -22,6 +23,7 @@ import torch
 
 from ..base import BaseDataset
 from ..core.config import get_cache_dir
+from ..core.estimators import InsufficientSamplesError, NotSPDError
 from ..core.fetch import run_pipeline
 from ..core.normalize import geometric_scale
 from .covariances import epochs_to_covariances
@@ -154,6 +156,11 @@ class MOABBCovariances(BaseDataset):
         cross-session, then within-session).
     scale : float
         Geometric scale applied to the covariances.
+    n_excluded : int
+        Trials dropped because their covariance could not be estimated
+        (too few time samples, or not SPD).
+    trial_index : ndarray of int
+        Index of each kept trial in the cached epochs.
     """
 
     def __init__(self, dataset, paradigm, subjects=None, *, estimator="scm", keep=None,
@@ -186,11 +193,31 @@ class MOABBCovariances(BaseDataset):
         metadata.reset_index(drop=True).to_csv(out / "metadata.csv", index=False)
 
     def _covariances(self, processed, out):
+        """Covariances of the epochs; trials whose estimate fails are excluded.
+
+        A trial raising :class:`InsufficientSamplesError` or :class:`NotSPDError`
+        is dropped from every array (``trial_index.npy`` maps the kept trials to
+        the cached epochs). If no trial is left, the last error is raised.
+        """
         X = np.load(processed / "epochs.npy")
-        np.save(out / "covariances.npy", epochs_to_covariances(X, self.estimator))
-        np.save(out / "means.npy", X.mean(axis=2, dtype=np.float64))
-        np.save(out / "labels.npy", np.load(processed / "labels.npy"))
-        _read_metadata(processed / "metadata.csv").to_csv(out / "metadata.csv", index=False)
+        covs, kept, error = [], [], None
+        for i, epoch in enumerate(X):
+            try:
+                covs.append(epochs_to_covariances(epoch[None], self.estimator)[0])
+            except (InsufficientSamplesError, NotSPDError) as exc:
+                error = exc
+                continue
+            kept.append(i)
+        if not kept:
+            raise error
+        kept = np.asarray(kept, dtype=np.int64)
+        np.save(out / "covariances.npy", np.stack(covs))
+        np.save(out / "means.npy", X[kept].mean(axis=2, dtype=np.float64))
+        np.save(out / "labels.npy", np.load(processed / "labels.npy")[kept])
+        np.save(out / "trial_index.npy", kept)
+        np.save(out / "n_excluded.npy", len(X) - len(kept))
+        metadata = _read_metadata(processed / "metadata.csv").iloc[kept]
+        metadata.reset_index(drop=True).to_csv(out / "metadata.csv", index=False)
 
     def _load_data(self):
         paths = run_pipeline(f"moabb_{self.dataset.code}", params=self._params(),
@@ -200,6 +227,8 @@ class MOABBCovariances(BaseDataset):
         self.paths = paths
         d = paths.covariance_dir
         self.covs = np.load(d / "covariances.npy")
+        self.trial_index = np.load(d / "trial_index.npy")
+        self.n_excluded = int(np.load(d / "n_excluded.npy"))
         self.means = np.load(d / "means.npy")
         self.metadata = _read_metadata(d / "metadata.csv")
         self.classes, self.labels = np.unique(np.load(d / "labels.npy"), return_inverse=True)
@@ -239,6 +268,6 @@ class MOABBCovariances(BaseDataset):
     def __getitem__(self, idx):
         cov = torch.from_numpy(self.covs[idx] * self.scale)
         mean = torch.from_numpy(self.means[idx]) if self.return_mean else None
-        raw = (torch.from_numpy(np.array(self.epochs[idx].T, dtype=np.float32))
+        raw = (torch.from_numpy(np.array(self.epochs[self.trial_index[idx]].T, dtype=np.float32))
                if self.return_raw else None)
         return self._pack(cov, mean, raw), int(self.labels[idx])

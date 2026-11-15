@@ -93,6 +93,7 @@ def test_raw_epoch_matches_covariance(cache):
 
 
 def test_too_short_epochs_raise(cache):
+    # every trial fails: nothing left to exclude, the error is raised
     with pytest.raises(InsufficientSamplesError):
         _make(cache, dataset=FakeDataset(n_times=2 * N_CH - 1))
 
@@ -130,6 +131,27 @@ def test_estimator_change_reuses_the_epochs(cache):
     assert paradigm._calls == 1
     assert scm.paths.processed_dir == lw.paths.processed_dir
     assert scm.paths.covariance_dir != lw.paths.covariance_dir
+
+
+class ConstantTrialParadigm(FakeParadigm):
+    """Trial 5 is constant: its covariance is singular (not SPD)."""
+
+    def get_data(self, dataset, subjects=None):
+        X, y, metadata = super().get_data(dataset, subjects)
+        X[5] = 1.0
+        metadata["trial"] = np.arange(len(y))
+        return X, y, metadata
+
+
+def test_failing_trials_are_excluded_and_counted(cache):
+    paradigm = ConstantTrialParadigm()
+    ds = _make(cache, paradigm=paradigm, return_raw=True)
+    X, y, metadata = paradigm.get_data(FakeDataset(), [1, 2, 3])
+    assert ds.n_excluded == 1 and len(ds) == len(y) - 1
+    assert 5 not in ds.trial_index and ds.metadata["trial"].tolist() == ds.trial_index.tolist()
+    assert [ds.classes[k] for k in ds.labels] == y[ds.trial_index].tolist()
+    check_spd(ds.covariances)
+    np.testing.assert_allclose(ds[5][0][1].numpy().T, X[6], rtol=1e-6)
 
 
 def test_keep_covariance_drops_epochs_and_forbids_raw(cache):
