@@ -12,16 +12,14 @@ from .estimator import EstimateCovariance, EstimateCovarianceTorch
 from .manager import DatasetManager
 
 # Import real datasets to register them
+from .radar_microdoppler import CI4RDataset, DopNetDataset, MVDopplerDataset
 from .real import (
     ChikuseiDataset,
-    CI4RDataset,
     DeepHSFruitDataset,
-    DopNetDataset,
     GSOffDataset,
     HDM05Dataset,
     HyperLeafDataset,
     KaggleWheatDataset,
-    MVDopplerDataset,
     NTU120Dataset,
     PlacentaDataset,
     Rices90Dataset,

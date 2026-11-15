@@ -1,7 +1,8 @@
 """Class selection and per-class limits of the radar/skeleton loaders.
 
-These loaders read one ``.pt`` covariance per file under ``cov/<class>/``
-(``cov/<modality>/<class>/`` for CI4R, ``cov/<split>/<class>/`` for DopNet).
+These loaders read one ``.pt`` covariance per file under ``cov/<class>/``.
+The radar loaders (CI4R, DopNet, MVDoppler) now read the raw data and are
+covered by ``tests/unit/test_radar_*.py``.
 The selection logic does not depend on the file contents, so it is tested on a
 tiny synthetic tree; the real-data tests live in ``tests/real``.
 """
@@ -11,12 +12,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from spdnet_datasets.real import (
-    CI4RDataset,
-    DopNetDataset,
-    MVDopplerDataset,
-    NTU120Dataset,
-)
+from spdnet_datasets.real import NTU120Dataset
 
 CLASSES = ["a", "b", "c", "d"]
 FILES_PER_CLASS = 5
@@ -31,9 +27,6 @@ def _make_tree(root: Path, prefix: tuple[str, ...]) -> None:
 
 
 LOADERS = {
-    "ci4r": (CI4RDataset, ("77GHz",), {"modality": "77GHz"}),
-    "dopnet": (DopNetDataset, ("train",), {"split": "train"}),
-    "mvdoppler": (MVDopplerDataset, (), {}),
     "ntu120": (NTU120Dataset, (), {}),
 }
 
