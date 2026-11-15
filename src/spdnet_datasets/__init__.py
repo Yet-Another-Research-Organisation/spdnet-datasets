@@ -7,6 +7,8 @@ This package provides:
 - Covariance estimation utilities
 """
 
+# Domain modules (audio, skeleton): importing them registers their classes
+from .audio import BirdSetXCMDataset, ESC50Dataset, GTZANDataset
 from .base import BaseDataset, create_dataloaders
 from .estimator import EstimateCovariance, EstimateCovarianceTorch
 from .manager import DatasetManager
@@ -17,7 +19,6 @@ from .real import (
     ChikuseiDataset,
     DeepHSFruitDataset,
     GSOffDataset,
-    HDM05Dataset,
     HyperLeafDataset,
     KaggleWheatDataset,
     NTU120Dataset,
@@ -26,6 +27,7 @@ from .real import (
     UAVDataset,
 )
 from .sits import PastisRDataset, fetch_pastis_r
+from .skeleton import HDM05Dataset, NTURGBD120Dataset
 
 __version__ = "0.1.0"
 
@@ -53,6 +55,10 @@ __all__ = [
     'CI4RDataset',
     'DopNetDataset',
     'MVDopplerDataset',
+    'ESC50Dataset',
+    'GTZANDataset',
+    'BirdSetXCMDataset',
+    'NTURGBD120Dataset',
 
     # SITS
     'PastisRDataset',
