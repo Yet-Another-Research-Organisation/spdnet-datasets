@@ -2,7 +2,7 @@
 
 Dataset loaders, covariance estimators and synthetic data generators for SPDNet research.
 
-Documentation: build it with `pip install -e ".[docs]" && make -C doc html` (published on GitHub Pages at each release).
+Documentation: <https://yet-another-research-organisation.github.io/spdnet-datasets/> (built from `doc/` and deployed by GitHub Actions on every push to `main`; local build: `pip install -e ".[docs]" -r doc/requirements.txt && make -C doc html`).
 
 ## Overview
 
