@@ -26,8 +26,8 @@ Download
 Kaggle competition ``beyond-visible-spectrum-ai-for-agriculture-2026``
 (https://www.kaggle.com/competitions/beyond-visible-spectrum-ai-for-agriculture-2026;
 organisers: https://han-research.gitlab.io/Agvision/). Needs Kaggle credentials
-(``KAGGLE_USERNAME`` / ``KAGGLE_KEY`` or ``~/.kaggle/kaggle.json``, see
-:mod:`spdnet_datasets.core.access`) and the competition rules accepted on its page
+(an access token in ``~/.kaggle/access_token`` or ``KAGGLE_API_TOKEN``; the legacy
+``kaggle.json`` also works, see :mod:`spdnet_datasets.core.access`) and the competition rules accepted on its page
 with the same account; licence: the competition rules. Without a local copy,
 ``fetch_kaggle_wheat`` downloads the competition archive through the Kaggle API
 into ``<cache_dir>/Wheat_Disease_ICPR26/downloads/`` (no checksum published) and

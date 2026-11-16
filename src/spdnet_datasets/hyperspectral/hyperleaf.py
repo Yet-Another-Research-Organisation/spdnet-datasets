@@ -28,8 +28,8 @@ Download
 --------
 Kaggle competition ``hyperleaf2024`` (https://www.kaggle.com/competitions/hyperleaf2024;
 no Kaggle dataset of that name: ``kaggle.com/datasets/hyperleaf2024`` redirects).
-Needs Kaggle credentials (``KAGGLE_USERNAME`` / ``KAGGLE_KEY`` or
-``~/.kaggle/kaggle.json``, see :mod:`spdnet_datasets.core.access`) and the
+Needs a Kaggle access token (``~/.kaggle/access_token`` or ``KAGGLE_API_TOKEN``;
+the legacy ``kaggle.json`` also works, see :mod:`spdnet_datasets.core.access`) and the
 competition rules accepted on its page; licence: the competition rules. Without a
 local copy, ``fetch_hyperleaf`` downloads the competition archive through the
 Kaggle API into ``<cache_dir>/HyperLeaf2024/downloads/`` (no checksum published)

@@ -42,8 +42,8 @@ blue) patch of 64 × 64. Only the HS patches are used here.
 
 Kaggle competition
 [`beyond-visible-spectrum-ai-for-agriculture-2026`](https://www.kaggle.com/competitions/beyond-visible-spectrum-ai-for-agriculture-2026/data).
-It needs Kaggle credentials (`KAGGLE_USERNAME` / `KAGGLE_KEY` or
-`~/.kaggle/kaggle.json`, see [Fetching](../guide/fetch.md)) and the competition
+It needs a Kaggle access token (`~/.kaggle/access_token` or `KAGGLE_API_TOKEN`,
+see [Fetching](../guide/fetch.md)) and the competition
 rules accepted with the same account. Without a local copy,
 `fetch_kaggle_wheat()` downloads the competition archive into
 `<cache>/Wheat_Disease_ICPR26/downloads/` (no checksum published) and reads the
