@@ -1,0 +1,63 @@
+{
+ "name": "fusar_ship",
+ "kwargs": {},
+ "split": "recommended",
+ "n_samples": 5198,
+ "n_groups": 3871,
+ "raw_shape": [
+  224,
+  224,
+  1
+ ],
+ "mean_dim": 1,
+ "classes": [
+  "Cargo",
+  "Dredger",
+  "Fishing",
+  "LawEnforce",
+  "Other",
+  "Passenger",
+  "Reserved",
+  "Tanker",
+  "Tug",
+  "Unspecified"
+ ],
+ "counts": {
+  "train": [
+   1269,
+   36,
+   473,
+   21,
+   986,
+   39,
+   22,
+   149,
+   39,
+   84
+  ],
+  "val": [
+   423,
+   13,
+   158,
+   7,
+   329,
+   12,
+   7,
+   50,
+   12,
+   29
+  ],
+  "test": [
+   422,
+   12,
+   158,
+   7,
+   329,
+   13,
+   8,
+   49,
+   13,
+   29
+  ]
+ }
+}

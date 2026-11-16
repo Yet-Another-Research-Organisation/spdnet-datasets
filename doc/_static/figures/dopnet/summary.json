@@ -1,0 +1,33 @@
+{
+ "name": "dopnet",
+ "kwargs": {},
+ "split": "official",
+ "p": 48,
+ "n_samples": 2145,
+ "classes": [
+  "Click",
+  "Pinch",
+  "Swipe",
+  "Wave"
+ ],
+ "counts": {
+  "train": [
+   375,
+   556,
+   394,
+   428
+  ],
+  "val": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "test": [
+   76,
+   126,
+   91,
+   99
+  ]
+ }
+}

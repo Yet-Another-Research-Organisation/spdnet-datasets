@@ -30,12 +30,28 @@ dependencies = [
     "scipy>=1.7.0",
     "tifffile>=2021.0.0",
     "spectral>=0.22.0",
+    "h5py>=3.0",
+    "tqdm>=4.0",
 ]
 
 [project.optional-dependencies]
 test = ["pytest>=7.0.0", "pytest-cov>=3.0.0"]
+synthetic = ["yetanotherspdnet"]
+# Tyler and Student-t estimators (yetanotherspdnet.functions.m_estimators)
+robust = ["yetanotherspdnet"]
+audio = ["pyarrow>=12.0", "soundfile>=0.12"]
+sits = ["geopandas>=0.14"]
+# S1SLC_CVDL is a zarr v3 store; MSTAR / AIR-PolSAR-Seg read jpg / png with Pillow
+sar = ["zarr>=3.0", "rasterio>=1.3", "Pillow>=9.0"]
+# CI4R spectrograms are PNG images
+radar = ["Pillow>=9.0"]
+# optional download of the MVDoppler snapshots from Google Drive
+gdrive = ["gdown>=5.0"]
+# 7z archives (ATRNet-STAR volumes) when the 7z command is not installed
+archives = ["py7zr>=0.20", "multivolumefile>=0.2"]
 dev = ["ruff>=0.1.0", "pre-commit>=3.4.0"]
-docs = ["sphinx>=7.2.0", "myst-parser>=2.0.0", "furo>=2024.8.6", "sphinx-copybutton>=0.5.0"]
+docs = ["sphinx>=7.2.0", "myst-parser>=2.0.0", "furo>=2024.8.6", "sphinx-copybutton>=0.5.0",
+        "sphinx-design>=0.6.0", "sphinx-gallery>=0.17.0", "matplotlib>=3.7"]
 
 [project.urls]
 Repository = "https://github.com/Yet-Another-Research-Organisation/spdnet-datasets"
@@ -45,6 +61,11 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "real_data: needs the datasets under $SPDNET_DATA_ROOT (skipped when absent)",
+    "slow: long test (real downloads, full datasets)",
+    "network: needs Internet access",
+]
 
 [tool.ruff]
 line-length = 88

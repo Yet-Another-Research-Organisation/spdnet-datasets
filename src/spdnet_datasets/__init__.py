@@ -7,26 +7,37 @@ This package provides:
 - Covariance estimation utilities
 """
 
+# Domain modules: importing them registers their classes in DatasetManager
+from .audio import BirdSetXCMDataset, ESC50Dataset, GTZANDataset
 from .base import BaseDataset, create_dataloaders
 from .estimator import EstimateCovariance, EstimateCovarianceTorch
-from .manager import DatasetManager
-
-# Import real datasets to register them
-from .real import (
+from .hyperspectral import (
     ChikuseiDataset,
-    CI4RDataset,
     DeepHSFruitDataset,
-    DopNetDataset,
+    GSOFFDataset,
     GSOffDataset,
-    HDM05Dataset,
     HyperLeafDataset,
     KaggleWheatDataset,
-    MVDopplerDataset,
-    NTU120Dataset,
     PlacentaDataset,
     Rices90Dataset,
     UAVDataset,
 )
+from .manager import DatasetManager
+from .radar_microdoppler import CI4RDataset, DopNetDataset, MVDopplerDataset
+
+# Deprecated loader kept for its precomputed cov/ layout (superseded by NTURGBD120Dataset)
+from .real import NTU120Dataset
+from .sar import (
+    AIRPolSARSegDataset,
+    ATRNetSTARDataset,
+    CPAZMaLDataset,
+    FUSARShipDataset,
+    MSTARDataset,
+    PolInSARIslandDataset,
+    S1SLCCVDLDataset,
+)
+from .sits import PastisRDataset, fetch_pastis_r
+from .skeleton import HDM05Dataset, NTURGBD120Dataset
 
 __version__ = "0.1.0"
 
@@ -46,6 +57,7 @@ __all__ = [
     'HDM05Dataset',
     'UAVDataset',
     'GSOffDataset',
+    'GSOFFDataset',
     'ChikuseiDataset',
     'DeepHSFruitDataset',
     'PlacentaDataset',
@@ -54,4 +66,21 @@ __all__ = [
     'CI4RDataset',
     'DopNetDataset',
     'MVDopplerDataset',
+    'ESC50Dataset',
+    'GTZANDataset',
+    'BirdSetXCMDataset',
+    'NTURGBD120Dataset',
+
+    # SITS
+    'PastisRDataset',
+    'fetch_pastis_r',
+
+    # SAR datasets
+    'AIRPolSARSegDataset',
+    'ATRNetSTARDataset',
+    'CPAZMaLDataset',
+    'FUSARShipDataset',
+    'MSTARDataset',
+    'PolInSARIslandDataset',
+    'S1SLCCVDLDataset',
 ]

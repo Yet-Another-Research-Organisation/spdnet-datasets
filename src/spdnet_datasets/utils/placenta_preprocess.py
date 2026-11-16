@@ -1,16 +1,21 @@
 """
 Hyperspectral Placenta Dataset Preprocessing
 Extracts windows from hyperspectral TIFF files with segmentation masks.
-Window size: 12x12, Purity threshold: 80%
+Window size: 24x24, Purity threshold: 90%
+
+:func:`build_windows` (used by ``hyperspectral.placenta.fetch_placenta`` after
+a download) writes the same files as :func:`main` without holding the windows
+in memory.
 """
 
-import numpy as np
-import os
 import argparse
-from pathlib import Path
-from tqdm import tqdm
 import json
-from .placenta_utils import read_stiff, read_mtiff
+from pathlib import Path
+
+import numpy as np
+from tqdm import tqdm
+
+from .placenta_utils import read_mtiff, read_stiff
 
 # Configuration
 WINDOW_SIZE = 24
@@ -237,21 +242,101 @@ def save_processed_data(all_windows, all_labels, all_metadata, output_dir):
         json.dump(summary, f, indent=2)
 
     print(f"\n{'='*80}")
-    print(f"Extraction Summary:")
+    print("Extraction Summary:")
     print(f"{'='*80}")
     print(f"Total windows: {len(windows_array)}")
     print(f"Window shape: {windows_array.shape}")
     print(f"Number of classes: {len(unique_labels)}")
-    print(f"\nClass distribution:")
+    print("\nClass distribution:")
     for label in unique_labels:
         count = class_counts[label]
         pct = 100 * count / len(windows_array)
         print(f"  {label:15s}: {count:5d} windows ({pct:5.1f}%)")
-    print(f"\nDye type distribution:")
+    print("\nDye type distribution:")
     for dye, count in dye_counts.items():
         pct = 100 * count / len(windows_array)
         print(f"  {dye:10s}: {count:5d} windows ({pct:5.1f}%)")
     print(f"{'='*80}")
+
+
+def _pure_windows(masks):
+    """``(y, x, unified_class, class_name)`` of the pure windows of one image.
+
+    Same order and rule as :func:`extract_windows_from_image` (mask order,
+    then raster order), without the data cube.
+    """
+    out = []
+    for class_name, mask in masks.items():
+        if 'Specular' in class_name or 'specular' in class_name:
+            continue
+        unified_class = CLASS_MAPPING.get(class_name)
+        if unified_class is None:
+            continue
+        height, width = mask.shape
+        for y in range(0, height - WINDOW_SIZE + 1, WINDOW_SIZE):
+            for x in range(0, width - WINDOW_SIZE + 1, WINDOW_SIZE):
+                if check_window_purity(mask[y:y + WINDOW_SIZE, x:x + WINDOW_SIZE]):
+                    out.append((y, x, unified_class, class_name))
+    return out
+
+
+def build_windows(data_dir, output_dir, folders=None):
+    """Write the ``imagettes/`` files (windows, labels, metadata) image by image.
+
+    Same windows, labels, metadata and order as :func:`main`, but the windows
+    are written into a memory-mapped ``.npy`` (memory: one image instead of
+    the 6.6 GB of the 77 203 windows). As in :func:`main`, images whose
+    number of bands differs from the first image are skipped (P088-P101 have
+    77 bands instead of 37).
+
+    Parameters
+    ----------
+    data_dir : path
+        Folder holding the ``Placenta P...`` folders of :data:`DYE_FOLDERS`
+        (read only).
+    output_dir : path
+        Receives ``placenta_windows_data.npy`` (N, 24, 24, bands) float32,
+        ``placenta_windows_labels.npy`` and ``placenta_windows_metadata.json``.
+    folders : dict, optional
+        ``{folder name: dye type}``, default :data:`DYE_FOLDERS`.
+    """
+    data_dir, output_dir = Path(data_dir), Path(output_dir)
+    plan, expected_bands = [], None
+    for folder_name, dye_type in (folders or DYE_FOLDERS).items():
+        folder = data_dir / folder_name
+        if not folder.exists():
+            raise FileNotFoundError(f"Placenta folder not found: {folder}")
+        for tif_file in sorted(f for f in folder.glob("P*.tif") if "mask" not in f.name):
+            mask_file = tif_file.parent / f"{tif_file.stem}, masks.tif"
+            if not mask_file.exists():
+                continue
+            n_bands = len(read_stiff(str(tif_file), rgb_only=True)[1])
+            expected_bands = expected_bands or n_bands
+            if n_bands != expected_bands:
+                continue
+            plan.append((tif_file, dye_type, _pure_windows(read_mtiff(str(mask_file)))))
+    n = sum(len(w) for _, _, w in plan)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    part = output_dir / 'placenta_windows_data.npy.part'
+    data = np.lib.format.open_memmap(part, mode='w+', dtype=np.float32,
+                                     shape=(n, WINDOW_SIZE, WINDOW_SIZE, expected_bands or 0))
+    labels, metadata, k = [], [], 0
+    for tif_file, dye_type, windows in plan:
+        cube = read_stiff(str(tif_file))[0]
+        for y, x, unified_class, class_name in windows:
+            data[k] = cube[y:y + WINDOW_SIZE, x:x + WINDOW_SIZE, :]
+            k += 1
+            labels.append(unified_class)
+            metadata.append({'sample_id': tif_file.stem, 'dye_type': dye_type,
+                             'class': unified_class, 'original_class': class_name,
+                             'position': [y, x]})
+    data.flush()
+    del data
+    np.save(output_dir / 'placenta_windows_labels.npy', np.array(labels))
+    with open(output_dir / 'placenta_windows_metadata.json', 'w') as f:
+        json.dump(metadata, f, indent=2)
+    part.rename(output_dir / 'placenta_windows_data.npy')
+    return output_dir
 
 
 def main():
@@ -261,14 +346,14 @@ def main():
     parser.add_argument(
         '--data-dir',
         type=str,
-        default='/media/mgallet/BACK UP/DATASET/Hyperspectral_Placenta_Dataset',
-        help='Directory containing Placenta folders'
+        required=True,
+        help='Directory containing Placenta folders (read only)'
     )
     parser.add_argument(
         '--output-dir',
         type=str,
-        default='/media/mgallet/BACK UP/DATASET/Hyperspectral_Placenta_Dataset/imagettes',
-        help='Output directory for extracted windows'
+        required=True,
+        help='Output directory for extracted windows (outside the read-only dataset copy)'
     )
 
     args = parser.parse_args()

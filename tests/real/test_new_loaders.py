@@ -1,11 +1,11 @@
-"""Smoke tests for the CI4R/DopNet/MVDoppler/NTU120 loaders against real data."""
+"""Smoke tests for the NTU120 and Rices90 loaders against real data.
+
+The radar loaders (CI4R, DopNet, MVDoppler) are tested in ``tests/real/test_radar_*.py``.
+"""
 
 import torch
 
 from spdnet_datasets.real import (
-    CI4RDataset,
-    DopNetDataset,
-    MVDopplerDataset,
     NTU120Dataset,
     Rices90Dataset,
 )
@@ -27,64 +27,9 @@ def _check_spd_sample(dataset, expected_dim: int | None = None) -> None:
     assert 0 <= int(y) < dataset.num_classes
 
 
-class TestCI4RDataset:
-    def test_77ghz_modality(self):
-        data_dir = dataset_dir("CI4R-MULTI3")
-        skip_if_missing(data_dir / "cov")  # loaders read precomputed covariances
-        ds = CI4RDataset(data_dir=str(data_dir), modality="77GHz", verbose=False)
-        # Actual precomputed matrices are 236x236, not the 471x471 the
-        # module docstring claims -- docstring is stale, not asserting it.
-        _check_spd_sample(ds)
-
-    def test_xethru_modality(self):
-        data_dir = dataset_dir("CI4R-MULTI3")
-        skip_if_missing(data_dir / "cov")  # loaders read precomputed covariances
-        ds = CI4RDataset(data_dir=str(data_dir), modality="Xethru", verbose=False)
-        _check_spd_sample(ds)
-
-    def test_ci4r_explicit_classes_and_limits(self):
-        """The `classes` and `max_samples_per_class` kwargs are honoured."""
-        data_dir = dataset_dir("CI4R-MULTI3")
-        skip_if_missing(data_dir / "cov")  # loaders read precomputed covariances
-        full = CI4RDataset(data_dir=str(data_dir), modality="77GHz", verbose=False)
-        subset = sorted(full.classes)[:2]
-        restricted = CI4RDataset(
-            data_dir=str(data_dir),
-            modality="77GHz",
-            classes=subset,
-            max_samples_per_class=3,
-            verbose=False,
-        )
-        assert restricted.classes == subset
-        assert {s["class_name"] for s in restricted.samples} == set(subset)
-        assert len(restricted.samples) <= 3 * len(subset)
-
-
-class TestDopNetDataset:
-    def test_train_split(self):
-        data_dir = dataset_dir("Dop-NET")
-        skip_if_missing(data_dir / "cov")  # loaders read precomputed covariances
-        ds = DopNetDataset(data_dir=str(data_dir), split="train", verbose=False)
-        _check_spd_sample(ds)
-
-    def test_test_split(self):
-        data_dir = dataset_dir("Dop-NET")
-        skip_if_missing(data_dir / "cov")  # loaders read precomputed covariances
-        ds = DopNetDataset(data_dir=str(data_dir), split="test", verbose=False)
-        _check_spd_sample(ds)
-
-
-class TestMVDopplerDataset:
-    def test_load(self):
-        data_dir = dataset_dir("MVDoppler")
-        skip_if_missing(data_dir / "cov")  # loaders read precomputed covariances
-        ds = MVDopplerDataset(data_dir=str(data_dir), verbose=False)
-        _check_spd_sample(ds, expected_dim=96)
-
-
 class TestNTU120Dataset:
     def test_load(self):
-        data_dir = dataset_dir("NTU_RGBD_120")
+        data_dir = dataset_dir("SKELETON", "NTU_RGBD_120")
         skip_if_missing(data_dir / "cov")  # loaders read precomputed covariances
         ds = NTU120Dataset(data_dir=str(data_dir), verbose=False)
         _check_spd_sample(ds, expected_dim=75)
@@ -93,8 +38,8 @@ class TestNTU120Dataset:
 class TestExplicitClasses:
     def test_explicit_classes_subset(self):
         """BaseDataset._limit_classes: an explicit `classes` list is honored
-        (currently wired only into Rices90Dataset, see CI4R test above)."""
-        data_dir = dataset_dir("Rices_90")
+        (tested here on Rices90Dataset)."""
+        data_dir = dataset_dir("HYPERSPECTRAL", "Rices_90")
         skip_if_missing(data_dir)
         full = Rices90Dataset(data_dir=str(data_dir), verbose=False)
         two_classes = sorted(full.classes)[:2]
@@ -106,7 +51,7 @@ class TestExplicitClasses:
         assert len(subset) < len(full)
 
     def test_explicit_classes_rejects_unknown_class(self):
-        data_dir = dataset_dir("Rices_90")
+        data_dir = dataset_dir("HYPERSPECTRAL", "Rices_90")
         skip_if_missing(data_dir)
         import pytest
 

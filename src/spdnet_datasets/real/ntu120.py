@@ -1,23 +1,28 @@
 """
-NTU RGB+D 120 Skeleton Dataset Loader.
+NTU RGB+D 120 Skeleton Dataset Loader (deprecated).
 
-Dataset: NTU RGB+D 120 (action recognition from skeleton data)
-Format: Pre-computed covariance matrices from 25-joint × 3-coord skeleton sequences
-Size: 75×75 covariance matrices
+Use :class:`spdnet_datasets.skeleton.ntu120.NTURGBD120Dataset`, which computes
+the covariances from the skeletons in a cache, with the official X-Sub /
+X-Setup splits; the name ``"ntu120"`` of the DatasetManager points to it.
+
+This legacy class only reads covariance matrices precomputed under
+``<data_dir>/cov/`` (written by the former ``utils/ntu120_covariance_precompute.py``, removed; use ``NTURGBD120Dataset``).
 """
 
+import warnings
 from pathlib import Path
 
 import torch
 
 from spdnet_datasets.base import BaseDataset
-from spdnet_datasets.manager import DatasetManager
+from spdnet_datasets.skeleton.ntu120 import NTURGBD120Dataset, fetch_ntu120
+
+__all__ = ["NTU120Dataset", "NTURGBD120Dataset", "fetch_ntu120"]
 
 
-@DatasetManager.register_dataset("ntu120")
 class NTU120Dataset(BaseDataset):
     """
-    NTU RGB+D 120 Skeleton Dataset.
+    NTU RGB+D 120 Skeleton Dataset (deprecated, precomputed ``cov/`` only).
 
     Loads pre-computed covariance matrices from skeleton motion sequences.
     Each skeleton has 25 joints × 3 coordinates = 75 features.
@@ -43,6 +48,9 @@ class NTU120Dataset(BaseDataset):
 
     def __init__(self, scaling_factor: float = 1.0, **kwargs):
         """Initialize NTU120 dataset."""
+        warnings.warn("spdnet_datasets.real.NTU120Dataset is deprecated; use "
+                      "spdnet_datasets.skeleton.NTURGBD120Dataset", DeprecationWarning,
+                      stacklevel=2)
         super().__init__(**kwargs)
         self.scaling_factor = scaling_factor
         self._load_data()
@@ -60,7 +68,7 @@ class NTU120Dataset(BaseDataset):
         if not cov_dir.exists():
             raise FileNotFoundError(
                 f"Covariance directory not found: {cov_dir}. "
-                "Run ntu120_covariance_precompute.py first."
+                "Use spdnet_datasets.skeleton.NTURGBD120Dataset, which builds its covariances in the cache."
             )
 
         if self.verbose:

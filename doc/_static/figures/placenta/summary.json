@@ -1,0 +1,39 @@
+{
+ "name": "placenta",
+ "kwargs": {
+  "verbose": false
+ },
+ "split": "by_image",
+ "p": 37,
+ "n_samples": 76862,
+ "classes": [
+  "Artery",
+  "Stroma",
+  "Suture",
+  "Umbilical",
+  "Vein"
+ ],
+ "counts": {
+  "train": [
+   5628,
+   33724,
+   72,
+   2346,
+   4169
+  ],
+  "val": [
+   2467,
+   11510,
+   1,
+   393,
+   1480
+  ],
+  "test": [
+   2047,
+   10876,
+   41,
+   449,
+   1659
+  ]
+ }
+}

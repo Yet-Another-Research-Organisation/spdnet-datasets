@@ -4,10 +4,13 @@ from pathlib import Path
 
 import numpy as np
 
-from spdnet_datasets.real.uav import UAVDataset
-from tests.conftest import dataset_dir, skip_if_missing
+from spdnet_datasets.real.uav import UAVLegacyDataset as UAVDataset
+from tests.conftest import DATA_ROOT, skip_if_missing
 
-UAV_DIR = dataset_dir("Hyperspectral", "UAV-HSI-Crop")
+# The prepared windows (MJK_N_W15_T80, ...) were not moved to the canonical
+# HYPERSPECTRAL/UAV-HSI-Crop (which only holds source/); they stay in the
+# legacy /DATA/Hyperspectral directory next to the dataset root.
+UAV_DIR = DATA_ROOT.parent / "Hyperspectral" / "UAV-HSI-Crop"
 
 
 def test_resolve_scene_dir_matches_parameter_suffixed_dirs():

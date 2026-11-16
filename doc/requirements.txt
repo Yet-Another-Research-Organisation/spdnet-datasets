@@ -1,0 +1,9 @@
+sphinx>=7.2.0
+myst-parser>=2.0.0
+furo>=2024.8.6
+sphinx-copybutton>=0.5.0
+sphinx-design>=0.6.0
+sphinx-gallery>=0.17.0
+matplotlib>=3.7
+# Tyler / Student-t estimators of the covariance tutorial (not on PyPI)
+yetanotherspdnet @ git+https://github.com/Yet-Another-Research-Organisation/yetanotherspdnet

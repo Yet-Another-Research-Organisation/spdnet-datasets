@@ -2,20 +2,25 @@
 Real dataset implementations for SPD matrix classification.
 """
 
-from .chikusei import ChikuseiDataset
+# Hyperspectral loaders moved to spdnet_datasets.hyperspectral (the real.<name>
+# modules are deprecated aliases); imported from there to avoid their warning.
+from ..hyperspectral import (
+    ChikuseiDataset,
+    DeepHSFruitDataset,
+    GSOffDataset,
+    HyperLeafDataset,
+    KaggleWheatDataset,
+    PlacentaDataset,
+    Rices90Dataset,
+    UAVDataset,
+)
 from .ci4r import CI4RDataset
-from .deephsfruit import DeepHSFruitDataset
 from .dopnet import DopNetDataset
 from .fusar import FUSARShipDataset
-from .gsoff import GSOffDataset
 from .hdm05 import HDM05Dataset
-from .hyperleaf import HyperLeafDataset
-from .kaggle_wheat import KaggleWheatDataset
 from .mvdoppler import MVDopplerDataset
 from .ntu120 import NTU120Dataset
-from .placenta import PlacentaDataset
-from .rices90 import Rices90Dataset
-from .uav import UAVDataset
+from .uav import UAVLegacyDataset  # registers 'uav_legacy'
 
 __all__ = [
     'Rices90Dataset',
@@ -32,4 +37,5 @@ __all__ = [
     'DopNetDataset',
     'MVDopplerDataset',
     'FUSARShipDataset',
+    'UAVLegacyDataset',
 ]

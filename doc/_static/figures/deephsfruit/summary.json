@@ -1,0 +1,39 @@
+{
+ "name": "deephsfruit",
+ "kwargs": {
+  "verbose": false
+ },
+ "split": "by_fruit",
+ "p": 224,
+ "n_samples": 3193,
+ "classes": [
+  "Avocado",
+  "Kaki",
+  "Kiwi",
+  "Mango",
+  "Papaya"
+ ],
+ "counts": {
+  "train": [
+   558,
+   223,
+   658,
+   322,
+   154
+  ],
+  "val": [
+   187,
+   74,
+   219,
+   108,
+   51
+  ],
+  "test": [
+   187,
+   74,
+   219,
+   108,
+   51
+  ]
+ }
+}

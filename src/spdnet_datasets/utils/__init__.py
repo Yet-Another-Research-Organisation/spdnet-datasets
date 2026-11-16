@@ -1,17 +1,21 @@
 """Utility functions and preprocessing scripts for dataset preparation.
 
 Preprocessing scripts (run as standalone or via CLI):
-    - chikusei_preprocess: Extract windows from Chikusei hyperspectral .mat files
-    - gsoff_preprocess: Extract windows from GSOFF GeoTIFF imagery
-    - uav_preprocess: Extract windows from UAV-HSI-Crop patches
     - placenta_preprocess: Extract windows from hyperspectral Placenta TIFF files
+      (the windows of ``imagettes/``, read by ``hyperspectral.placenta``)
 
-Covariance precomputation:
-    - base_covariance_precompute: Base class for covariance matrix precomputation
-    - covariance_precompute: Unified precomputation for HyperLeaf, Rices90, UAV,
-      GSOFF, Chikusei, Placenta, and DeepHS-Fruit datasets
-    - kaggle_wheat_covariance_precompute: Specialized precomputation for Kaggle
-      Wheat Disease HS dataset (107x107 covariance matrices)
+The Chikusei, GSOFF, UAV-HSI-Crop and Kaggle wheat scripts were replaced by the
+``fetch_<dataset>()`` functions of :mod:`spdnet_datasets.hyperspectral`.
+
+The covariance precomputation scripts (``covariance_precompute``,
+``base_covariance_precompute``, ``ci4r`` / ``dopnet`` / ``mvdoppler`` /
+``ntu120_covariance_precompute``) wrote ``cov/`` inside the dataset directories;
+they were removed: every ``fetch_<dataset>()`` now builds its covariances in
+the cache (``SPDNET_CACHE_DIR``).
+
+Dataset sources (sources): local copy -> ``archive=`` -> cache -> download ->
+manual download, folder lookup in extracted archives, 7z / RAR extraction
+(used by the hyperspectral and SAR ``fetch_<dataset>()`` functions).
 
 Placenta utilities (placenta_utils sub-package):
     - spectral_tiffs: Read/write spectral TIFF image cubes and mask bitmaps

@@ -1,122 +1,72 @@
 # spdnet-datasets
 
-A public shared infrastructure package for SPDNet research, providing dataset loaders, covariance estimators, and synthetic data generators.
+Dataset loaders, covariance estimators and synthetic data generators for SPDNet research.
 
-Documentation: build it with `pip install -e ".[docs]" && make -C docs html` (published on GitHub Pages at each release).
+Documentation: build it with `pip install -e ".[docs]" && make -C doc html` (published on GitHub Pages at each release).
 
 ## Overview
 
-This package extracts core dataset and data generation functionality from the monolithic `spdnet-benchmarks` codebase, making it available as a reusable library for the SPDNet research community.
+Loaders that turn heterogeneous measurements into symmetric positive definite
+(SPD) covariance matrices for SPDNet-style networks, with the raw data and
+channel means available for other models (CNN, Transformer, ViT). Every dataset
+comes with a standalone `fetch_<name>()` (download or local check, staged
+cache), leakage-free splits and a documentation page.
 
-## Features
+| Domain | Datasets |
+|---|---|
+| Audio | ESC-50, GTZAN, BirdSet_XCM |
+| Skeleton | HDM05, NTU RGB+D 120 |
+| Micro-Doppler radar | CI4R (77 GHz, xethru), MVDoppler, DopNet |
+| Satellite image time series (SITS) | PASTIS-R (scenarios A–E) |
+| Hyperspectral (HSI) | GSOFF, Chikusei, UAV-HSI-Crop, Wheat disease, Placenta, Rices_90, HyperLeaf2024, DeepHS-Fruit |
+| Synthetic aperture radar (SAR) | Pol-InSAR-Island, CPAZMaL, S1SLC_CVDL, AIR-PolSAR-Seg, ATRNet-STAR, FUSAR-Ship 1.0, MSTAR |
 
-### Real Dataset Loaders
-
-Pre-built loaders for hyperspectral and motion capture datasets with SPD matrices:
-
-- **Rices90**: Vietnamese rice varieties (90 classes, 256×256 covariance matrices)
-- **HyperLeaf**: Hyperspectral barley leaf imagery (4 cultivars, 3 fertilizer levels)
-- **HDM05**: Human motion capture dataset
-- **UAV-HSI-Crop**: UAV hyperspectral crop classification
-- **GSOFF**: Tree species classification from airborne hyperspectral
-- **Chikusei**: Land cover classification (19 classes, 128 spectral bands)
-- **DeepHS-Fruit**: Fruit classification and ripeness assessment
-- **Placenta**: Hyperspectral tissue classification
-- **Kaggle Wheat**: Wheat disease classification
-
-### Synthetic Data Generators
-
-Tools for generating synthetic SPD matrix datasets for controlled experiments:
-
-- **ScaleMatrixGeneratorDiagonal**: Diagonal eigenvalue control with random rotation
-- **ScaleMatrixGeneratorBlock**: Block-structured SPD matrices
-- **WishartGenerator**: Wishart/Inverse-Wishart distributions with random SPD scales
-
-### Covariance Estimation
-
-Utilities for computing covariance matrices from hyperspectral images:
-
-- Sample Covariance Matrix (SCM)
-- Ledoit-Wolf shrinkage estimator
-- PyTorch-compatible estimators for GPU acceleration
+Branches: `timeseries` (series of covariances for Transformers), `local`
+(datasets not published yet: S1 Iceland SAR, AVIRIS), `moabb` (adapter for
+MOABB EEG datasets).
 
 ## Installation
 
 ```bash
-pip install spdnet-datasets
+pip install "spdnet-datasets @ git+https://github.com/Yet-Another-Research-Organisation/spdnet-datasets"
+pip install "spdnet-datasets[robust,audio,sar] @ git+..."   # Tyler/Student estimators, audio, SAR readers
 ```
 
-Or for development:
+Development: `pip install -e ".[dev,test,docs]"`.
 
-```bash
-git clone https://github.com/Yet-Another-Research-Organisation/spdnet-datasets.git
-cd spdnet-datasets
-pip install -e ".[dev,test]"
-```
-
-## Quick Start
-
-### Loading a Real Dataset
+## Quick start
 
 ```python
-from spdnet_datasets import DatasetManager
+from spdnet_datasets import PastisRDataset, create_dataloaders
 
-# Configure dataset
-config = {
-    'name': 'rices90',
-    'path': '/path/to/data',
-    'max_classes': 10,
-    'seed': 42
-}
-
-# Create dataloaders
-train_loader, val_loader, test_loader, num_classes = \
-    DatasetManager.create_dataloaders(config)
+ds = PastisRDataset(scenario="C", estimator="ledoit_wolf", return_mean=True)
+train, val, test = create_dataloaders(ds, split="official", batch_size=64)
+(cov, mean), y = next(iter(train))      # cov: (64, 16, 16) SPD, mean: (64, 16)
 ```
 
-### Generating Synthetic Data
+- Datasets are read from `$SPDNET_DATA_ROOT/<DOMAIN>/<Name>` (default
+  `/DATA/DATASET`, never written to); caches go to `$SPDNET_CACHE_DIR`
+  (default `~/.cache/spdnet_datasets`).
+- `estimator` is `"scm"`, `"ledoit_wolf"`, `"tyler"` or `"student"`; every
+  covariance needs `n >= 2p` observations and is checked to be SPD.
+- `task="fine" | "coarse" | "regression"`, `drop_classes`, `merge_classes` and
+  `balance` select the task; named splits (`dataset.splits`) never separate a
+  subject, patch, block or site.
 
-```python
-from spdnet_datasets.synthetic import ScaleMatrixGeneratorDiagonal
+The configuration-dictionary entry point is kept:
+`DatasetManager.create_dataloaders({"name": "pastis_r", "scenario": "A", "split_strategy": "official", ...})`.
 
-# Create generator
-generator = ScaleMatrixGeneratorDiagonal(matrix_size=16, n_classes=3, seed=42)
-
-# Generate data
-data, labels, info = generator.generate_data(
-    n_samples_per_class=120,
-    max_value=100.0,
-    conditioning=100.0,
-    mode='geomspace'
-)
-```
-
-### Computing Covariance Matrices
-
-```python
-from spdnet_datasets.estimator import EstimateCovariance
-import numpy as np
-
-# Initialize estimator
-estimator = EstimateCovariance(method='scm', remove_mean=True)
-
-# Compute covariance from hyperspectral image
-image = np.random.rand(100, 100, 128)  # H x W x C
-cov_matrix = estimator.from_image(image)  # C x C
-```
-
-## Package Structure
+## Package structure
 
 ```
-spdnet-datasets/
-├── src/spdnet_datasets/
-│   ├── base.py              # Base dataset class
-│   ├── manager.py           # Dataset manager
-│   ├── real/                # Real dataset loaders
-│   ├── synthetic/           # Synthetic data generators
-│   ├── estimator/           # Covariance estimators
-│   └── utils/               # Preprocessing utilities
-└── tests/                   # Test suite
+src/spdnet_datasets/
+├── core/                 config, estimators, normalize, outputs, tasks, splits, fetch
+├── audio/ skeleton/ radar_microdoppler/ sits/ hyperspectral/ sar/
+│                         one module per dataset: fetch_<name>() + <Name>Dataset
+├── base.py, manager.py   BaseDataset, create_dataloaders, DatasetManager
+├── real/                 deprecated aliases of the former loaders
+├── synthetic/            synthetic SPD datasets (extra "synthetic")
+└── estimator/            former estimator classes
 ```
 
 ## License

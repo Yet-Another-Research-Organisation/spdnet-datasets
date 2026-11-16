@@ -78,11 +78,21 @@ class DatasetManager:
                 path = str(Path(path) / subdir)
             kwargs['data_dir'] = path
 
+        # The named split used by the dataloaders is also the one the dataset fits
+        # its statistics on (normalisation, class weights): pass it to datasets
+        # whose constructor takes ``split`` (create_dataloaders rejects a mismatch).
+        split_strategy = kwargs.get('split_strategy')
+        if split_strategy is not None and 'split' not in kwargs:
+            import inspect
+            if 'split' in inspect.signature(dataset_class.__init__).parameters:
+                kwargs['split'] = split_strategy
+
         # Remove dataloader-specific params that shouldn't go to dataset
         dataloader_params = [
             'batch_size', 'num_workers', 'pin_memory',
             'persistent_workers', 'shuffle', 'val_ratio',
-            'test_ratio', 'num_classes', 'task_type'
+            'test_ratio', 'num_classes', 'task_type', 'split_strategy',
+            'stratified',
         ]
         for param in dataloader_params:
             kwargs.pop(param, None)
@@ -129,6 +139,9 @@ class DatasetManager:
         seed = config.get('seed', 42)
         verbose = config.get('verbose', True)
         stratified = config.get('stratified', False)
+        # Named leakage-free split of the dataset (dataset.splits); the 'split'
+        # key is kept for the dataset's own subset argument.
+        split_strategy = config.get('split_strategy')
 
         # Create dataloaders
         train_loader, val_loader, test_loader = create_dataloaders(
@@ -142,7 +155,8 @@ class DatasetManager:
             shuffle=shuffle,
             seed=seed,
             verbose=verbose,
-            stratified=stratified
+            stratified=stratified,
+            split=split_strategy,
         )
 
         num_classes = dataset.get_num_classes()
