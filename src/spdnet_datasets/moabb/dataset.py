@@ -14,7 +14,7 @@ The covariance stage is keyed on the estimator only on top of the epochs key,
 so changing the estimator does not call ``paradigm.get_data`` again.
 """
 
-import re
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -31,24 +31,48 @@ from .covariances import epochs_to_covariances
 SPLIT_KINDS = ("within_session", "cross_session", "cross_subject")
 
 
-def _key_value(v):
-    """JSON-friendly, process-stable form of ``v`` for the cache key."""
+_MAX_DEPTH = 6
+
+
+def _key_value(v, depth=0):
+    """JSON-friendly, process-stable fingerprint of ``v`` for the cache key.
+
+    Objects are fingerprinted by their configuration (``get_params()`` for
+    scikit-learn-like objects, else their public attributes), never by their
+    ``repr``: two objects of one class with different settings get different
+    keys. A value that cannot be fingerprinted raises ``TypeError`` instead of
+    risking a silent cache collision.
+    """
+    if depth > _MAX_DEPTH:
+        raise TypeError(f"Cannot fingerprint {type(v).__name__} for the cache key "
+                        "(nested too deeply)")
     if isinstance(v, np.generic):
         return v.item()
     if isinstance(v, (bool, int, float, str, type(None))):
         return v
-    if isinstance(v, (list, tuple)):
-        return [_key_value(x) for x in v]
+    if isinstance(v, (list, tuple, set, frozenset)):
+        items = [_key_value(x, depth + 1) for x in v]
+        return sorted(items, key=repr) if isinstance(v, (set, frozenset)) else items
     if isinstance(v, dict):
-        return {str(k): _key_value(x) for k, x in sorted(v.items(), key=lambda kv: str(kv[0]))}
+        return {str(k): _key_value(x, depth + 1)
+                for k, x in sorted(v.items(), key=lambda kv: str(kv[0]))}
     if isinstance(v, np.ndarray):
-        return _key_value(v.tolist())
-    return re.sub(r" at 0x[0-9a-fA-F]+", "", repr(v))  # drop memory addresses
+        return _key_value(v.tolist(), depth + 1)
+    if isinstance(v, type) or callable(v) and hasattr(v, "__qualname__"):
+        return f"{v.__module__}.{v.__qualname__}"
+    name = f"{type(v).__module__}.{type(v).__qualname__}"
+    if hasattr(v, "get_params"):
+        return {"class": name, "params": _key_value(v.get_params(deep=False), depth + 1)}
+    if hasattr(v, "__dict__"):
+        return {"class": name, "attrs": _key_attributes(v, depth + 1)}
+    raise TypeError(f"Cannot fingerprint {name} for the cache key; pass plain values "
+                    "(numbers, strings, lists, dicts or objects with public attributes)")
 
 
-def _key_attributes(obj) -> dict:
+def _key_attributes(obj, depth=0) -> dict:
     """Public attributes of ``obj`` (dataset or paradigm options) for the cache key."""
-    return {k: _key_value(v) for k, v in sorted(vars(obj).items()) if not k.startswith("_")}
+    return {k: _key_value(v, depth) for k, v in sorted(vars(obj).items())
+            if not k.startswith("_")}
 
 
 def _read_metadata(path):
@@ -78,8 +102,12 @@ def moabb_splits(y, metadata, n_folds=5, seed=42) -> dict:
     -------
     dict
         ``"<protocol>_<k>" -> {"train", "val", "test"}`` (``val`` is empty).
-        ``cross_session`` needs at least two sessions per subject and
-        ``cross_subject`` at least two subjects; otherwise they are absent.
+        Each protocol is built on its own: ``cross_session`` needs at least
+        one subject with two sessions (MOABB skips single-session subjects),
+        ``cross_subject`` at least two subjects, and ``within_session`` enough
+        trials per class and session for ``n_folds`` folds. A protocol that
+        cannot be built is absent (with a ``UserWarning``) and does not prevent
+        the others.
     """
     from moabb.evaluations.splitters import (
         CrossSessionSplitter,
@@ -91,16 +119,22 @@ def moabb_splits(y, metadata, n_folds=5, seed=42) -> dict:
     metadata = metadata.reset_index(drop=True)
     splitters = {"within_session": WithinSessionSplitter(n_folds=n_folds, shuffle=True,
                                                          random_state=seed)}
-    if metadata.groupby("subject")["session"].nunique().min() >= 2:
+    if metadata.groupby("subject")["session"].nunique().max() >= 2:
         splitters["cross_session"] = CrossSessionSplitter()
     if metadata["subject"].nunique() >= 2:
         splitters["cross_subject"] = CrossSubjectSplitter()
     empty = np.array([], dtype=np.int64)
     out = {}
     for kind, splitter in splitters.items():
-        for k, (train, test) in enumerate(splitter.split(y, metadata)):
-            out[f"{kind}_{k}"] = {"train": np.asarray(train, dtype=np.int64), "val": empty,
-                                  "test": np.asarray(test, dtype=np.int64)}
+        try:
+            folds = [(np.asarray(tr, dtype=np.int64), np.asarray(te, dtype=np.int64))
+                     for tr, te in splitter.split(y, metadata)]
+        except ValueError as exc:  # e.g. fewer trials per class than folds
+            warnings.warn(f"MOABB protocol {kind!r} skipped: {exc}", UserWarning,
+                          stacklevel=2)
+            continue
+        for k, (train, test) in enumerate(folds):
+            out[f"{kind}_{k}"] = {"train": train, "val": empty, "test": test}
     return out
 
 
@@ -212,7 +246,8 @@ class MOABBCovariances(BaseDataset):
             raise error
         kept = np.asarray(kept, dtype=np.int64)
         np.save(out / "covariances.npy", np.stack(covs))
-        np.save(out / "means.npy", X[kept].mean(axis=2, dtype=np.float64))
+        # channel means first, then the kept rows: no copy of the epochs
+        np.save(out / "means.npy", X.mean(axis=2, dtype=np.float64)[kept])
         np.save(out / "labels.npy", np.load(processed / "labels.npy")[kept])
         np.save(out / "trial_index.npy", kept)
         np.save(out / "n_excluded.npy", len(X) - len(kept))

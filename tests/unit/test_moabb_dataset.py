@@ -115,13 +115,21 @@ def test_cache_key_covers_dataset_and_paradigm_options(cache):
     assert len(ds) == 3 * 2 * 2 * 5
     _make(cache, paradigm=FakeParadigm(fmax=np.float64(30)))  # numpy scalar option
     paradigm = FakeParadigm()
-    paradigm.filters = [object()]  # non-plain option: keyed by its repr, without address
+    paradigm.filters = [object()]  # no configuration to fingerprint: refused
+    with pytest.raises(TypeError, match="fingerprint"):
+        _make(cache, paradigm=paradigm)
+    paradigm = FakeParadigm()
+    paradigm.filters = [_Filter(8)]  # object option: keyed by its attributes
     _make(cache, paradigm=paradigm)
     paradigm = FakeParadigm()
-    paradigm.filters = [object()]
+    paradigm.filters = [_Filter(8)]
     _make(cache, paradigm=paradigm)
-    assert paradigm._calls == 0  # same repr: cache replayed
-    assert len(list((cache / "moabb_Fake-2026" / "processed").iterdir())) == 4
+    assert paradigm._calls == 0  # same configuration: cache replayed
+    paradigm = FakeParadigm()
+    paradigm.filters = [_Filter(30)]
+    _make(cache, paradigm=paradigm)
+    assert paradigm._calls == 1  # other configuration: recomputed
+    assert len(list((cache / "moabb_Fake-2026" / "processed").iterdir())) == 5
 
 
 def test_estimator_change_reuses_the_epochs(cache):
@@ -219,3 +227,61 @@ def test_create_dataloaders_without_split(cache):
     with pytest.warns(UserWarning, match="Sample-level split"):
         tr, va, te = create_dataloaders(ds, num_workers=0)
     assert len(tr.dataset) + len(va.dataset) + len(te.dataset) == len(ds)
+
+
+# ------------------------------------------------------- review regressions
+class _Filter:
+    """Configuration object with the default repr (``<... at 0x...>``)."""
+
+    def __init__(self, cutoff):
+        self.cutoff = cutoff
+
+
+class _Slotted:
+    __slots__ = ("cutoff",)
+
+    def __init__(self, cutoff):
+        self.cutoff = cutoff
+
+
+def test_cache_key_fingerprints_object_configuration():
+    from spdnet_datasets.moabb.dataset import _key_value
+
+    assert _key_value(_Filter(8)) != _key_value(_Filter(30))
+    assert _key_value(_Filter(8)) == _key_value(_Filter(8))
+    with pytest.raises(TypeError, match="fingerprint"):
+        _key_value(_Slotted(8))
+
+
+class _SessionsParadigm(FakeParadigm):
+    """Subject 1 has two sessions, subject 2 only one."""
+
+    def get_data(self, dataset, subjects=None):
+        X, y, meta = super().get_data(dataset, subjects)
+        keep = ~((meta["subject"] == 2) & (meta["session"] == "1train")).to_numpy()
+        return X[keep], y[keep], meta[keep].reset_index(drop=True)
+
+
+def test_cross_session_when_one_subject_has_two_sessions(cache):
+    ds = _make(cache, FakeDataset(n_subjects=2), _SessionsParadigm())
+    assert any(k.startswith("cross_session_") for k in ds.splits)
+
+
+def test_infeasible_within_session_does_not_block_other_protocols(cache):
+    with pytest.warns(UserWarning, match="within_session"):
+        ds = _make(cache, FakeDataset(n_per_class=2))  # 4 trials per session < 5 folds
+    assert not any(k.startswith("within_session_") for k in ds.splits)
+    assert ds.splits["recommended"] is ds.splits["cross_subject_0"]
+
+
+class _NaNParadigm(FakeParadigm):
+    def get_data(self, dataset, subjects=None):
+        X, y, meta = super().get_data(dataset, subjects)
+        X[0, 0, 5] = np.nan
+        return X, y, meta
+
+
+@pytest.mark.parametrize("estimator", ["scm", "ledoit_wolf"])
+def test_non_finite_epochs_are_excluded(cache, estimator):
+    ds = _make(cache, paradigm=_NaNParadigm(), estimator=estimator)
+    assert ds.n_excluded == 1 and 0 not in set(ds.trial_index.tolist())

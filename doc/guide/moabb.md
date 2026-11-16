@@ -122,12 +122,15 @@ depends on the `return_*` flags:
 - `ds.splits` holds the folds produced by MOABB's own splitters, so they follow
   the same protocols as the MOABB evaluations. The within-session folds are
   identical to those of `WithinSessionEvaluation(random_state=seed)` when both
-  use the same seed:
+  use the same seed. Each protocol is built on its own: one that cannot be
+  built (for instance fewer trials per class and session than `n_folds`, or a
+  single subject for cross-subject) is left out with a warning, and the others
+  remain available:
 
 | Split names | Protocol | Matches |
 |---|---|---|
 | `within_session_<k>` | 5-fold stratified cross-validation inside each (subject, session) | `WithinSessionEvaluation` |
-| `cross_session_<k>` | leave one session out, per subject (≥ 2 sessions) | `CrossSessionEvaluation` |
+| `cross_session_<k>` | leave one session out, per subject (subjects with a single session are skipped) | `CrossSessionEvaluation` |
 | `cross_subject_<k>` | leave one subject out (≥ 2 subjects) | `CrossSubjectEvaluation` |
 | `recommended` | first fold of the strictest available protocol | |
 
@@ -158,7 +161,10 @@ deletes them. Under `SPDNET_CACHE_DIR/moabb_<dataset code>/`, it caches:
 The `processed` hash covers the dataset code and every public setting of the
 MOABB dataset object (for instance `PhysionetMI(imagined=True)` and
 `PhysionetMI(executed=True)` get different entries), the subjects, and the
-paradigm class with its public settings (NumPy scalars included). The
+paradigm class with its public settings. Settings that are objects are keyed
+by their configuration (`get_params()` or their public attributes), never by
+their `repr`; a setting that cannot be fingerprinted raises `TypeError` rather
+than risking two configurations sharing one cache entry. The
 `covariance` hash adds the estimator only: changing the estimator recomputes
 the covariances from the cached epochs without calling `get_data` again. A
 second run with the same settings reads the cache. `force=True` recomputes.
