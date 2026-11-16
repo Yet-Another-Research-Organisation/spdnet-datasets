@@ -235,7 +235,7 @@ def test_normalization_is_fitted_on_the_split_train(cache, abide):
     train = ds.splits["recommended"]["train"]
     assert abs(np.mean(np.log(np.linalg.eigvalsh(ds.covariances[train])))) < 1e-10
     assert _make(cache, normalize=False).scale == 1.0
-    with pytest.raises(ValueError, match="Unknown split"):
+    with pytest.raises(ValueError, match="is not available"):
         _make(cache, split="nope")
 
 
@@ -296,3 +296,26 @@ def test_nilearn_resolves_to_the_pypi_package():
     import nilearn
 
     assert hasattr(nilearn, "datasets") and "spdnet_datasets" not in nilearn.__file__
+
+
+# ------------------------------------------------------- review regressions
+def test_eight_subject_cohort_builds_every_split(cache, abide):
+    ds = _make(cache, fetcher_kwargs={"SITE_ID": ["NYU", "UM_1"]})  # 8 subjects, 4 + 4
+    assert len(ds) == 8
+    strat = ds.splits["stratified"]
+    for part in ("val", "test"):  # at least one subject per class
+        assert set(ds.labels[strat[part]]) == {0, 1}
+    assert ds.splits["recommended"] is ds.splits["site_grouped"]
+    assert_no_leakage(ds.sites[ds.splits["site_grouped"]["train"]],
+                      ds.sites[ds.splits["site_grouped"]["test"]])
+
+
+def test_infeasible_stratified_split_does_not_block_site_grouped(cache, abide):
+    with pytest.warns(UserWarning, match="'stratified' cannot be built"):
+        ds = _make(cache, n_subjects=5, fetcher_kwargs={"SITE_ID": ["NYU", "UM_1"]})
+    assert "stratified" not in ds.splits and "site_grouped" in ds.splits
+    assert ds.split == "recommended" and ds.splits["recommended"] is ds.splits["site_grouped"]
+    with pytest.raises(ValueError, match="'stratified' is not available"):
+        with pytest.warns(UserWarning):
+            _make(cache, n_subjects=5, split="stratified",
+                  fetcher_kwargs={"SITE_ID": ["NYU", "UM_1"]})

@@ -147,15 +147,21 @@ def stratified_split(y, *, stratify=True, val_size=0.1, test_size=0.1, seed=0):
     """Subject-level train/val/test split, stratified on ``y`` if ``stratify``.
 
     Sites are mixed between train and test, so on multi-site data the score is
-    optimistic. ``test_size=0.1`` follows the spdlearn fMRI example.
+    optimistic. ``test_size=0.1`` follows the spdlearn fMRI example. With
+    ``stratify``, the test and validation parts hold at least one subject per
+    class, so small cohorts get proportionally larger parts; a cohort too small
+    for that raises ``ValueError``.
     """
     from sklearn.model_selection import train_test_split
 
     y = np.asarray(y)
     idx = np.arange(len(y))
-    rest, test = train_test_split(idx, test_size=test_size, stratify=y if stratify else None,
+    k = len(np.unique(y)) if stratify else 1
+    n_test = max(int(np.ceil(test_size * len(y))), k)
+    rest, test = train_test_split(idx, test_size=n_test, stratify=y if stratify else None,
                                   random_state=seed)
-    train, val = train_test_split(rest, test_size=val_size / (1 - test_size),
+    n_val = max(int(np.ceil(val_size * len(y))), k)
+    train, val = train_test_split(rest, test_size=n_val,
                                   stratify=y[rest] if stratify else None, random_state=seed)
     return {"train": np.sort(train), "val": np.sort(val), "test": np.sort(test)}
 
@@ -420,12 +426,25 @@ class NilearnConnectomes(BaseDataset):
             self.series = self._split_series(np.load(p / "series.npy", mmap_mode="r"),
                                              np.load(p / "lengths.npy"))
 
-        self.splits = {"stratified": stratified_split(self.labels, stratify=stratify,
-                                                         seed=self.seed)}
+        # Each split is built on its own: an infeasible one (too few subjects
+        # per class or per site) is left out and does not block the others.
+        builders = {"stratified": lambda: stratified_split(self.labels, stratify=stratify,
+                                                           seed=self.seed)}
         if multi_site and len(np.unique(self.sites)) >= 2:
-            self.splits["site_grouped"] = site_grouped_split(self.labels, self.sites,
-                                                             stratify=stratify, seed=self.seed)
-        self.splits["recommended"] = self.splits.get("site_grouped", self.splits["stratified"])
+            builders["site_grouped"] = lambda: site_grouped_split(
+                self.labels, self.sites, stratify=stratify, seed=self.seed)
+        self.splits, self.split_errors = {}, {}
+        for name, build in builders.items():
+            try:
+                self.splits[name] = build()
+            except ValueError as exc:
+                self.split_errors[name] = str(exc)
+                warnings.warn(f"split {name!r} cannot be built on {len(self.labels)} "
+                              f"subjects and is left out: {exc}", UserWarning, stacklevel=3)
+        for name in ("site_grouped", "stratified"):
+            if name in self.splits:
+                self.splits["recommended"] = self.splits[name]
+                break
         if multi_site and self.split == "stratified":
             warnings.warn("split='stratified' mixes acquisition sites between train and test: "
                           "the score is optimistic. Use split='site_grouped'.",
@@ -433,7 +452,11 @@ class NilearnConnectomes(BaseDataset):
         self.scale = 1.0
         if self.split is not None:
             if self.split not in self.splits:
-                raise ValueError(f"Unknown split {self.split!r}; available: {sorted(self.splits)}")
+                reason = self.split_errors.get(
+                    "site_grouped" if self.split == "recommended" else self.split)
+                raise ValueError(f"Split {self.split!r} is not available"
+                                 + (f" ({reason})" if reason else "")
+                                 + f"; available: {sorted(self.splits)}")
             if self.normalize:
                 self.scale = geometric_scale(self.covs[self.splits[self.split]["train"]])
 

@@ -213,6 +213,12 @@ level:
 | `site_grouped` | `StratifiedGroupKFold` on sites: test = fold 0 of `min(5, n_sites)`, val = fold 0 of the remaining sites; `assert_no_leakage` on every pair | `abide`, `adhd` |
 | `recommended` | `site_grouped`, or `stratified` for `development` (single site, one sample per subject) | default |
 
+Each split is built on its own. On a small cohort, the `stratified` test and
+validation parts are enlarged to hold at least one subject per class; a split
+that still cannot be built (too few subjects per class or per site) is left
+out with a warning, and the others remain available. Asking for it explicitly
+raises a `ValueError` that gives the reason.
+
 For `adhd`, the cohorts `Peking_1`, `Peking_2` and `Peking_3` count as one site,
 `Peking`. With `normalize=True`, the geometric scale (see
 {doc}`outputs`) is fitted on the training indices of `split`. Pass the same
