@@ -1,0 +1,72 @@
+{
+ "name": "aviris",
+ "kwargs": {
+  "version": "mix",
+  "task": "fine"
+ },
+ "split": "recommended",
+ "p": 83,
+ "n_samples": 2031,
+ "classes": [
+  "amandiers",
+  "arbustes",
+  "autre",
+  "eau",
+  "foret_coniferes",
+  "foret_mixte",
+  "prairie_paturage",
+  "sol_nu",
+  "urbain_dense",
+  "urbain_faible",
+  "urbain_moyen",
+  "urbain_ouvert",
+  "vignes"
+ ],
+ "counts": {
+  "train": [
+   70,
+   94,
+   67,
+   94,
+   93,
+   92,
+   95,
+   77,
+   96,
+   106,
+   159,
+   94,
+   92
+  ],
+  "val": [
+   28,
+   31,
+   21,
+   29,
+   30,
+   31,
+   29,
+   24,
+   27,
+   33,
+   48,
+   31,
+   28
+  ],
+  "test": [
+   25,
+   30,
+   22,
+   32,
+   32,
+   32,
+   31,
+   26,
+   32,
+   35,
+   53,
+   32,
+   30
+  ]
+ }
+}

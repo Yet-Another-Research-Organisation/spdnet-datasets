@@ -12,6 +12,7 @@ from .audio import BirdSetXCMDataset, ESC50Dataset, GTZANDataset
 from .base import BaseDataset, create_dataloaders
 from .estimator import EstimateCovariance, EstimateCovarianceTorch
 from .hyperspectral import (
+    AVIRISDataset,
     ChikuseiDataset,
     DeepHSFruitDataset,
     GSOFFDataset,
@@ -36,6 +37,7 @@ from .sar import (
     PolInSARIslandDataset,
     S1SLCCVDLDataset,
 )
+from .sar.s1_iceland import S1IcelandDataset, fetch_s1_iceland
 from .sits import PastisRDataset, fetch_pastis_r
 from .skeleton import HDM05Dataset, NTURGBD120Dataset
 
@@ -58,6 +60,7 @@ __all__ = [
     'UAVDataset',
     'GSOffDataset',
     'GSOFFDataset',
+    'AVIRISDataset',
     'ChikuseiDataset',
     'DeepHSFruitDataset',
     'PlacentaDataset',
@@ -83,4 +86,6 @@ __all__ = [
     'MSTARDataset',
     'PolInSARIslandDataset',
     'S1SLCCVDLDataset',
+    'S1IcelandDataset',
+    'fetch_s1_iceland',
 ]

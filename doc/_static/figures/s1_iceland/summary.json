@@ -1,0 +1,45 @@
+{
+ "name": "s1_iceland",
+ "kwargs": {},
+ "split": "official",
+ "p": 30,
+ "n_samples": 57947,
+ "classes": [
+  "open_spaces",
+  "other_vegetation",
+  "periodic_herbaceous",
+  "sealed",
+  "snow_ice",
+  "sparse_vegetated",
+  "water"
+ ],
+ "counts": {
+  "train": [
+   1602,
+   1721,
+   23080,
+   1190,
+   2055,
+   3820,
+   6322
+  ],
+  "val": [
+   2445,
+   233,
+   3991,
+   105,
+   173,
+   596,
+   3823
+  ],
+  "test": [
+   0,
+   421,
+   4237,
+   50,
+   350,
+   1181,
+   552
+  ]
+ }
+}
