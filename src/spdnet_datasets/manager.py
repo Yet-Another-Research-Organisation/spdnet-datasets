@@ -78,6 +78,15 @@ class DatasetManager:
                 path = str(Path(path) / subdir)
             kwargs['data_dir'] = path
 
+        # The named split used by the dataloaders is also the one the dataset fits
+        # its statistics on (normalisation, class weights): pass it to datasets
+        # whose constructor takes ``split`` (create_dataloaders rejects a mismatch).
+        split_strategy = kwargs.get('split_strategy')
+        if split_strategy is not None and 'split' not in kwargs:
+            import inspect
+            if 'split' in inspect.signature(dataset_class.__init__).parameters:
+                kwargs['split'] = split_strategy
+
         # Remove dataloader-specific params that shouldn't go to dataset
         dataloader_params = [
             'batch_size', 'num_workers', 'pin_memory',
