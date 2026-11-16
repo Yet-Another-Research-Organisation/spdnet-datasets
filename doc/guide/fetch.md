@@ -74,19 +74,32 @@ Credentials are never written in code, URLs or logs, and the
 `Authorization` header is dropped when a download is redirected to another
 host. They are looked up in this order ({mod}`spdnet_datasets.core.access`):
 
-1. environment variables: `KAGGLE_USERNAME` and `KAGGLE_KEY`; `HF_TOKEN`;
-2. the tool's own file: `~/.kaggle/kaggle.json` (create it from
-   *kaggle.com > Settings > API > Create New Token*, then `chmod 600`);
-   the Hugging Face token cache written by `huggingface-cli login`;
+1. environment variables: `KAGGLE_API_TOKEN`; `HF_TOKEN`;
+2. the tool's own file: `~/.kaggle/access_token` for Kaggle; the Hugging Face
+   token cache written by `hf auth login` (`huggingface-cli login`);
 3. the system keyring (optional `keyring` package):
 
    ```python
    from spdnet_datasets.core.access import store_secret
    store_secret("huggingface", "hf_...")                      # once
-   store_secret("kaggle", '{"username": "...", "key": "..."}')
+   store_secret("kaggle_token", "KGAT_...")
    ```
 
 4. a hidden prompt, when the fetch runs in a terminal.
+
+Kaggle access token: on <https://www.kaggle.com/settings/api>, click
+*Generate New Token* and store the token without leaving it in the shell
+history:
+
+```bash
+mkdir -p ~/.kaggle && chmod 700 ~/.kaggle
+read -rs T && printf %s "$T" > ~/.kaggle/access_token && chmod 600 ~/.kaggle/access_token && unset T
+```
+
+It is sent as `Authorization: Bearer <token>`. The legacy API key format
+(`~/.kaggle/kaggle.json`, or `KAGGLE_USERNAME` / `KAGGLE_KEY`) is still accepted
+when no access token is found. With either, accept the dataset or competition
+rules on its page with the same account.
 
 Without credentials, the fetch raises `MissingCredentialsError` with these
 instructions. On a shared machine, prefer the keyring or a file readable only
