@@ -63,6 +63,13 @@ Dataset classes, the `core` contract (estimators, outputs, tasks, splits,
 fetch), the manager and the synthetic generators.
 :::
 
+:::{grid-item-card} External datasets
+:link: guide/moabb
+:link-type: doc
+
+MOABB (EEG): covariances from the MOABB datasets, paradigms and evaluations.
+:::
+
 ::::
 
 ```{toctree}
@@ -87,6 +94,7 @@ guide/datasets
 guide/adding
 guide/synthetic
 guide/covariance
+guide/moabb
 ```
 
 ```{toctree}
