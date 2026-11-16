@@ -22,6 +22,7 @@ For development, with the tests and the documentation:
 ```bash
 git clone https://github.com/Yet-Another-Research-Organisation/spdnet-datasets.git
 cd spdnet-datasets && pip install -e ".[dev,test,docs]"
+pip install -r doc/requirements.txt   # yetanotherspdnet (Tyler / Student-t) for the tutorials
 make -C doc html          # strict build; runs the tutorials of the gallery
 ```
 

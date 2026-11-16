@@ -141,3 +141,11 @@ def test_batch_and_channel_mean(X):
     covs = estimate_covariances([X, X[:100]], "scm")
     assert covs.shape == (2, 6, 6)
     np.testing.assert_allclose(channel_mean(X), X.mean(0))
+
+
+@pytest.mark.parametrize("estimator", ESTIMATORS)
+def test_non_finite_observations_raise_not_spd(estimator):
+    X = np.random.default_rng(5).standard_normal((50, 4))
+    X[3, 1] = np.nan
+    with pytest.raises(NotSPDError, match="NaN"):
+        estimate_covariance(X, estimator)

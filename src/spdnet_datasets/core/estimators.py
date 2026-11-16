@@ -133,6 +133,8 @@ def estimate_covariance(
     n, p = X.shape
     if check:
         check_sample_size(n, p)
+        if not np.all(np.isfinite(X)):
+            raise NotSPDError("Observations contain NaN or infinite values")
 
     if estimator == "ledoit_wolf":
         from sklearn.covariance import LedoitWolf

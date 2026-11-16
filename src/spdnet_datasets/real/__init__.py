@@ -20,6 +20,7 @@ from .fusar import FUSARShipDataset
 from .hdm05 import HDM05Dataset
 from .mvdoppler import MVDopplerDataset
 from .ntu120 import NTU120Dataset
+from .uav import UAVLegacyDataset  # registers 'uav_legacy'
 
 __all__ = [
     'Rices90Dataset',
@@ -36,4 +37,5 @@ __all__ = [
     'DopNetDataset',
     'MVDopplerDataset',
     'FUSARShipDataset',
+    'UAVLegacyDataset',
 ]
