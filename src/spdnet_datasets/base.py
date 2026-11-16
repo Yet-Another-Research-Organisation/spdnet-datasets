@@ -206,6 +206,14 @@ def create_dataloaders(
         if split not in splits:
             raise ValueError(f"Unknown split {split!r}; available: {sorted(splits)}")
         parts = splits[split]
+        fitted = getattr(dataset, "split", None)
+        if (isinstance(fitted, str) and fitted != split and fitted in splits
+                and not np.array_equal(np.sort(np.asarray(splits[fitted].get("train", []))),
+                                       np.sort(np.asarray(parts.get("train", []))))):
+            raise ValueError(
+                f"The dataset fitted its normalisation and class weights on split "
+                f"{fitted!r}, but split {split!r} was requested: construct the dataset "
+                f"with split={split!r} so that the statistics come from its training part.")
         train_ds, val_ds, test_ds = (
             Subset(dataset, np.asarray(parts.get(k, []), dtype=int).tolist())
             for k in ("train", "val", "test")

@@ -98,9 +98,13 @@ def test_dataset_outputs_normalisation_and_registry(data, tmp_path):
 
     (cov, mean, raw), _ = CI4RDataset(data, return_mean=True, return_raw=True, **kw)[0]
     assert mean.shape == (P,) and raw.shape == (W, P) and raw.dtype == torch.float32
-    tr, va, te = create_dataloaders(ds, batch_size=4, num_workers=0, split="fold1",
+    # statistics fitted on "recommended" (fold0): loading fold1 is refused
+    with pytest.raises(ValueError, match="split='fold1'"):
+        create_dataloaders(ds, batch_size=4, num_workers=0, split="fold1", verbose=False)
+    ds1 = CI4RDataset(data, split="fold1", **kw)
+    tr, va, te = create_dataloaders(ds1, batch_size=4, num_workers=0, split="fold1",
                                     verbose=False)
-    assert len(tr.dataset) + len(te.dataset) == len(ds) and len(va.dataset) == 0
+    assert len(tr.dataset) + len(te.dataset) == len(ds1) and len(va.dataset) == 0
 
 
 def test_cache_key_has_source_and_estimator_only_in_covariances(data, tmp_path):
