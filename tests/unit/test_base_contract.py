@@ -65,3 +65,43 @@ def test_max_classes_uses_dataset_seed(tmp_path):
     picks = {s: _Toy(tmp_path, max_classes=3, seed=s)._limit_classes(classes) for s in range(6)}
     assert picks[1] == _Toy(tmp_path, max_classes=3, seed=1)._limit_classes(classes)
     assert len({tuple(v) for v in picks.values()}) > 1  # no longer fixed to seed 42
+
+
+class _Fitted(_Toy):
+    """Toy dataset that fits its statistics on ``split`` (like HSI, radar, UAV...)."""
+
+    def __init__(self, data_dir, split="official", **kw):
+        self.split = split
+        kw.pop("verbose", None)  # _Toy sets it
+        super().__init__(data_dir, **kw)
+        self.splits["transfer"] = {"train": np.arange(10), "test": np.arange(10, 20)}
+        self.splits["alias"] = self.splits["official"]
+
+
+def test_dataloaders_reject_split_other_than_the_fitted_one(tmp_path):
+    ds = _Fitted(tmp_path, split="official")
+    with pytest.raises(ValueError, match="split='transfer'"):
+        create_dataloaders(ds, num_workers=0, split="transfer", verbose=False)
+    # same training part under another name: accepted
+    create_dataloaders(ds, num_workers=0, split="alias", verbose=False)
+    create_dataloaders(_Fitted(tmp_path, split="transfer"), num_workers=0, split="transfer",
+                       verbose=False)
+
+
+def test_manager_passes_split_strategy_to_the_constructor(tmp_path, monkeypatch):
+    from spdnet_datasets import DatasetManager
+
+    monkeypatch.setitem(DatasetManager.DATASETS, "_fitted", _Fitted)
+    ds = DatasetManager.create_dataset({"name": "_fitted", "data_dir": str(tmp_path),
+                                        "split_strategy": "transfer", "verbose": False})
+    assert ds.split == "transfer"
+    DatasetManager.create_dataloaders({"name": "_fitted", "data_dir": str(tmp_path),
+                                       "split_strategy": "transfer", "num_workers": 0,
+                                       "verbose": False})
+
+
+def test_legacy_uav_name_is_registered():
+    import spdnet_datasets
+    from spdnet_datasets import DatasetManager
+
+    assert spdnet_datasets is not None and "uav_legacy" in DatasetManager.DATASETS
