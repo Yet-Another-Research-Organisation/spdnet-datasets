@@ -49,6 +49,8 @@ radar = ["Pillow>=9.0"]
 gdrive = ["gdown>=5.0"]
 # 7z archives (ATRNet-STAR volumes) when the 7z command is not installed
 archives = ["py7zr>=0.20", "multivolumefile>=0.2"]
+# MOABB adapter (spdnet_datasets.moabb), tested with moabb 1.7.2
+moabb = ["moabb>=1.7.2"]
 # nilearn adapter (spdnet_datasets.nilearn), tested with nilearn 0.14.1
 nilearn = ["nilearn>=0.14.1"]
 dev = ["ruff>=0.1.0", "pre-commit>=3.4.0"]

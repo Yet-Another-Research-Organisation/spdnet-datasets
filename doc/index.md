@@ -63,11 +63,18 @@ Dataset classes, the `core` contract (estimators, outputs, tasks, splits,
 fetch), the manager and the synthetic generators.
 :::
 
-:::{grid-item-card} External datasets
+:::{grid-item-card} MOABB (EEG)
+:link: guide/moabb
+:link-type: doc
+
+Covariances from the MOABB datasets, paradigms and evaluations.
+:::
+
+:::{grid-item-card} nilearn (fMRI)
 :link: guide/nilearn
 :link-type: doc
 
-nilearn (fMRI): connectomes of ABIDE, ADHD-200 and development fMRI, with site-grouped splits.
+Connectomes of ABIDE, ADHD-200 and development fMRI, with site-grouped splits.
 :::
 
 ::::
@@ -94,6 +101,7 @@ guide/datasets
 guide/adding
 guide/synthetic
 guide/covariance
+guide/moabb
 guide/nilearn
 ```
 
