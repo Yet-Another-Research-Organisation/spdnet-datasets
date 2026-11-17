@@ -172,6 +172,44 @@ def test_download_wrong_size_raises_without_looping(tmp_path, monkeypatch):
     assert (tmp_path / "h.bin.part").exists() and len(server.calls) == 1
 
 
+def test_download_keeps_announced_total_across_retries(tmp_path, monkeypatch):
+    """A total announced once is kept; a 206 without total does not redefine it."""
+    payload = bytes(range(250)) * 4  # 1000 bytes
+    calls = []
+
+    def server(req, timeout=None):
+        calls.append(req.headers.get("Range"))
+        if len(calls) == 1:  # announces 1000 bytes, delivers 100
+            resp = _FakeResponse(payload[:100])
+            resp.headers = {"Content-Length": "1000"}
+        else:  # unknown total, only a short range
+            start = int(req.headers["Range"].split("=")[1].rstrip("-"))
+            resp = _FakeResponse(payload[start:start + 100], status=206)
+            resp.headers = {"Content-Range": f"bytes {start}-{start + 99}/*",
+                            "Content-Length": "100"}
+        return resp
+
+    monkeypatch.setattr(F, "_open", server)
+    with pytest.raises(OSError, match="Incomplete download.*of 1000"):
+        F.download("http://x/f.bin", tmp_path / "f.bin", retries=2)
+    assert not (tmp_path / "f.bin").exists()
+    assert (tmp_path / "f.bin.part").stat().st_size == 300
+
+
+def test_download_without_resume_restarts_from_zero(tmp_path, monkeypatch):
+    payload = bytes(range(256)) * 20
+    server = _Server(payload, cuts=1)
+
+    def no_ranges(req, timeout=None):
+        if req.headers.get("Range"):
+            raise F.urllib.error.HTTPError(req.full_url, 403, "Forbidden", {}, None)
+        return server(req, timeout)
+
+    monkeypatch.setattr(F, "_open", no_ranges)
+    dest = F.download("http://x/f.bin", tmp_path / "f.bin", resume=False)
+    assert dest.read_bytes() == payload and server.calls == [None, None]
+
+
 def test_download_http_error_is_not_retried(tmp_path, monkeypatch):
     calls = []
 

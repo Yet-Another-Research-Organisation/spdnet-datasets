@@ -103,15 +103,16 @@ def _open(req, timeout):
 _RETRY_WAIT = 2.0  # seconds before the first retry, doubled at each new one
 
 
-def _total_size(resp, start):
-    """Total size of the file announced by a response (``None`` when unknown)."""
+def _total_size(resp):
+    """Total size of the file announced by a response (``None`` when unknown).
+
+    A partial answer (206) announces it only in ``Content-Range``: its
+    ``Content-Length`` is the length of the range, not of the file.
+    """
     headers = getattr(resp, "headers", None) or {}
     if getattr(resp, "status", 200) == 206:
         total = (headers.get("Content-Range") or "").rpartition("/")[2]
-        if total.isdigit():
-            return int(total)
-        length = headers.get("Content-Length")
-        return start + int(length) if length and length.isdigit() else None
+        return int(total) if total.isdigit() else None
     length = headers.get("Content-Length")
     return int(length) if length and length.isdigit() else None
 
@@ -126,11 +127,12 @@ def download(url, dest, checksum=None, algo="sha256", resume=True, timeout=60,
     already complete: it is checked and renamed.
 
     Completeness is checked against ``size`` (expected size in bytes) when
-    given, else against the size announced by the server (``Content-Length``,
-    or the total of ``Content-Range``). A connection closed early, or broken by
+    given, else against the size announced by the server (``Content-Length``
+    of a full answer, or the total of ``Content-Range``), kept across attempts. A connection closed early, or broken by
     a network error, keeps ``.part`` and is resumed after a short, growing
     wait, up to ``retries`` times after the first attempt; ``OSError`` is then
-    raised with ``.part`` kept (a later call resumes it). A size that cannot be
+    raised with ``.part`` kept (a later call resumes it). With
+    ``resume=False`` every attempt restarts from byte zero, without ``Range``. A size that cannot be
     reached by resuming (``.part`` or ``dest`` larger than, or a complete file
     different from, ``size``) raises at once. HTTP errors other than ``416``
     (401, 403, 404...) are raised at once.
@@ -148,14 +150,15 @@ def download(url, dest, checksum=None, algo="sha256", resume=True, timeout=60,
         return dest
     dest.parent.mkdir(parents=True, exist_ok=True)
     part = dest.with_name(dest.name + ".part")
-    if not resume and part.exists():
-        part.unlink()
+    known = size  # total size of the file: given, or the first one a server announces
     for attempt in range(retries + 1):
+        if not resume and part.exists():  # every attempt restarts from byte zero
+            part.unlink()
         start = part.stat().st_size if part.exists() else 0
-        if size is not None and start > size:
-            raise OSError(f"{part}: {start} bytes, more than the expected {size}; delete it")
-        expected, error = size, None
-        if size is None or start < size:
+        if known is not None and start > known:
+            raise OSError(f"{part}: {start} bytes, more than the expected {known}; delete it")
+        error = None
+        if known is None or start < known:
             hdrs = dict(headers or {})
             if start:
                 hdrs["Range"] = f"bytes={start}-"
@@ -163,34 +166,35 @@ def download(url, dest, checksum=None, algo="sha256", resume=True, timeout=60,
             try:
                 with _open(req, timeout) as resp:
                     resumed = start and getattr(resp, "status", 200) == 206
-                    total = _total_size(resp, start if resumed else 0)
-                    if size is not None and total is not None and total != size:
-                        raise OSError(f"{url}: the server announces {total} bytes, "
-                                      f"expected {size}")
-                    expected = size if size is not None else total
+                    total = _total_size(resp)
+                    if total is not None:
+                        if known is not None and total != known:
+                            raise OSError(f"{url}: the server announces {total} bytes, "
+                                          f"expected {known}")
+                        known = total
                     with open(part, "ab" if resumed else "wb") as out:
                         shutil.copyfileobj(resp, out, 1 << 20)
             except urllib.error.HTTPError as exc:
                 # 416 on a resume: the range starts at the end of the file, .part is complete
                 if not (start and exc.code == 416):
                     raise
-                if size is not None and start != size:
+                if known is not None and start != known:
                     raise OSError(f"{part}: {start} bytes and the server has no more, "
-                                  f"expected {size}") from exc
-                expected = start
+                                  f"expected {known}") from exc
+                known = start
             except (urllib.error.URLError, http.client.HTTPException, ConnectionError,
                     TimeoutError) as exc:  # network failure: resumed below
                 error = exc
         got = part.stat().st_size if part.exists() else 0
-        if expected is not None and got > expected:
-            raise OSError(f"{part}: {got} bytes, more than the expected {expected}; delete it")
-        if error is None and (expected is None or got == expected):
+        if known is not None and got > known:
+            raise OSError(f"{part}: {got} bytes, more than the expected {known}; delete it")
+        if error is None and (known is None or got == known):
             break
         if attempt < retries:
             time.sleep(_RETRY_WAIT * 2 ** attempt)
     else:
         raise OSError(f"Incomplete download of {url} after {retries + 1} attempts: {got} bytes"
-                      f"{f' of {expected}' if expected is not None else ''}"
+                      f"{f' of {known}' if known is not None else ''}"
                       f"{f' ({error})' if error is not None else ''}; {part} is kept and the "
                       "next call resumes it")
     if checksum and _hash_file(part, algo) != checksum:
