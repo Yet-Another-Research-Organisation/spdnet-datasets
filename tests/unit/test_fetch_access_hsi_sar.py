@@ -484,3 +484,51 @@ def test_atrnet_star_archive_first_volume_or_local_layout(atr_dir, tmp_path, mon
     b2 = ATR.fetch_atrnet_star(tmp_path / "missing", cache_dir=tmp_path / "c2", archive=atr_dir,
                                split="EOC_depression")
     assert b2.root == atr_dir
+
+
+# --- dataset classes without local copy: the fetch fills the cache ------------------------------
+
+def test_hsi_classes_build_from_the_fetch_without_local_copy(rices_dir, fruit_dir, tmp_path,  # noqa: F811
+                                                             fake_net, monkeypatch):
+    monkeypatch.setenv("SPDNET_DATA_ROOT", str(tmp_path / "empty_root"))
+    serve, calls = fake_net
+    z = _zip_tree(rices_dir, tmp_path / RI.ZIP, top="rices")
+    serve(RI.URL, z.read_bytes())
+    monkeypatch.setattr(RI, "ZIP_MD5", _md5(z))
+    monkeypatch.setattr(RI, "ZIP_SIZE", z.stat().st_size)
+    cache = tmp_path / "c"
+    ds = RI.Rices90Dataset(cache_dir=cache, verbose=False, return_raw=True)
+    (cov, raw), _ = ds[0]
+    assert calls == [RI.URL] and raw.ndim == 2 and ds.data_dir.is_relative_to(cache)
+    RI.Rices90Dataset(cache_dir=cache, verbose=False)  # cache reused, no new request
+    assert calls == [RI.URL]
+    # manual source: ManualDownloadRequired, then the cache filled by an archive is reused
+    with pytest.raises(ManualDownloadRequired):
+        DHS.DeepHSFruitDataset(cache_dir=cache, verbose=False)
+    DHS.fetch_deephsfruit(cache_dir=cache, archive=_zip_tree(fruit_dir, tmp_path / "f.zip"))
+    ds = DHS.DeepHSFruitDataset(cache_dir=cache, verbose=False)
+    assert len(ds) > 0 and (ds.data_dir / "cov_VIS").is_dir()
+
+
+def test_sar_classes_build_from_the_fetch_without_local_copy(fusar_dir, mstar_dir, tmp_path,  # noqa: F811
+                                                             fake_net, monkeypatch):
+    monkeypatch.setenv("SPDNET_DATA_ROOT", str(tmp_path / "empty_root"))
+    serve, calls = fake_net
+    src = tmp_path / "fusar_src"
+    for name in ("Cargo", "Fishing"):
+        shutil.copytree(fusar_dir / name, src / name)
+    shutil.copy(fusar_dir / "meta.csv", src / "meta.csv")
+    z = _zip_tree(src, tmp_path / FUS.ZIP, top="")
+    serve(FUS.URL, z.read_bytes())
+    monkeypatch.setattr(FUS, "ZIP_SHA256", _sha(z))
+    monkeypatch.setattr(FUS, "ZIP_SIZE", z.stat().st_size)
+    cache = tmp_path / "c"
+    ds = FUS.FUSARShipDataset(cache_dir=cache, image_size=16, return_raw=True, verbose=False)
+    assert calls == [FUS.URL] and ds[0][0].shape == (16, 16, 1)
+    assert ds.data_dir.is_relative_to(cache)
+    # manual source: ManualDownloadRequired, then the cache filled by an archive is reused
+    with pytest.raises(ManualDownloadRequired):
+        MST.MSTARDataset(cache_dir=cache, return_raw=True, verbose=False)
+    MST.fetch_mstar(cache_dir=cache, archive=_zip_tree(mstar_dir, tmp_path / "m.zip"))
+    ds = MST.MSTARDataset(cache_dir=cache, crop=16, return_raw=True, verbose=False)
+    assert len(ds) == 30 and ds[0][0].shape == (16, 16, 1) and ds.data_dir.is_relative_to(cache)

@@ -53,7 +53,7 @@ import pandas as pd
 import torch
 
 from ..base import BaseDataset
-from ..core.config import dataset_path
+from ..core.config import dataset_path, existing_dir
 from ..core.estimators import channel_mean
 from ..core.fetch import Bunch
 from ..manager import DatasetManager
@@ -153,7 +153,7 @@ class MSTARDataset(BaseDataset):
     source : {"jpg", "amplitude", "complex"}
     crop : int
         Side of the centre crop (``<= 128`` keeps every class).
-    verify, val_size
+    verify, val_size, cache_dir
         See :func:`fetch_mstar`.
     **kwargs
         :class:`~spdnet_datasets.base.BaseDataset` arguments; exactly one of
@@ -162,15 +162,19 @@ class MSTARDataset(BaseDataset):
 
     OUTPUTS = ("raw", "mean")
 
-    def __init__(self, data_dir=None, *, source="jpg", crop=128, verify="size", val_size=0.1, **kwargs):
+    def __init__(self, data_dir=None, *, source="jpg", crop=128, verify="size", val_size=0.1,
+                 cache_dir=None, **kwargs):
         root = dataset_path(DOMAIN, NAME, data_dir)
         self.source, self.crop = source, crop
-        self._fetch = {"source": source, "verify": verify, "val_size": val_size}
-        super().__init__(data_dir=str(root), **kwargs)
+        self._fetch = {"source": source, "verify": verify, "val_size": val_size,
+                       "cache_dir": cache_dir}
+        self._root = root
+        super().__init__(data_dir=str(existing_dir(root, cache_dir)), **kwargs)
         self._load_data()
 
     def _load_data(self):
-        b = fetch_mstar(self.data_dir, seed=self.seed, **self._fetch)
+        b = fetch_mstar(self._root, seed=self.seed, **self._fetch)
+        self.data_dir = Path(b.root)
         keep = finalize_labels(self, b.meta["label"].to_numpy(), b.meta["chip_id"].to_numpy(), b.splits)
         self.meta = b.meta.iloc[keep].reset_index(drop=True)
         self.samples = list(range(len(self.meta)))

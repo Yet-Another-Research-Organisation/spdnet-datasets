@@ -45,7 +45,7 @@ import pandas as pd
 import torch
 
 from ..core.access import kaggle_download
-from ..core.config import dataset_path
+from ..core.config import dataset_path, existing_dir
 from ..core.fetch import Bunch, run_pipeline
 from ..manager import DatasetManager
 from ..utils.sources import source_dir
@@ -102,6 +102,15 @@ def _splits(df, n_splits, fold, seed):
     return {"by_plot": sp, "recommended": sp}
 
 
+def _source(data_dir, cache_dir, archive, verify):
+    """Folder holding ``train.csv`` and ``images/`` (local copy, archive or download)."""
+    return source_dir(
+        NAME, dataset_path(DOMAIN, NAME, data_dir), required=("train.csv", "images"),
+        page_url=PAGE, expected=f"the archive of the Kaggle competition {COMPETITION}",
+        cache_dir=cache_dir, archive=archive, verify=verify,
+        download=lambda d: kaggle_download(COMPETITION, d, competition=True))
+
+
 def fetch_hyperleaf(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
                     verify="size", *, band_step=1, n_splits=5, fold=0, seed=0, archive=None):
     """Leaf covariances of the HyperLeaf2024 training images.
@@ -118,11 +127,7 @@ def fetch_hyperleaf(data_dir=None, cache_dir=None, keep=None, estimator="scm", f
     ``train.csv`` columns plus ``cultivar``, ``fertilizer``, ``combined``,
     ``plot``, ``n_valid``), ``groups`` (plot), ``info`` and ``splits``.
     """
-    root = source_dir(
-        NAME, dataset_path(DOMAIN, NAME, data_dir), required=("train.csv", "images"),
-        page_url=PAGE, expected=f"the archive of the Kaggle competition {COMPETITION}",
-        cache_dir=cache_dir, archive=archive, verify=verify,
-        download=lambda d: kaggle_download(COMPETITION, d, competition=True))
+    root = _source(data_dir, cache_dir, archive, verify)
     bands = band_index(N_BANDS, band_step)
     params = {"band_step": band_step, "source": str(root.resolve()), "version": 2}
 
@@ -198,10 +203,11 @@ class HyperLeafDataset(HSIDataset):
             raise ValueError(f"bands must be in [0, {N_BANDS}), got {self.bands}")
         self.target_size = (N_BANDS, N_BANDS) if mode == "cov" else (len(self.bands), 48, 352)
         root = dataset_path(DOMAIN, NAME, data_dir)
-        super().__init__(data_dir=str(root), **kwargs)
+        super().__init__(data_dir=str(existing_dir(root, cache_dir)), **kwargs)
         if mode == "image":
             if self.return_mean or self.return_raw:
                 raise ValueError("mode='image' returns the image only")
+            root = _source(root, cache_dir, None, verify)
             meta = train_table(root)
             bunch = Bunch(covariances=None, means=None, meta=meta, root=root,
                           groups=meta["plot"].to_numpy(), info={},
@@ -213,6 +219,7 @@ class HyperLeafDataset(HSIDataset):
         bunch.targets = bunch.meta[list(regression_targets)].to_numpy(np.float64) \
             if set(regression_targets) <= set(bunch.meta.columns) else None
         bunch.target_names = list(regression_targets)
+        self.data_dir = Path(bunch.root)
         self._setup(bunch, split, subset)
 
     def _load_raw(self, k):

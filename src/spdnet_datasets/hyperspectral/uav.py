@@ -50,7 +50,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from ..core.config import dataset_path
+from ..core.config import dataset_path, existing_dir
 from ..core.estimators import check_sample_size
 from ..core.fetch import Bunch, run_pipeline
 from ..manager import DatasetManager
@@ -222,10 +222,11 @@ class UAVDataset(HSIDataset):
                  subset=None, cache_dir=None, keep=None, force=False, verify="size",
                  **kwargs):
         root = dataset_path(DOMAIN, NAME, data_dir)
-        super().__init__(data_dir=str(root), **kwargs)
+        super().__init__(data_dir=str(existing_dir(root, cache_dir)), **kwargs)
         bunch = fetch_uav(root, cache_dir, keep, self.estimator, force, verify,
                           scenes=scenes, window=window, band_step=band_step,
                           threshold=threshold, block=block, n_splits=n_splits, fold=fold)
+        self.data_dir = Path(bunch.root)
         self._setup(bunch, split, subset)
 
 

@@ -95,7 +95,7 @@ import torch
 
 from ..base import BaseDataset
 from ..core.access import hf_download
-from ..core.config import dataset_path, get_cache_dir
+from ..core.config import dataset_path, existing_dir, get_cache_dir
 from ..core.estimators import channel_mean
 from ..core.fetch import Bunch, verify_local
 from ..manager import DatasetManager
@@ -386,12 +386,14 @@ class ATRNetSTARDataset(BaseDataset):
         root = dataset_path(DOMAIN, NAME, data_dir)
         self.protocol, self.representation, self.slant_features = split, representation, slant_features
         self._fetch = {"cache_dir": cache_dir, "verify": verify, "val_size": val_size}
-        super().__init__(data_dir=str(root), **kwargs)
+        self._root = root
+        super().__init__(data_dir=str(existing_dir(root, cache_dir)), **kwargs)
         self._load_data()
 
     def _load_data(self):
-        b = fetch_atrnet_star(self.data_dir, split=self.protocol, representation=self.representation,
+        b = fetch_atrnet_star(self._root, split=self.protocol, representation=self.representation,
                               seed=self.seed, **self._fetch)
+        self.data_dir = Path(b.root)
         keep = finalize_labels(self, b.meta["label"].to_numpy(), b.meta["chip_id"].to_numpy(), b.splits)
         self.meta = b.meta.iloc[keep].reset_index(drop=True)
         self.n_empty = b.n_empty

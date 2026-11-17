@@ -60,7 +60,7 @@ import torch
 
 from ..base import BaseDataset
 from ..core.access import extract_archive, manual_source
-from ..core.config import dataset_path, get_cache_dir
+from ..core.config import dataset_path, existing_dir, get_cache_dir
 from ..core.fetch import Bunch, check_local
 from ..manager import DatasetManager
 from ..utils.sources import downloads_dir, extract_rar, find_root
@@ -252,13 +252,15 @@ class S1SLCCVDLDataset(BaseDataset):
         root = dataset_path(DOMAIN, NAME, data_dir)
         self.split, self.features = split, features
         self._opts = {"n_stat_patches": n_stat_patches, "cache_dir": cache_dir}
-        self._fetch = {"verify": verify, "val_size": val_size}
+        self._fetch = {"verify": verify, "val_size": val_size, "cache_dir": cache_dir}
         self._chunk = {}
-        super().__init__(data_dir=str(root), **kwargs)
+        self._root = root
+        super().__init__(data_dir=str(existing_dir(root, cache_dir)), **kwargs)
         self._load_data()
 
     def _load_data(self):
-        b = fetch_s1slc_cvdl(self.data_dir, seed=self.seed, **self._fetch)
+        b = fetch_s1slc_cvdl(self._root, seed=self.seed, **self._fetch)
+        self.data_dir = Path(b.root)
         keep = finalize_labels(self, b.meta["label"].to_numpy(), b.meta["city"].to_numpy(), b.splits)
         self.meta = b.meta.iloc[keep].reset_index(drop=True)
         if self.split not in self.splits:

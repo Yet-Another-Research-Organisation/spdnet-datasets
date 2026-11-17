@@ -49,7 +49,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from ..core.config import dataset_path
+from ..core.config import dataset_path, existing_dir
 from ..core.fetch import Bunch, download, run_pipeline
 from ..manager import DatasetManager
 from ..utils.sources import source_dir
@@ -228,9 +228,10 @@ class Rices90Dataset(HSIDataset):
                  subset=None, cache_dir=None, keep=None, force=False, verify="size",
                  **kwargs):
         root = dataset_path(DOMAIN, NAME, data_dir)
-        super().__init__(data_dir=str(root), **kwargs)
+        super().__init__(data_dir=str(existing_dir(root, cache_dir)), **kwargs)
         bunch = fetch_rices90(root, cache_dir, keep, self.estimator, force, verify,
                               band_bin=band_bin, val_fraction=val_fraction)
+        self.data_dir = Path(bunch.root)
         self._setup(bunch, split, subset)
 
     def _load_raw(self, k):

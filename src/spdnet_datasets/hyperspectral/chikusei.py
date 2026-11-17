@@ -48,7 +48,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from ..core.config import dataset_path
+from ..core.config import dataset_path, existing_dir
 from ..core.estimators import check_sample_size
 from ..core.fetch import Bunch, check_local, download, run_pipeline
 from ..manager import DatasetManager
@@ -273,9 +273,10 @@ class ChikuseiDataset(HSIDataset):
                  subset=None, cache_dir=None, keep=None, force=False, verify="size",
                  **kwargs):
         root = dataset_path(DOMAIN, NAME, data_dir)
-        super().__init__(data_dir=str(root), **kwargs)
+        super().__init__(data_dir=str(existing_dir(root, cache_dir)), **kwargs)
         bunch = fetch_chikusei(root, cache_dir, keep, self.estimator, force, verify,
                                window=window, band_step=band_step)
+        self.data_dir = Path(bunch.root)
         self._setup(bunch, split, subset)
         self._h5 = None
 

@@ -89,7 +89,7 @@ import torch
 
 from ..base import BaseDataset
 from ..core.access import extract_archive, manual_source
-from ..core.config import dataset_path
+from ..core.config import dataset_path, existing_dir
 from ..core.estimators import (
     InsufficientSamplesError,
     NotSPDError,
@@ -468,11 +468,13 @@ class PolInSARIslandDataset(BaseDataset):
         self._fetch = {"cache_dir": cache_dir, "keep": keep, "representation": representation,
                        "bands": tuple(bands), "cells": cells, "cell": cell, "purity": purity,
                        "min_labelled": min_labelled, "block": block}
-        super().__init__(data_dir=str(root), **kwargs)
+        self._root = root
+        super().__init__(data_dir=str(existing_dir(root, cache_dir)), **kwargs)
         self._load_data()
 
     def _load_data(self):
-        b = fetch_pol_insar_island(self.data_dir, estimator=self.estimator, **self._fetch)
+        b = fetch_pol_insar_island(self._root, estimator=self.estimator, **self._fetch)
+        self.data_dir = Path(b.root)
         if self.return_raw and b.processed_dir is None:
             raise ValueError("return_raw=True needs the preprocessed cells (keep != 'keep_covariance')")
         keep = finalize_labels(self, b.labels, b.groups, b.splits)
