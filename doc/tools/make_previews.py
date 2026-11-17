@@ -419,7 +419,10 @@ def _draw(ax, kind, a, theme):
         s.set_visible(False)
 
 
-def _png(fig, path, facecolor):
+COLOURS = {"pastis_r": 48}  # natural images: fewer colours keep the PNG small
+
+
+def _png(fig, path, facecolor, colors=128):
     import matplotlib.pyplot as plt
     from PIL import Image
 
@@ -427,7 +430,7 @@ def _png(fig, path, facecolor):
     fig.savefig(buf, format="png", facecolor=facecolor)
     plt.close(fig)
     buf.seek(0)
-    Image.open(buf).convert("RGB").quantize(colors=128, method=Image.Quantize.MEDIANCUT,
+    Image.open(buf).convert("RGB").quantize(colors=colors, method=Image.Quantize.MEDIANCUT,
                                             dither=Image.Dither.NONE).save(path, optimize=True)
 
 
@@ -461,7 +464,8 @@ def draw(name, panels):
             fig.subplots_adjust(left=0.14, right=0.99, bottom=0.03, top=0.97, hspace=0.12)
         else:
             fig.subplots_adjust(left=0.01, right=0.99, bottom=0.02, top=0.88, wspace=0.08)
-        _png(fig, out / ("samples.png" if theme == "light" else "samples_dark.png"), t["surface"])
+        _png(fig, out / ("samples.png" if theme == "light" else "samples_dark.png"), t["surface"],
+             COLOURS.get(name, 128))
     # thumbnail: 16:9, no text, on the dark surface (the tiles show it in both themes)
     n = len(panels)
     fig, axes = plt.subplots(n if wide else 1, 1 if wide else n, figsize=(4.8, 2.7), dpi=100,
@@ -469,7 +473,7 @@ def draw(name, panels):
     for ax, (kind, a, _) in zip(axes.ravel(), panels, strict=True):
         _draw(ax, kind, a, "dark")
     fig.subplots_adjust(left=0.02, right=0.98, bottom=0.04, top=0.96, wspace=0.05, hspace=0.1)
-    _png(fig, out / "thumb.png", THEMES["dark"]["surface"])
+    _png(fig, out / "thumb.png", THEMES["dark"]["surface"], COLOURS.get(name, 128))
     return {p.name: p.stat().st_size for p in sorted(out.glob("*.png"))}
 
 

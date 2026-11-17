@@ -168,7 +168,8 @@ def render_static(fig: dict, path: Path, theme: str, width=9.6, height=4.4, dpi=
                      and tr.get("type") not in ("heatmap",)) > 1
     top = top - 0.05 if has_legend else top
     rotated = any(tr.get("type") == "bar" and tr.get("x") is not None
-                  and 8 < len(decode(tr["x"])) <= 60 for tr in data)
+                  and 8 < len(decode(tr["x"])) <= 60 for tr in data) \
+        or sum(tr.get("type") == "box" for tr in data) > 6
     bottom = 0.30 if rotated else 0.12
     boxes = _axes_layout(layout)
     many_panels = len(boxes) > 1
@@ -184,6 +185,9 @@ def render_static(fig: dict, path: Path, theme: str, width=9.6, height=4.4, dpi=
             ax.set_ylabel(ya["title"]["text"])
         if ya.get("type") == "log":
             ax.set_yscale("log")
+        if ya.get("tickvals") is not None and ya.get("ticktext") is not None:
+            ax.set_yticks(decode(ya["tickvals"]), ya["ticktext"])
+            ax.set_ylim(min(decode(ya["tickvals"])) - 0.6, max(decode(ya["tickvals"])) + 0.6)
         axes[suffix] = ax
 
     groups = [tr for tr in data if tr.get("type") == "bar"]
@@ -237,17 +241,17 @@ def render_static(fig: dict, path: Path, theme: str, width=9.6, height=4.4, dpi=
             ax.set_xlabel(ax.get_xlabel() or "samples per group")
         elif typ == "box":
             y = np.asarray(decode(tr.get("y")), dtype=float)
-            i = seq.setdefault(id(ax), [0])
-            bp = ax.boxplot(y, positions=[i[0]], widths=0.6, patch_artist=True, showfliers=False)
+            names = seq.setdefault(("box", id(ax)), [])
+            bp = ax.boxplot(y[np.isfinite(y)], positions=[len(names)], widths=0.6,
+                            patch_artist=True, showfliers=False)
             for b in bp["boxes"]:
                 b.set_facecolor(color), b.set_edgecolor(t["muted"])
             for part in ("whiskers", "caps", "medians"):
                 for line in bp[part]:
                     line.set_color(t["muted"])
-            ticks = list(ax.get_xticks()) if i[0] else []
-            labels = [tl.get_text() for tl in ax.get_xticklabels()] if i[0] else []
-            ax.set_xticks(ticks + [i[0]], labels + [str(tr.get("name", ""))], rotation=45, fontsize=7)
-            i[0] += 1
+            names.append(str(tr.get("name", "")))
+            ax.set_xticks(range(len(names)), names, rotation=45 if len(names) > 6 else 0,
+                          ha="right" if len(names) > 6 else "center", fontsize=7)
         else:  # scatter, scattergl
             x = decode(tr.get("x"))
             y = decode(tr.get("y"))
@@ -256,6 +260,7 @@ def render_static(fig: dict, path: Path, theme: str, width=9.6, height=4.4, dpi=
                 cats += [c for c in dict.fromkeys(y) if c not in cats]
                 y = np.asarray([cats.index(c) for c in y], dtype=float)
                 ax.set_yticks(range(len(cats)), cats)
+                ax.set_ylim(-0.6, len(cats) - 0.4)
             y = np.asarray(y, dtype=float)
             x = np.arange(1, len(y) + 1) if x is None else x
             if tr.get("fill") == "toself":
@@ -275,6 +280,8 @@ def render_static(fig: dict, path: Path, theme: str, width=9.6, height=4.4, dpi=
     for suffix, ax in axes.items():
         if layout.get(f"yaxis{suffix}", {}).get("autorange") == "reversed":
             ax.invert_yaxis()
+        if not ax.has_data():  # empty panel (e.g. no groups): keep only its annotation
+            ax.set_axis_off()
     if title:
         f.text(0.07, 0.95, title, fontsize=12, color=t["ink"], ha="left", va="top", fontweight="bold")
     for an in layout.get("annotations", []):
