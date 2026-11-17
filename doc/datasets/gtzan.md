@@ -25,6 +25,9 @@ GTZAN has no artist metadata. The stratified folds put excerpts of one artist
 `GTZANDataset` emits a `UserWarning` saying so.
 ```
 
+```{dataset-preview} gtzan
+```
+
 ## Description and source
 
 The GTZAN genre collection holds 10 genres × 100 excerpts of 30 s (blues,
@@ -59,8 +62,7 @@ header, is 22 050 Hz, and the features use the real rate. The figure shows the
 20 MFCC of the non-silent frames of four
 excerpts (time axis decimated for display).
 
-```{raw} html
-<iframe src="../_static/figures/gtzan/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} gtzan/raw_samples
 ```
 
 ## Classes
@@ -68,9 +70,10 @@ excerpts (time axis decimated for display).
 After removing duplicates: blues 100, classical 100, country 100, disco 99,
 hiphop 98, jazz 99, metal 93, pop 98, reggae 99, rock 99.
 
-```{raw} html
-<iframe src="../_static/figures/gtzan/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/gtzan/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} gtzan/class_hist
+```
+
+```{dataset-figure} gtzan/class_means
 ```
 
 ## Covariance construction
@@ -94,9 +97,10 @@ removed (the second file of each pair is dropped): `pop.00060`, `pop.00071`,
 With `normalize=True` (default), covariances are multiplied by the scalar
 fitted on the training part (geometric mean of the eigenvalues = 1).
 
-```{raw} html
-<iframe src="../_static/figures/gtzan/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/gtzan/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} gtzan/cov_samples
+```
+
+```{dataset-figure} gtzan/eigen_spectrum
 ```
 
 ## Splits
@@ -112,8 +116,7 @@ Groups are the excerpts themselves (one group per excerpt): the right panel of
 the figure is therefore trivial, and the folds do not protect against artist
 or song leakage.
 
-```{raw} html
-<iframe src="../_static/figures/gtzan/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} gtzan/split_schema
 ```
 
 ## Leakage risks and measures

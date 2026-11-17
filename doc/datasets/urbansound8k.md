@@ -7,6 +7,9 @@ function on the `timeseries` branch, not updated.** There is no
 registry of the main package.
 ```
 
+```{dataset-preview} urbansound8k
+```
+
 ## Description and source
 
 UrbanSound8K holds 8 732 labelled slices (at most 4 s) of urban sounds from

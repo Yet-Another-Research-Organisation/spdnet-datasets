@@ -1,0 +1,1 @@
+- R. Mohammadi Asiyabi, M. Datcu, A. Anghel, H. Nies *et al.*, "S1SLC_CVDL: A Complex-Valued Annotated Single Look Complex Sentinel-1 SAR dataset for Complex-Valued Deep Networks", IEEE DataPort, 2023. doi:[10.21227/nm4g-yd98](https://doi.org/10.21227/nm4g-yd98)

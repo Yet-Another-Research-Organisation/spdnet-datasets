@@ -1,0 +1,1 @@
+- J. Salamon, C. Jacoby and J. P. Bello, "A Dataset and Taxonomy for Urban Sound Research", *Proceedings of the 22nd ACM International Conference on Multimedia*, 2014, pp. 1041–1044. doi:[10.1145/2647868.2655045](https://doi.org/10.1145/2647868.2655045)

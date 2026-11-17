@@ -19,6 +19,9 @@
   - `spdnet_datasets.hyperspectral.rices90` (`fetch_rices90`, `Rices90Dataset`, registry name `rices90`)
 ```
 
+```{dataset-preview} rices90
+```
+
 ## Description and source
 
 Rices_90 contains VNIR (visible and near-infrared) cubes of 90 Vietnamese
@@ -58,8 +61,7 @@ The raw output of a sample is the **matrix of the pixels of one grain**
 (n_pixels × 64 binned bands), not an image. The figure shows four grains as
 band × pixel matrices.
 
-```{raw} html
-<iframe src="../_static/figures/rices90/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} rices90/raw_samples
 ```
 
 ## Classes
@@ -67,9 +69,10 @@ band × pixel matrices.
 90 varieties of 96 to 106 grains each: the classes are almost balanced. The
 mean-spectrum figure shows only the first 8 varieties in alphabetical order.
 
-```{raw} html
-<iframe src="../_static/figures/rices90/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/rices90/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} rices90/class_hist
+```
+
+```{dataset-figure} rices90/class_means
 ```
 
 ## Covariance construction
@@ -99,9 +102,10 @@ The construction follows the atlas recipe, as did the former `series_rices`:
 The segmentation gives 8 803 grains. The atlas fiche gives 8 796 (48 to 54
 per cube): the small difference comes from the segmentation details.
 
-```{raw} html
-<iframe src="../_static/figures/rices90/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/rices90/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} rices90/cov_samples
+```
+
+```{dataset-figure} rices90/eigen_spectrum
 ```
 
 ## Splits
@@ -118,8 +122,7 @@ variety. The grains of a cube are never split between train and test.
 - **`cross_session`**: as `bundle`, but the test keeps only the 17 varieties
   whose two bundles were acquired in two different sessions (846 grains).
 
-```{raw} html
-<iframe src="../_static/figures/rices90/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} rices90/split_schema
 ```
 
 ## Leakage risks and measures

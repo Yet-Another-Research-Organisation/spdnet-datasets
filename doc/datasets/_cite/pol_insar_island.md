@@ -1,0 +1,2 @@
+- S. M. Hochstuhl, N. Pfeffer, A. Thiele, S. Hinz *et al.*, "Pol-InSAR-Island – A benchmark dataset for multi-frequency Pol-InSAR data land cover classification", *ISPRS Open Journal of Photogrammetry and Remote Sensing* 10, 2023, 100047. doi:[10.1016/j.ophoto.2023.100047](https://doi.org/10.1016/j.ophoto.2023.100047)
+- Data: KITopenData, version 2, 2023. doi:[10.35097/1700](https://doi.org/10.35097/1700)

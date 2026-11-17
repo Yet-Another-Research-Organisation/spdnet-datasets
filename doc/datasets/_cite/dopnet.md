@@ -1,0 +1,2 @@
+- M. Ritchie, R. Capraru and F. Fioranelli, "Dop-NET: a micro-Doppler radar data challenge", *Electronics Letters* 56(11), 2020, pp. 568–570. doi:[10.1049/el.2019.4153](https://doi.org/10.1049/el.2019.4153)
+- Data: M. Ritchie, "Dop-Net Data", University College London, 2024. doi:[10.5522/04/25486597.v1](https://doi.org/10.5522/04/25486597.v1)

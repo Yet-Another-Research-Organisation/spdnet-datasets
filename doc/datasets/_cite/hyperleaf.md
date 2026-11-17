@@ -1,0 +1,1 @@
+- W. M. Laprade *et al.*, "HyperLeaf2024 – A Hyperspectral Imaging Dataset for Classification and Regression of Wheat Leaves", *IEEE/CVF Conference on Computer Vision and Pattern Recognition Workshops (CVPRW)*, 2024, pp. 1234–1243. doi:[10.1109/CVPRW63382.2024.00130](https://doi.org/10.1109/CVPRW63382.2024.00130)

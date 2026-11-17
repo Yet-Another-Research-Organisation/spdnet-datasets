@@ -1,0 +1,7 @@
+{#- Adds data-section to <body>: the first path segment of the page (getting_started,
+    guide, datasets, auto_examples, reference) or the page name at the root.
+    custom.css gives each section its accent colour from this attribute. -#}
+{% extends "pydata_sphinx_theme/layout.html" %}
+{% block body_tag %}
+  <body data-default-mode="{{ default_mode }}" data-section="{{ pagename.split('/')[0] }}">
+{%- endblock %}

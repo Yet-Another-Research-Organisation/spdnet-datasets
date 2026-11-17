@@ -19,6 +19,9 @@
   - `spdnet_datasets.hyperspectral.uav` (`fetch_uav`, `UAVDataset`, registry name `uav`)
 ```
 
+```{dataset-preview} uav_hsi_crop
+```
+
 ## Description and source
 
 UAV-HSI-Crop is a crop-mapping dataset acquired by a UAV over three scenes
@@ -61,8 +64,7 @@ split is 312 training, 34 validation and 87 test patches. The raw output is
 the 15 × 15 × 100 window; the figure shows the band-mean image of four
 windows.
 
-```{raw} html
-<iframe src="../_static/figures/uav_hsi_crop/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} uav_hsi_crop/raw_samples
 ```
 
 ## Classes
@@ -72,9 +74,10 @@ windows), `code 2` (2 502), `code 10` (1 752), `code 3` (1 320) and `code 19`
 (887). Eleven codes have fewer than 30 windows: `code 7` has 2, and `code 6`
 and `code 27` have 4 each. Each scene holds only part of the codes.
 
-```{raw} html
-<iframe src="../_static/figures/uav_hsi_crop/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/uav_hsi_crop/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} uav_hsi_crop/class_hist
+```
+
+```{dataset-figure} uav_hsi_crop/class_means
 ```
 
 ## Covariance construction
@@ -99,9 +102,10 @@ and `code 27` have 4 each. Each scene holds only part of the codes.
    (geometric mean of the eigenvalues = 1). Means and raw windows are
    multiplied by √s.
 
-```{raw} html
-<iframe src="../_static/figures/uav_hsi_crop/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/uav_hsi_crop/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} uav_hsi_crop/cov_samples
+```
+
+```{dataset-figure} uav_hsi_crop/eigen_spectrum
 ```
 
 ## Splits
@@ -123,8 +127,7 @@ and `code 27` have 4 each. Each scene holds only part of the codes.
   (4 212). There is no validation part. This split is defined when both
   scenes are loaded.
 
-```{raw} html
-<iframe src="../_static/figures/uav_hsi_crop/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} uav_hsi_crop/split_schema
 ```
 
 ## Leakage risks and measures

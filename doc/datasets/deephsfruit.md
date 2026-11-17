@@ -40,6 +40,9 @@ record.
   - `spdnet_datasets.hyperspectral.deephsfruit` (`fetch_deephsfruit`, `DeepHSFruitDataset`, registry name `deephsfruit`)
 ```
 
+```{dataset-preview} deephsfruit
+```
+
 ## Description and source
 
 DeepHS-Fruit holds ENVI (Environment for Visualizing Images) cubes, in
@@ -89,9 +92,10 @@ one 224 × 224 covariance per VIS cube. There is therefore no raw-data figure.
   216, overripe 86 and unripe 82. `ripe` is merged into `perfect`. By fruit,
   these are Kiwi 138, Avocado 92, Kaki 56, Mango 56 and Papaya 42.
 
-```{raw} html
-<iframe src="../_static/figures/deephsfruit/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/deephsfruit/ripeness/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} deephsfruit/class_hist
+```
+
+```{dataset-figure} deephsfruit/ripeness/class_hist
 ```
 
 ## Covariance construction
@@ -110,11 +114,16 @@ their eigenvalues is 1.
 The figures below show two covariances of each mode and the eigenvalue
 spectrum.
 
-```{raw} html
-<iframe src="../_static/figures/deephsfruit/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/deephsfruit/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/deephsfruit/ripeness/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/deephsfruit/ripeness/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} deephsfruit/cov_samples
+```
+
+```{dataset-figure} deephsfruit/eigen_spectrum
+```
+
+```{dataset-figure} deephsfruit/ripeness/cov_samples
+```
+
+```{dataset-figure} deephsfruit/ripeness/eigen_spectrum
 ```
 
 ## Splits
@@ -129,9 +138,10 @@ spectrum.
   `cov_VIS` file. It would also leak: 46 of the 140 VIS test cubes have the
   other face of their fruit in train.
 
-```{raw} html
-<iframe src="../_static/figures/deephsfruit/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/deephsfruit/ripeness/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} deephsfruit/split_schema
+```
+
+```{dataset-figure} deephsfruit/ripeness/split_schema
 ```
 
 ## Leakage risks and measures

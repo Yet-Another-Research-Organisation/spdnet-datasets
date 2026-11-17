@@ -1,0 +1,1 @@
+- S. D. Fabiyi, H. Vu, C. Tachtatzis, P. Murray *et al.*, "Varietal Classification of Rice Seeds Using RGB and Hyperspectral Images", *IEEE Access* 8, 2020, pp. 22493–22505. doi:[10.1109/ACCESS.2020.2969847](https://doi.org/10.1109/ACCESS.2020.2969847)

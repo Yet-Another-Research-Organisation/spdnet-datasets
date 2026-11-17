@@ -21,7 +21,7 @@ description: :doc:`/datasets/mstar`.
 from spdnet_datasets import create_dataloaders
 from spdnet_datasets.sar.mstar import MSTARDataset
 
-# sphinx_gallery_thumbnail_path = "_static/thumbnails/mstar.png"
+# sphinx_gallery_thumbnail_path = "_static/previews/mstar/thumb.png"
 ds = MSTARDataset(source="jpg", crop=128, return_raw=True)
 x, y = ds[0]
 print(len(ds), "chips; x", tuple(x.shape), "-", ds.classes[y])
@@ -32,11 +32,11 @@ print(len(ds), "chips; x", tuple(x.shape), "-", ds.classes[y])
 # A few chips, the distribution of their pixel values, and the class counts
 # per split.
 #
-# .. raw:: html
+# .. dataset-figure:: mstar/raw_samples
 #
-#    <iframe src="../../_static/figures/mstar/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
-#    <iframe src="../../_static/figures/mstar/amplitude_hist.html" class="plotly-figure" loading="lazy"></iframe>
-#    <iframe src="../../_static/figures/mstar/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
+# .. dataset-figure:: mstar/amplitude_hist
+#
+# .. dataset-figure:: mstar/class_hist
 
 # %%
 # Splitting the data
@@ -50,6 +50,4 @@ print({k: len(v) for k, v in parts.items()})
 train, val, test = create_dataloaders(ds, split="official", batch_size=64, num_workers=0)
 
 # %%
-# .. raw:: html
-#
-#    <iframe src="../../_static/figures/mstar/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+# .. dataset-figure:: mstar/split_schema

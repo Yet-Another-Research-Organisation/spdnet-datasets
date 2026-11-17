@@ -1,8 +1,12 @@
 <!--
 Template of a dataset page. Copy to <name>.md, fill every section, then run
 `python doc/tools/make_figures.py <registered name> --kwargs '{...}' --split <split>`
-on a machine holding the data to produce doc/_static/figures/<name>/*.html.
-This file is excluded from the build (conf.py: exclude_patterns).
+on a machine holding the data to produce doc/_static/figures/<name>/ (fixed
+PNG figures and interactive JSON, see doc/tools/figures_io.py), and
+`python doc/tools/make_previews.py <name>` for doc/_static/previews/<name>/.
+Add the page to the toctree and the tiles of its domain page
+(doc/datasets/<domain>.md), and its publication to doc/references.md
+(doc/datasets/_cite/<name>.md). This file is excluded from the build (conf.py: exclude_patterns).
 -->
 # <Dataset name>
 
@@ -32,15 +36,15 @@ link; licence; where the data come from.>
 
 <Layout of the files, shapes, value ranges.>
 
-```{raw} html
-<iframe src="../_static/figures/<name>/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} <name>/raw_samples
 ```
 
 ## Classes
 
-```{raw} html
-<iframe src="../_static/figures/<name>/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/<name>/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} <name>/class_hist
+```
+
+```{dataset-figure} <name>/class_means
 ```
 
 ## Covariance construction
@@ -48,9 +52,10 @@ link; licence; where the data come from.>
 <Windows / parcels / segments, filters, band selection, normalisation, dates
 kept, number of observations per covariance, samples discarded and why.>
 
-```{raw} html
-<iframe src="../_static/figures/<name>/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/<name>/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} <name>/cov_samples
+```
+
+```{dataset-figure} <name>/eigen_spectrum
 ```
 
 ## Splits
@@ -58,8 +63,7 @@ kept, number of observations per covariance, samples discarded and why.>
 <Official split from the paper, or the proposed leakage-free split and why the
 paper's split was not used. Sizes per split.>
 
-```{raw} html
-<iframe src="../_static/figures/<name>/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} <name>/split_schema
 ```
 
 ## Leakage risks and measures

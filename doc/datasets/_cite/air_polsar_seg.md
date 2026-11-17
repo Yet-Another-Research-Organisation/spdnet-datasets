@@ -1,0 +1,1 @@
+- Z. Wang, X. Zeng, Z. Yan, J. Kang and X. Sun, "AIR-PolSAR-Seg: A Large-Scale Data Set for Terrain Segmentation in Complex-Scene PolSAR Images", *IEEE Journal of Selected Topics in Applied Earth Observations and Remote Sensing* 15, 2022, pp. 3830–3841. doi:[10.1109/JSTARS.2022.3170326](https://doi.org/10.1109/JSTARS.2022.3170326)

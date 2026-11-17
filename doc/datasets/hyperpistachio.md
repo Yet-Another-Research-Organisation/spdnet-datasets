@@ -7,6 +7,9 @@ documented here for reference only. `spdnet-datasets` provides no loader, no
 the dataset atlas fiche.
 ```
 
+```{dataset-preview} hyperpistachio
+```
+
 ## Description and source
 
 HyperPistachio is the public subset of a dataset of pistachio nuts

@@ -19,6 +19,9 @@
   - `spdnet_datasets.hyperspectral.gsoff` (`fetch_gsoff`, `GSOFFDataset`, registry name `gsoff`)
 ```
 
+```{dataset-preview} gsoff
+```
+
 ## Description and source
 
 GSOFF (Gaofeng State Owned Forest Farm) is an airborne
@@ -68,8 +71,7 @@ fetch_gsoff(archive="~/Downloads/gsoff")
 The raw output is the 15 × 15 × 63 window that the covariance is computed on.
 The figure shows the band-mean image of four windows.
 
-```{raw} html
-<iframe src="../_static/figures/gsoff/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} gsoff/raw_samples
 ```
 
 ## Classes
@@ -81,9 +83,10 @@ The counts are `code 1` 355, `code 2` 42, `code 3` 44, `code 4` 87, `code 5`
 the spatial split. The second figure gives the mean spectrum of the first 8
 classes (in alphabetical order of their names).
 
-```{raw} html
-<iframe src="../_static/figures/gsoff/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/gsoff/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} gsoff/class_hist
+```
+
+```{dataset-figure} gsoff/class_means
 ```
 
 ## Covariance construction
@@ -112,9 +115,10 @@ The construction follows the original preprocessing script; the window size is
    geometric mean of their eigenvalues is 1. The cache keeps the unscaled
    matrices. Means and raw windows are multiplied by √s.
 
-```{raw} html
-<iframe src="../_static/figures/gsoff/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/gsoff/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} gsoff/cov_samples
+```
+
+```{dataset-figure} gsoff/eigen_spectrum
 ```
 
 ## Splits
@@ -132,8 +136,7 @@ spatial split, as recommended in the dataset atlas:
   windows removed by the buffer. `code 12` is absent from validation and test,
   and `code 7` is absent from validation.
 
-```{raw} html
-<iframe src="../_static/figures/gsoff/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} gsoff/split_schema
 ```
 
 ## Leakage risks and measures

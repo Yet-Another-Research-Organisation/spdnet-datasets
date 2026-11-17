@@ -2,12 +2,13 @@
 
 ``make_figures.py`` needs a covariance output. The SAR datasets of the mission
 that only give raw chips or channel means (``OUTPUTS = ("raw", "mean")``) are
-drawn here with the same palette, layout and static-HTML convention::
+drawn here with the same palette, layout and output convention::
 
     python doc/tools/make_figures_raw.py mstar --split official
     python doc/tools/make_figures_raw.py atrnet_star --split official --fifth protocol_overlap
 
-Figures written to ``doc/_static/figures/<page>/``, with ``summary.json``:
+Figures written to ``doc/_static/figures/<page>/`` (fixed PNG or interactive JSON,
+see ``figures_io.py``), with ``summary.json``:
 
 - ``raw_samples``: one chip per class for four classes (first channel, log10
   scale or as returned with ``--raw-scale linear``, 1-99 % clipping, at most
@@ -37,16 +38,15 @@ import json
 from pathlib import Path
 
 import numpy as np
+from figures_io import write_figure
 from make_figures import GRID, OUT, SEQUENTIAL, SERIES, _layout  # noqa: F401
 
 PART_COLORS = {"train": SERIES[0], "val": SERIES[1], "test": SERIES[2]}
 
 
 def _write(out, figs):
-    out.mkdir(parents=True, exist_ok=True)
     for kind, f in figs.items():
-        (out / f"{kind}.html").write_text(
-            f.to_html(include_plotlyjs="cdn", full_html=True, config={"responsive": True}))
+        write_figure(f, out, kind)
 
 
 def _labels(ds):
@@ -158,10 +158,17 @@ def build_raw(name, kwargs, split, page, max_samples=400, seed=0, fifth="amplitu
     fig.add_bar(x=list(parts), y=[len(v) for v in parts.values()],
                 marker_color=[PART_COLORS.get(s, SERIES[3]) for s in parts], showlegend=False,
                 row=1, col=1)
-    _, sizes = np.unique(np.asarray(ds.groups), return_counts=True)
-    fig.add_histogram(x=sizes, marker_color=SERIES[1], nbinsx=40, showlegend=False, row=1, col=2)
-    fig.update_xaxes(title_text="samples in the group", row=1, col=2)
-    _layout(fig, f"Split sizes and group sizes ({len(sizes)} groups, never across parts)")
+    if getattr(ds, "groups", None) is not None:
+        _, sizes = np.unique(np.asarray(ds.groups), return_counts=True)
+        fig.add_histogram(x=sizes, marker_color=SERIES[1], nbinsx=40, showlegend=False,
+                          row=1, col=2)
+        fig.update_xaxes(title_text="samples in the group", row=1, col=2)
+        _layout(fig, f"Split sizes and group sizes ({len(sizes)} groups, never across parts)")
+    else:  # no group (e.g. MSTAR: the parts are fixed by the depression angle)
+        sizes = np.zeros(0)
+        fig.add_annotation(text="no groups: the parts are given by the source", showarrow=False,
+                           xref="x2 domain", yref="y2 domain", x=0.5, y=0.5)
+        _layout(fig, "Split sizes (no groups)")
     figs["split_schema"] = fig
 
     extra = {}
@@ -208,7 +215,7 @@ def build_raw(name, kwargs, split, page, max_samples=400, seed=0, fifth="amplitu
     out = OUT / page
     _write(out, figs)
     summary = {"name": name, "kwargs": kwargs, "split": split, "n_samples": int(len(ds)),
-               "n_groups": int(len(sizes)), "raw_shape": list(raws[0].shape), "mean_dim": p,
+               "n_groups": int(len(sizes)) if len(sizes) else None, "raw_shape": list(raws[0].shape), "mean_dim": p,
                "classes": names, "counts": counts, **extra}
     (out / "summary.json").write_text(json.dumps(summary, indent=1))
     return summary

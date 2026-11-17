@@ -22,7 +22,7 @@ depending on the scenario). Full description: :doc:`/datasets/pastis_r`.
 from spdnet_datasets.core.splits import assert_no_leakage
 from spdnet_datasets.sits.pastis_r import PastisRDataset
 
-# sphinx_gallery_thumbnail_path = "_static/thumbnails/pastis_r.png"
+# sphinx_gallery_thumbnail_path = "_static/previews/pastis_r/thumb.png"
 ds = PastisRDataset(scenario="C", split="official", return_mean=True, return_raw=True)
 (cov, mean, raw), y = ds[0]
 print(len(ds), "parcels; cov", tuple(cov.shape), "mean", tuple(mean.shape),
@@ -34,18 +34,16 @@ print(len(ds), "parcels; cov", tuple(cov.shape), "mean", tuple(mean.shape),
 # Four parcels as returned by ``return_raw=True`` (one column per pixel, one
 # row per standardised channel), then the class counts per split.
 #
-# .. raw:: html
+# .. dataset-figure:: pastis_r/raw_samples
 #
-#    <iframe src="../../_static/figures/pastis_r/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
-#    <iframe src="../../_static/figures/pastis_r/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
+# .. dataset-figure:: pastis_r/class_hist
 
 # %%
 # Covariance matrices
 # -------------------
-# .. raw:: html
+# .. dataset-figure:: pastis_r/cov_samples
 #
-#    <iframe src="../../_static/figures/pastis_r/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-#    <iframe src="../../_static/figures/pastis_r/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+# .. dataset-figure:: pastis_r/eigen_spectrum
 
 # %%
 # Splitting the data
@@ -61,6 +59,4 @@ for a, b in [("train", "val"), ("train", "test"), ("val", "test")]:
 print({k: len(v) for k, v in parts.items()})
 
 # %%
-# .. raw:: html
-#
-#    <iframe src="../../_static/figures/pastis_r/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+# .. dataset-figure:: pastis_r/split_schema

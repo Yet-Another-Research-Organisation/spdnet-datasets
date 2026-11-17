@@ -28,6 +28,9 @@ copy are not comparable with the BirdSet benchmark. `BirdSetXCMDataset` emits a
 `UserWarning`.
 ```
 
+```{dataset-preview} birdset_xcm
+```
+
 ## Description and source
 
 BirdSet is a benchmark for audio classification in avian bioacoustics. XCM is
@@ -73,8 +76,7 @@ detected vocalisations, in s), `recordist`, `quality`, … The figure shows the
 20 MFCC of the non-silent frames of four
 recordings (time axis decimated for display).
 
-```{raw} html
-<iframe src="../_static/figures/birdset_xcm/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} birdset_xcm/raw_samples
 ```
 
 ## Classes
@@ -84,9 +86,10 @@ Species with at least `min_recordings = 10` recordings in the copy are kept:
 out). The classes are imbalanced: 10 to 256 recordings per species. The class
 names are eBird codes.
 
-```{raw} html
-<iframe src="../_static/figures/birdset_xcm/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/birdset_xcm/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} birdset_xcm/class_hist
+```
+
+```{dataset-figure} birdset_xcm/class_means
 ```
 
 ## Covariance construction
@@ -107,9 +110,10 @@ Exclusions (listed in `dataset.excluded`): 2 recordings of the 5 185, so 5 183
 are kept. `XC539245` (easwar1) has 35 non-silent frames for 2p = 40, and the
 sample covariance matrix (SCM) of `XC592530` (blutit) is not SPD (smallest eigenvalue −5·10⁻¹³).
 
-```{raw} html
-<iframe src="../_static/figures/birdset_xcm/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/birdset_xcm/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} birdset_xcm/cov_samples
+```
+
+```{dataset-figure} birdset_xcm/eigen_spectrum
 ```
 
 ## Splits
@@ -123,8 +127,7 @@ fold `fold`, validation = the next fold, train = the three others. Empty
 recordist names form one group `"NA"`. The 5 183 recordings come from 950
 recordists. With `fold=1`: 3 120 / 1 032 / 1 031.
 
-```{raw} html
-<iframe src="../_static/figures/birdset_xcm/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} birdset_xcm/split_schema
 ```
 
 ## Leakage risks and measures

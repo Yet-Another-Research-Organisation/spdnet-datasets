@@ -1,0 +1,1 @@
+- S. Z. Gurbuz, M. M. Rahman, E. Kurtoglu, T. Macks and F. Fioranelli, "Cross-frequency training with adversarial learning for radar micro-Doppler signature classification", *Proc. SPIE 11408, Radar Sensor Technology XXIV*, 2020, 114080A (citation requested by the dataset repository). doi:[10.1117/12.2559155](https://doi.org/10.1117/12.2559155)
