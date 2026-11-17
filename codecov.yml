@@ -1,0 +1,13 @@
+# Codecov settings: coverage is reported on pull requests but never blocks them
+# (the tests on real data run on the lab server and are not counted here).
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+comment:
+  layout: "diff, flags, files"
+  require_changes: true
