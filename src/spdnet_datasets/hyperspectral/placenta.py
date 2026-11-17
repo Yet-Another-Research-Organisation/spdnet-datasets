@@ -100,7 +100,7 @@ def _download_root(cache_dir, archive):
                     raise OSError(f"Checksum mismatch for {z}")
             else:
                 z = download(ZENODO + urllib.parse.quote(name) + "?download=1", out / name,
-                             checksum=md5, algo="md5")
+                             checksum=md5, algo="md5", size=size)
             extract_archive(z, out / name[:-4])
     build_windows(src, out / "imagettes")
     return out

@@ -76,7 +76,7 @@ EXPECTED = (f"{ZIP} ({ZIP_SIZE} bytes) from Google Drive "
 
 def _download(dest_dir):
     try:
-        return download(URL, dest_dir / ZIP, checksum=ZIP_SHA256)
+        return download(URL, dest_dir / ZIP, checksum=ZIP_SHA256, size=ZIP_SIZE)
     except OSError as exc:  # quota page instead of the file, network error...
         manual_source(NAME, page_url=PAGE, expected=f"{EXPECTED} (automatic download "
                       f"failed: {exc})", dest_dir=dest_dir)

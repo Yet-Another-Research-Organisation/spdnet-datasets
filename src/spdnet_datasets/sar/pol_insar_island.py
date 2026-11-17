@@ -131,7 +131,7 @@ def _download_root(cache_dir, archive):
         if found is not None:
             return found
         try:
-            path = download(TAR_URL, out / TAR, checksum=TAR_MD5, algo="md5")
+            path = download(TAR_URL, out / TAR, checksum=TAR_MD5, algo="md5", size=TAR_SIZE)
         except OSError as exc:  # access refused (terms, login), md5 mismatch, network...
             manual_source(NAME, page_url=PAGE, dest_dir=out,
                           expected=f"the archive of the page ({TAR_SIZE} bytes, md5 {TAR_MD5}; "

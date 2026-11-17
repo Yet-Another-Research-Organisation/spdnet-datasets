@@ -52,7 +52,7 @@ from ..core.config import dataset_path
 from ..core.estimators import check_sample_size
 from ..core.fetch import Bunch, check_local, download, run_pipeline
 from ..manager import DatasetManager
-from ..utils.sources import check_size, downloads_dir, source_dir
+from ..utils.sources import downloads_dir, source_dir
 from ._common import (
     HSIDataset,
     band_index,
@@ -165,7 +165,7 @@ def _download_root(root, cache_dir, archive, verify):
         NAME, root / "source", required=(SCENE_FILE, GT_FILE), page_url=PAGE,
         expected=f"{ZIP} ({ZIP_SIZE} bytes)", cache_dir=cache_dir, archive=archive,
         size=ZIP_SIZE, verify=verify,
-        download=lambda d: check_size(download(URL, d / ZIP), ZIP_SIZE))
+        download=lambda d: download(URL, d / ZIP, size=ZIP_SIZE))
     prepare_v2(src, out / PREPARED)
     return out
 

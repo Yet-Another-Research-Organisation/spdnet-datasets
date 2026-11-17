@@ -99,7 +99,7 @@ from ..core.config import dataset_path, get_cache_dir
 from ..core.estimators import channel_mean
 from ..core.fetch import Bunch, verify_local
 from ..manager import DatasetManager
-from ..utils.sources import check_size, downloads_dir, extract_7z, find_root
+from ..utils.sources import downloads_dir, extract_7z, find_root
 from ._common import finalize_labels
 
 DOMAIN, NAME = "SAR", "ATRNet-STAR"
@@ -160,7 +160,7 @@ def _download_root(cache_dir, archive, representation, split):
                 raise FileNotFoundError(f"{given} holds no {split} folder nor {Path(name).name}.001")
     else:
         quoted = urllib.parse.quote(name)  # spaces and non-ASCII characters in the file name
-        vols = [check_size(hf_download(HF_REPO, f"{quoted}.{k:03d}", out / "hf", gated=True), size)
+        vols = [hf_download(HF_REPO, f"{quoted}.{k:03d}", out / "hf", gated=True, size=size)
                 for k, size in enumerate(sizes, start=1)]
         first = vols[0]
     if first is not None:

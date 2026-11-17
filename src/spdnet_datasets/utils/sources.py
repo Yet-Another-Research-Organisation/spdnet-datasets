@@ -117,7 +117,11 @@ def expose_as(path, sub, parent):
 
 
 def check_size(path, size):
-    """Raise ``OSError`` if ``path`` does not have ``size`` bytes (``None``: no check)."""
+    """Raise ``OSError`` if ``path`` does not have ``size`` bytes (``None``: no check).
+
+    Guard for files given by the user (``archive=``); downloads are checked by
+    :func:`core.fetch.download` (``size=``) before they are renamed.
+    """
     if size is not None and Path(path).stat().st_size != size:
         raise OSError(f"{path}: {Path(path).stat().st_size} bytes, expected {size}; delete it and retry")
     return Path(path)

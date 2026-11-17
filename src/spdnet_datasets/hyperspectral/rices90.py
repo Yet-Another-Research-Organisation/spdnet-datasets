@@ -138,7 +138,7 @@ def fetch_rices90(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
         NAME, dataset_path(DOMAIN, NAME, data_dir), required=("index.csv",),
         page_url=PAGE, expected=f"{ZIP} ({ZIP_SIZE} bytes, md5 {ZIP_MD5})",
         cache_dir=cache_dir, archive=archive, checksum=ZIP_MD5, size=ZIP_SIZE, verify=verify,
-        download=lambda d: download(URL, d / ZIP, checksum=ZIP_MD5, algo="md5"))
+        download=lambda d: download(URL, d / ZIP, checksum=ZIP_MD5, algo="md5", size=ZIP_SIZE))
     p = N_BANDS // band_bin
     params = {"band_bin": band_bin, "source": str(root.resolve()), "version": 2}
 

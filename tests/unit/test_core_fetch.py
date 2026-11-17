@@ -84,6 +84,107 @@ def test_download_bad_checksum_leaves_no_file(tmp_path, fake_net):
     assert not list(tmp_path.iterdir())
 
 
+class _Server:
+    """Serve ``payload`` with Range support; cut the first ``cuts`` answers after ``chunk`` bytes."""
+
+    def __init__(self, payload, *, cuts=0, chunk=1000, length=True):
+        self.payload, self.cuts, self.chunk, self.length = payload, cuts, chunk, length
+        self.calls = []
+
+    def __call__(self, req, timeout=None):
+        self.calls.append(req.headers.get("Range"))
+        rng = req.headers.get("Range")
+        start = int(rng.split("=")[1].rstrip("-")) if rng else 0
+        body = self.payload[start:]
+        resp = _FakeResponse(body[:self.chunk] if len(self.calls) <= self.cuts else body,
+                             status=206 if rng else 200)
+        resp.headers = {}
+        if self.length:
+            resp.headers["Content-Length"] = str(len(body))
+            if rng:
+                resp.headers["Content-Range"] = (f"bytes {start}-{len(self.payload) - 1}/"
+                                                 f"{len(self.payload)}")
+        return resp
+
+
+def test_download_connection_cut_is_resumed(tmp_path, monkeypatch):
+    payload = bytes(range(256)) * 20
+    server = _Server(payload, cuts=2)
+    monkeypatch.setattr(F, "_open", server)
+    dest = F.download("http://x/f.bin", tmp_path / "f.bin", size=len(payload))
+    assert dest.read_bytes() == payload
+    assert server.calls == [None, "bytes=1000-", "bytes=2000-"]
+
+
+def test_download_incomplete_after_retries_keeps_part(tmp_path, monkeypatch):
+    payload = bytes(range(256)) * 20
+    server = _Server(payload, cuts=99)
+    monkeypatch.setattr(F, "_open", server)
+    with pytest.raises(OSError, match="Incomplete download.*4000 bytes of 5120"):
+        F.download("http://x/f.bin", tmp_path / "f.bin", retries=3)
+    assert len(server.calls) == 4  # first attempt + 3 retries
+    assert not (tmp_path / "f.bin").exists()
+    assert (tmp_path / "f.bin.part").read_bytes() == payload[:4000]
+    server.cuts = 0  # a later call resumes the kept .part
+    assert F.download("http://x/f.bin", tmp_path / "f.bin").read_bytes() == payload
+    assert server.calls[-1] == "bytes=4000-"
+
+
+def test_download_without_content_length_uses_size(tmp_path, monkeypatch):
+    payload = bytes(range(256)) * 20
+    server = _Server(payload, cuts=1, length=False)
+    monkeypatch.setattr(F, "_open", server)
+    dest = F.download("http://x/f.bin", tmp_path / "f.bin", size=len(payload))
+    assert dest.read_bytes() == payload and len(server.calls) == 2
+
+
+def test_download_network_error_is_retried(tmp_path, monkeypatch):
+    payload = b"abc" * 100
+    server = _Server(payload)
+    calls = []
+
+    def flaky(req, timeout=None):
+        calls.append(req)
+        if len(calls) == 1:
+            raise ConnectionResetError("reset")
+        return server(req, timeout)
+
+    monkeypatch.setattr(F, "_open", flaky)
+    assert F.download("http://x/f.bin", tmp_path / "f.bin").read_bytes() == payload
+    assert len(calls) == 2
+
+
+def test_download_wrong_size_raises_without_looping(tmp_path, monkeypatch):
+    payload = b"abc" * 100
+    server = _Server(payload)
+    monkeypatch.setattr(F, "_open", server)
+    with pytest.raises(OSError, match="announces 300 bytes, expected 301"):
+        F.download("http://x/f.bin", tmp_path / "f.bin", size=301)
+    assert len(server.calls) == 1
+    (tmp_path / "g.bin").write_bytes(payload)  # complete file, wrong expected size
+    with pytest.raises(OSError, match="expected 299"):
+        F.download("http://x/g.bin", tmp_path / "g.bin", size=299)
+    (tmp_path / "h.bin.part").write_bytes(payload)  # complete .part answered 416
+    monkeypatch.setattr(F, "_open", lambda req, timeout=None: (_ for _ in ()).throw(
+        F.urllib.error.HTTPError(req.full_url, 416, "Range Not Satisfiable", {}, None)))
+    with pytest.raises(OSError, match="no more, expected 400"):
+        F.download("http://x/h.bin", tmp_path / "h.bin", size=400)
+    assert (tmp_path / "h.bin.part").exists() and len(server.calls) == 1
+
+
+def test_download_http_error_is_not_retried(tmp_path, monkeypatch):
+    calls = []
+
+    def forbidden(req, timeout=None):
+        calls.append(req)
+        raise F.urllib.error.HTTPError(req.full_url, 403, "Forbidden", {}, None)
+
+    monkeypatch.setattr(F, "_open", forbidden)
+    with pytest.raises(F.urllib.error.HTTPError):
+        F.download("http://x/f.bin", tmp_path / "f.bin")
+    assert len(calls) == 1
+
+
 def _make_local_dataset(root: Path):
     (root / "sub").mkdir(parents=True)
     (root / "a.npy").write_bytes(b"12345")

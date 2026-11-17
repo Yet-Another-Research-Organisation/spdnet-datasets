@@ -27,8 +27,10 @@ they are checked against their ``MANIFEST_NAS.tsv`` instead of downloaded.
 
 import csv
 import hashlib
+import http.client
 import json
 import shutil
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -98,14 +100,40 @@ def _open(req, timeout):
     return urllib.request.urlopen(req, timeout=timeout)
 
 
-def download(url, dest, checksum=None, algo="sha256", resume=True, timeout=60,
-             headers=None) -> Path:
-    """Download ``url`` to ``dest`` once; verify ``checksum`` if given.
+_RETRY_WAIT = 2.0  # seconds before the first retry, doubled at each new one
 
-    The file is written to ``dest.part`` and renamed when complete, so an
+
+def _total_size(resp, start):
+    """Total size of the file announced by a response (``None`` when unknown)."""
+    headers = getattr(resp, "headers", None) or {}
+    if getattr(resp, "status", 200) == 206:
+        total = (headers.get("Content-Range") or "").rpartition("/")[2]
+        if total.isdigit():
+            return int(total)
+        length = headers.get("Content-Length")
+        return start + int(length) if length and length.isdigit() else None
+    length = headers.get("Content-Length")
+    return int(length) if length and length.isdigit() else None
+
+
+def download(url, dest, checksum=None, algo="sha256", resume=True, timeout=60,
+             headers=None, size=None, retries=3) -> Path:
+    """Download ``url`` to ``dest`` once; verify ``size`` and ``checksum`` if given.
+
+    The file is written to ``dest.part`` and renamed only when complete, so an
     interrupted download is resumed (HTTP Range) or restarted, never mistaken
     for a finished one. A ``416`` answer to a resume means that ``.part`` is
-    already complete: it is checked (``checksum``) and renamed.
+    already complete: it is checked and renamed.
+
+    Completeness is checked against ``size`` (expected size in bytes) when
+    given, else against the size announced by the server (``Content-Length``,
+    or the total of ``Content-Range``). A connection closed early, or broken by
+    a network error, keeps ``.part`` and is resumed after a short, growing
+    wait, up to ``retries`` times after the first attempt; ``OSError`` is then
+    raised with ``.part`` kept (a later call resumes it). A size that cannot be
+    reached by resuming (``.part`` or ``dest`` larger than, or a complete file
+    different from, ``size``) raises at once. HTTP errors other than ``416``
+    (401, 403, 404...) are raised at once.
 
     ``headers`` (e.g. an ``Authorization`` header built by
     :mod:`spdnet_datasets.core.access`) are sent with the request but never
@@ -113,25 +141,58 @@ def download(url, dest, checksum=None, algo="sha256", resume=True, timeout=60,
     """
     dest = Path(dest)
     if dest.exists():
+        if size is not None and dest.stat().st_size != size:
+            raise OSError(f"{dest}: {dest.stat().st_size} bytes, expected {size}; delete it")
         if checksum and _hash_file(dest, algo) != checksum:
             raise OSError(f"Checksum mismatch for existing file {dest}; delete it or use force")
         return dest
     dest.parent.mkdir(parents=True, exist_ok=True)
     part = dest.with_name(dest.name + ".part")
-    start = part.stat().st_size if (resume and part.exists()) else 0
-    hdrs = dict(headers or {})
-    if start:
-        hdrs["Range"] = f"bytes={start}-"
-    req = urllib.request.Request(url, headers=hdrs)
-    try:
-        with _open(req, timeout) as resp:
-            mode = "ab" if start and getattr(resp, "status", 200) == 206 else "wb"
-            with open(part, mode) as out:
-                shutil.copyfileobj(resp, out, 1 << 20)
-    except urllib.error.HTTPError as exc:
-        # 416 on a resume: the range starts at the end of the file, .part is complete
-        if not (start and exc.code == 416):
-            raise
+    if not resume and part.exists():
+        part.unlink()
+    for attempt in range(retries + 1):
+        start = part.stat().st_size if part.exists() else 0
+        if size is not None and start > size:
+            raise OSError(f"{part}: {start} bytes, more than the expected {size}; delete it")
+        expected, error = size, None
+        if size is None or start < size:
+            hdrs = dict(headers or {})
+            if start:
+                hdrs["Range"] = f"bytes={start}-"
+            req = urllib.request.Request(url, headers=hdrs)
+            try:
+                with _open(req, timeout) as resp:
+                    resumed = start and getattr(resp, "status", 200) == 206
+                    total = _total_size(resp, start if resumed else 0)
+                    if size is not None and total is not None and total != size:
+                        raise OSError(f"{url}: the server announces {total} bytes, "
+                                      f"expected {size}")
+                    expected = size if size is not None else total
+                    with open(part, "ab" if resumed else "wb") as out:
+                        shutil.copyfileobj(resp, out, 1 << 20)
+            except urllib.error.HTTPError as exc:
+                # 416 on a resume: the range starts at the end of the file, .part is complete
+                if not (start and exc.code == 416):
+                    raise
+                if size is not None and start != size:
+                    raise OSError(f"{part}: {start} bytes and the server has no more, "
+                                  f"expected {size}") from exc
+                expected = start
+            except (urllib.error.URLError, http.client.HTTPException, ConnectionError,
+                    TimeoutError) as exc:  # network failure: resumed below
+                error = exc
+        got = part.stat().st_size if part.exists() else 0
+        if expected is not None and got > expected:
+            raise OSError(f"{part}: {got} bytes, more than the expected {expected}; delete it")
+        if error is None and (expected is None or got == expected):
+            break
+        if attempt < retries:
+            time.sleep(_RETRY_WAIT * 2 ** attempt)
+    else:
+        raise OSError(f"Incomplete download of {url} after {retries + 1} attempts: {got} bytes"
+                      f"{f' of {expected}' if expected is not None else ''}"
+                      f"{f' ({error})' if error is not None else ''}; {part} is kept and the "
+                      "next call resumes it")
     if checksum and _hash_file(part, algo) != checksum:
         part.unlink()
         raise OSError(f"Checksum mismatch for {url}")

@@ -85,6 +85,10 @@ def _sha(path):
 class _Resp(io.BytesIO):
     status = 200
 
+    def __init__(self, data):
+        super().__init__(data)
+        self.headers = {"Content-Length": str(len(data))}
+
     def __enter__(self):
         return self
 
@@ -220,11 +224,11 @@ def test_rices90_download_and_checksum(rices_dir, tmp_path, fake_net, monkeypatc
     z = _zip_tree(rices_dir, tmp_path / RI.ZIP, top="RGB and VIS-NIR HSI Data for 90 Rice Seed Varieties",
                   extra={"__MACOSX/RGB and VIS-NIR HSI Data for 90 Rice Seed Varieties/index.csv": "x"})
     serve(RI.URL, z.read_bytes())
+    monkeypatch.setattr(RI, "ZIP_SIZE", z.stat().st_size)
     monkeypatch.setattr(RI, "ZIP_MD5", "0" * 32)
     with pytest.raises(OSError, match="Checksum"):
         RI.fetch_rices90(tmp_path / "missing", cache_dir=tmp_path / "c")
     monkeypatch.setattr(RI, "ZIP_MD5", _md5(z))
-    monkeypatch.setattr(RI, "ZIP_SIZE", z.stat().st_size)
     b = RI.fetch_rices90(tmp_path / "missing", cache_dir=tmp_path / "c")
     ref = RI.fetch_rices90(rices_dir, cache_dir=tmp_path / "ref")
     np.testing.assert_allclose(b.covariances, ref.covariances)
@@ -336,6 +340,7 @@ def test_drive_downloads_checksum_and_quota_fallback(module, request, tmp_path, 
     z = _zip_tree(root, tmp_path / module.ZIP, top=top)
     serve(module.URL, z.read_bytes())
     monkeypatch.setattr(module, "ZIP_SHA256", _sha(z))
+    monkeypatch.setattr(module, "ZIP_SIZE", z.stat().st_size)
     b = fetch(tmp_path / "missing", cache_dir=tmp_path / "c", **kw)
     ref = fetch(root, cache_dir=tmp_path / "ref", **kw)
     assert b.meta.drop(columns="path", errors="ignore").equals(ref.meta.drop(columns="path", errors="ignore"))
