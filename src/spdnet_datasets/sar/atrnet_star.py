@@ -95,11 +95,11 @@ import torch
 
 from ..base import BaseDataset
 from ..core.access import hf_download
-from ..core.config import dataset_path, existing_dir, get_cache_dir
+from ..core.config import dataset_path, get_cache_dir
 from ..core.estimators import channel_mean
 from ..core.fetch import Bunch, verify_local
 from ..manager import DatasetManager
-from ..utils.sources import downloads_dir, extract_7z, find_root
+from ..utils.sources import downloads_dir, existing_dir, extract_7z, find_root
 from ._common import finalize_labels
 
 DOMAIN, NAME = "SAR", "ATRNet-STAR"

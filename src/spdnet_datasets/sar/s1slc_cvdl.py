@@ -60,10 +60,10 @@ import torch
 
 from ..base import BaseDataset
 from ..core.access import extract_archive, manual_source
-from ..core.config import dataset_path, existing_dir, get_cache_dir
+from ..core.config import dataset_path, get_cache_dir
 from ..core.fetch import Bunch, check_local
 from ..manager import DatasetManager
-from ..utils.sources import downloads_dir, extract_rar, find_root
+from ..utils.sources import downloads_dir, existing_dir, extract_rar, find_root
 from ._common import finalize_labels
 
 DOMAIN, NAME = "SAR", "S1SLC_CVDL"

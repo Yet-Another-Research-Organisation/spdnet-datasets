@@ -51,10 +51,10 @@ import numpy as np
 import pandas as pd
 import torch
 
-from ..core.config import dataset_path, existing_dir
+from ..core.config import dataset_path
 from ..core.fetch import Bunch
 from ..manager import DatasetManager
-from ..utils.sources import source_dir
+from ..utils.sources import existing_dir, source_dir
 from ._common import HSIDataset, group_kfold_split
 
 DOMAIN, NAME = "HYPERSPECTRAL", "DeepHS-Fruit"

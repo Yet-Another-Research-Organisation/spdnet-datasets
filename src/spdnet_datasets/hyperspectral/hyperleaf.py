@@ -49,10 +49,10 @@ import pandas as pd
 import torch
 
 from ..core.access import kaggle_download
-from ..core.config import dataset_path, existing_dir
+from ..core.config import dataset_path
 from ..core.fetch import Bunch, run_pipeline
 from ..manager import DatasetManager
-from ..utils.sources import source_dir
+from ..utils.sources import existing_dir, source_dir
 from ._common import (
     HSIDataset,
     band_index,

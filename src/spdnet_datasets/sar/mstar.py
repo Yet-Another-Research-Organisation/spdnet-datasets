@@ -59,11 +59,11 @@ import pandas as pd
 import torch
 
 from ..base import BaseDataset
-from ..core.config import dataset_path, existing_dir
+from ..core.config import dataset_path
 from ..core.estimators import channel_mean
 from ..core.fetch import Bunch
 from ..manager import DatasetManager
-from ..utils.sources import source_dir
+from ..utils.sources import existing_dir, source_dir
 from ._common import finalize_labels
 
 DOMAIN, NAME = "SAR", "MSTAR_SOC"

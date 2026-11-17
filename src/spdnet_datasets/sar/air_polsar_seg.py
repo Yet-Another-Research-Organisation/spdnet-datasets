@@ -59,10 +59,10 @@ import torch
 
 from ..base import BaseDataset
 from ..core.access import manual_source
-from ..core.config import dataset_path, existing_dir
+from ..core.config import dataset_path
 from ..core.fetch import Bunch, download, run_pipeline
 from ..manager import DatasetManager
-from ..utils.sources import source_dir
+from ..utils.sources import existing_dir, source_dir
 from ._common import check_split_groups, finalize_labels, group_kfold_splits
 
 DOMAIN, NAME = "SAR", "AIR-PolSAR-Seg"

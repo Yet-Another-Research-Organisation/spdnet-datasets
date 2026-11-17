@@ -488,8 +488,8 @@ def test_atrnet_star_archive_first_volume_or_local_layout(atr_dir, tmp_path, mon
 
 # --- dataset classes without local copy: the fetch fills the cache ------------------------------
 
-def test_hsi_classes_build_from_the_fetch_without_local_copy(rices_dir, fruit_dir, tmp_path,  # noqa: F811
-                                                             fake_net, monkeypatch):
+def test_hsi_classes_build_from_the_fetch_without_local_copy(rices_dir, fruit_dir, leaf_dir,  # noqa: F811
+                                                             tmp_path, fake_net, monkeypatch):
     monkeypatch.setenv("SPDNET_DATA_ROOT", str(tmp_path / "empty_root"))
     serve, calls = fake_net
     z = _zip_tree(rices_dir, tmp_path / RI.ZIP, top="rices")
@@ -508,6 +508,13 @@ def test_hsi_classes_build_from_the_fetch_without_local_copy(rices_dir, fruit_di
     DHS.fetch_deephsfruit(cache_dir=cache, archive=_zip_tree(fruit_dir, tmp_path / "f.zip"))
     ds = DHS.DeepHSFruitDataset(cache_dir=cache, verbose=False)
     assert len(ds) > 0 and (ds.data_dir / "cov_VIS").is_dir()
+    # HyperLeaf: the image mode resolves the sources without computing covariances
+    with pytest.raises(MissingCredentialsError):
+        HL.HyperLeafDataset(cache_dir=cache, mode="image", verbose=False)
+    HL.fetch_hyperleaf(cache_dir=cache, archive=_zip_tree(leaf_dir, tmp_path / "l.zip"), band_step=4)
+    for kw in ({"mode": "image"}, {"band_step": 4}):
+        ds = HL.HyperLeafDataset(cache_dir=cache, verbose=False, **kw)
+        assert len(ds) == 24 and ds.data_dir.is_relative_to(cache)
 
 
 def test_sar_classes_build_from_the_fetch_without_local_copy(fusar_dir, mstar_dir, tmp_path,  # noqa: F811

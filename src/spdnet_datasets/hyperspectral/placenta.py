@@ -46,11 +46,11 @@ import numpy as np
 import pandas as pd
 
 from ..core.access import extract_archive
-from ..core.config import dataset_path, existing_dir
+from ..core.config import dataset_path
 from ..core.estimators import check_sample_size
 from ..core.fetch import Bunch, check_local, download, md5sum, run_pipeline
 from ..manager import DatasetManager
-from ..utils.sources import check_size, downloads_dir
+from ..utils.sources import check_size, downloads_dir, existing_dir
 from ._common import (
     HSIDataset,
     band_index,

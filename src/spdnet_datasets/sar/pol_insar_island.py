@@ -92,7 +92,7 @@ import torch
 
 from ..base import BaseDataset
 from ..core.access import extract_archive, manual_source
-from ..core.config import dataset_path, existing_dir
+from ..core.config import dataset_path
 from ..core.estimators import (
     InsufficientSamplesError,
     NotSPDError,
@@ -103,7 +103,7 @@ from ..core.estimators import (
 from ..core.fetch import Bunch, check_local, download, md5sum, run_pipeline
 from ..core.normalize import apply_scale
 from ..manager import DatasetManager
-from ..utils.sources import check_size, downloads_dir, find_root
+from ..utils.sources import check_size, downloads_dir, existing_dir, find_root
 from ._common import (
     check_split_groups,
     finalize_labels,

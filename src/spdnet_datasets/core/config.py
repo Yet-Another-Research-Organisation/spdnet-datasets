@@ -31,18 +31,3 @@ def dataset_path(domain: str, name: str, data_dir=None) -> Path:
     if data_dir is not None:
         return Path(data_dir).expanduser()
     return get_data_root() / domain / name
-
-
-def existing_dir(root, cache_dir=None) -> Path:
-    """``root`` if it exists, else the cache directory (created).
-
-    :class:`~spdnet_datasets.base.BaseDataset` needs an existing folder; without
-    a local copy, the dataset classes give it the cache, where their fetch
-    downloads (or finds) the sources, then set ``data_dir`` to ``bunch.root``.
-    """
-    root = Path(root)
-    if root.exists():
-        return root
-    cache = Path(cache_dir).expanduser() if cache_dir else get_cache_dir()
-    cache.mkdir(parents=True, exist_ok=True)
-    return cache
