@@ -118,7 +118,7 @@ def _color(c, theme, default):
     if c.startswith("rgba("):
         r, g, b, a = (float(x) for x in c[5:-1].split(","))
         if theme == "dark":  # same hue, from the dark steps when it is a palette colour
-            hexc = "#%02x%02x%02x" % (int(r), int(g), int(b))
+            hexc = f"#{int(r):02x}{int(g):02x}{int(b):02x}"
             hexc = LIGHT_TO_DARK.get(hexc, hexc)
             r, g, b = (int(hexc[i:i + 2], 16) for i in (1, 3, 5))
         return (r / 255, g / 255, b / 255, a)
