@@ -35,8 +35,11 @@ Representations (``representation``)
 
 Outputs: covariance; mean = per-channel mean over the labelled pixels
 (``logpower``: ``p`` log-powers; ``t6``: the 36 real T6 parameters per band,
-diagonals then ``Re``/``Im`` of the upper terms); raw (``logpower``) = the
-``(32, 32, p)`` features of every pixel of the cell (unlabelled ones included).
+diagonals then ``Re``/``Im`` of the upper terms); raw (``logpower``), chosen by
+``raw_layout``: ``"pixels"`` (default) = the ``(n, p)`` features of the labelled
+pixels of the cell, exactly the observations of the covariance and the mean
+(``n`` varies: ``batch_size=1`` or a ``collate_fn``); ``"grid"`` = the
+``(32, 32, p)`` grid of the cell with the unlabelled pixels set to 0.
 With ``normalize=True`` the covariances are multiplied by the geometric scale
 ``s``, the mean and raw by ``sqrt(s)`` (``t6`` means, which are T6 entries, by
 ``s``).
@@ -447,6 +450,10 @@ class PolInSARIslandDataset(BaseDataset):
         Default ``"official"`` if ``split == "official"`` else ``"union"``.
     cache_dir, keep, representation, bands, cell, purity, min_labelled, block
         See :func:`fetch_pol_insar_island`.
+    raw_layout : {"pixels", "grid"}
+        Raw output (``logpower``): the labelled pixels ``(n, p)`` of the cell,
+        the observations of ``cov`` and ``mean`` (default), or the
+        ``(cell, cell, p)`` grid with the unlabelled pixels set to 0.
     **kwargs
         :class:`~spdnet_datasets.base.BaseDataset` arguments.
     """
@@ -455,7 +462,10 @@ class PolInSARIslandDataset(BaseDataset):
 
     def __init__(self, data_dir=None, *, split="recommended", cells=None, cache_dir=None, keep=None,
                  representation="logpower", bands=("L", "S"), cell=32, purity=0.75,
-                 min_labelled=None, block=512, **kwargs):
+                 min_labelled=None, block=512, raw_layout="pixels", **kwargs):
+        if raw_layout not in ("pixels", "grid"):
+            raise ValueError("raw_layout must be 'pixels' or 'grid'")
+        self.raw_layout = raw_layout
         root = dataset_path(DOMAIN, NAME, data_dir)
         cells = cells or ("official" if split == "official" else "union")
         if split == "official":
@@ -499,8 +509,11 @@ class PolInSARIslandDataset(BaseDataset):
         if self.return_raw:
             if not hasattr(self, "_raw"):
                 self._raw = np.load(Path(self._processed) / "raw.npy", mmap_mode="r")
-            raw = torch.from_numpy((np.asarray(self._raw[int(self.meta["proc_index"].iat[idx])])
-                                    * np.sqrt(self.scale)).astype(np.float32))
+                self._masks = np.load(Path(self._processed) / "masks.npy", mmap_mode="r")
+            k = int(self.meta["proc_index"].iat[idx])
+            cell, mask = np.asarray(self._raw[k]), np.asarray(self._masks[k])
+            x = cell[mask] if self.raw_layout == "pixels" else cell * mask[..., None]
+            raw = torch.from_numpy((x * np.sqrt(self.scale)).astype(np.float32))
         x = self._pack(cov, mean, raw)
         if self.transform is not None:
             x = self.transform(x)
