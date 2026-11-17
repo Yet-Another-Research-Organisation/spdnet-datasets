@@ -3,7 +3,8 @@ Dataset Manager - Central router for all datasets.
 Automatically selects and instantiates the correct dataset based on configuration.
 """
 
-from typing import Dict, Any, Tuple
+from typing import Any
+
 from torch.utils.data import DataLoader
 
 from spdnet_datasets.base import create_dataloaders
@@ -27,7 +28,7 @@ class DatasetManager:
         return decorator
 
     @classmethod
-    def create_dataset(cls, config: Dict[str, Any]):
+    def create_dataset(cls, config: dict[str, Any]):
         """
         Create a dataset from a configuration dictionary.
 
@@ -114,8 +115,8 @@ class DatasetManager:
     @classmethod
     def create_dataloaders(
         cls,
-        config: Dict[str, Any]
-    ) -> Tuple[DataLoader, DataLoader, DataLoader, int]:
+        config: dict[str, Any]
+    ) -> tuple[DataLoader, DataLoader, DataLoader, int]:
         """
         Create dataset and dataloaders from configuration.
 

@@ -2,10 +2,10 @@
 PyTorch Dataset and DataLoader utilities for simulation experiments.
 """
 
-import torch
-from torch.utils.data import Dataset, DataLoader
+
 import numpy as np
-from typing import Tuple, Optional
+import torch
+from torch.utils.data import DataLoader, Dataset
 
 from .data_generator import shuffle_data
 
@@ -32,7 +32,7 @@ class SimulationDataset(Dataset):
     def __len__(self) -> int:
         return len(self.data)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         return self.data[idx], self.labels[idx]
 
     @property
@@ -50,10 +50,10 @@ def create_dataloaders(
     batch_size: int = 12,
     val_ratio: float = 0.1,
     test_ratio: float = 0.2,
-    seed: Optional[int] = None,
+    seed: int | None = None,
     dtype: torch.dtype = torch.float64,
     num_workers: int = 0,
-) -> Tuple[DataLoader, DataLoader, DataLoader, int]:
+) -> tuple[DataLoader, DataLoader, DataLoader, int]:
     """
     Create train / validation / test dataloaders from raw data arrays.
 
