@@ -14,6 +14,12 @@ the same class within 2 deg of azimuth (atlas). SOC measures a 2 deg
 generalisation in depression, not recognition of new vehicles. There is no
 exact duplicate (md5).
 
+``groups`` is ``None``: the only physical unit, the vehicle (``TargetSerNum``
+of the Phoenix headers), is one per class and the same at 17 and 15 deg, so it
+cannot separate train from test; the file stem ``HBxxxxx`` is not a unit (the
+same stem appears in several classes). The validation part of ``"official"``
+is a stratified draw of the 17 deg chips.
+
 Chip sizes depend on the class (128 x 128 to 193 x 192): every chip is centre
 cropped to ``crop x crop`` (default 128, the smallest size).
 
@@ -175,7 +181,8 @@ class MSTARDataset(BaseDataset):
     def _load_data(self):
         b = fetch_mstar(self._root, seed=self.seed, **self._fetch)
         self.data_dir = Path(b.root)
-        keep = finalize_labels(self, b.meta["label"].to_numpy(), b.meta["chip_id"].to_numpy(), b.splits)
+        # no group: one vehicle (serial number) per class, the same at 17 and 15 deg
+        keep = finalize_labels(self, b.meta["label"].to_numpy(), None, b.splits)
         self.meta = b.meta.iloc[keep].reset_index(drop=True)
         self.samples = list(range(len(self.meta)))
         if self.verbose:

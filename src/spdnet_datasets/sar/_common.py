@@ -21,8 +21,9 @@ def finalize_labels(ds, labels, groups, splits, *, coarse_map=None):
         ``balance``, ``seed``, ``max_samples_per_class`` and the class limits).
     labels : array (n,)
         Class names (fine level) of all loaded samples.
-    groups : array (n,)
-        Group of each sample (site, block, vessel, city...).
+    groups : array (n,) or None
+        Group of each sample (site, block, vessel, city...); ``None`` when the
+        dataset has no physical group (``ds.groups`` is then ``None``).
     splits : dict
         ``{name: {"train": idx, "val": idx, "test": idx}}`` on the loaded samples.
     coarse_map : dict, optional
@@ -80,7 +81,7 @@ def finalize_labels(ds, labels, groups, splits, *, coarse_map=None):
     ds.targets = y
     ds.classes = names
     ds.class_to_idx = {c: i for i, c in enumerate(names)}
-    ds.groups = np.asarray(groups)[keep]
+    ds.groups = None if groups is None else np.asarray(groups)[keep]
     ds.splits = new_splits
     train = new_splits.get(getattr(ds, "split", "recommended"), {}).get("train", ())
     ds.class_weights = (class_weights(y[train], n_classes=len(names)) if len(train)
