@@ -52,7 +52,7 @@ import pandas as pd
 from ..core.config import dataset_path
 from ..core.fetch import Bunch, download, run_pipeline
 from ..manager import DatasetManager
-from ..utils.sources import source_dir
+from ..utils.sources import existing_dir, source_dir
 from ._common import (
     HSIDataset,
     covariance_stage,
@@ -138,7 +138,7 @@ def fetch_rices90(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
         NAME, dataset_path(DOMAIN, NAME, data_dir), required=("index.csv",),
         page_url=PAGE, expected=f"{ZIP} ({ZIP_SIZE} bytes, md5 {ZIP_MD5})",
         cache_dir=cache_dir, archive=archive, checksum=ZIP_MD5, size=ZIP_SIZE, verify=verify,
-        download=lambda d: download(URL, d / ZIP, checksum=ZIP_MD5, algo="md5"))
+        download=lambda d: download(URL, d / ZIP, checksum=ZIP_MD5, algo="md5", size=ZIP_SIZE))
     p = N_BANDS // band_bin
     params = {"band_bin": band_bin, "source": str(root.resolve()), "version": 2}
 
@@ -228,9 +228,10 @@ class Rices90Dataset(HSIDataset):
                  subset=None, cache_dir=None, keep=None, force=False, verify="size",
                  **kwargs):
         root = dataset_path(DOMAIN, NAME, data_dir)
-        super().__init__(data_dir=str(root), **kwargs)
+        super().__init__(data_dir=str(existing_dir(root, cache_dir)), **kwargs)
         bunch = fetch_rices90(root, cache_dir, keep, self.estimator, force, verify,
                               band_bin=band_bin, val_fraction=val_fraction)
+        self.data_dir = Path(bunch.root)
         self._setup(bunch, split, subset)
 
     def _load_raw(self, k):

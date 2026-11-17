@@ -14,6 +14,12 @@ the same class within 2 deg of azimuth (atlas). SOC measures a 2 deg
 generalisation in depression, not recognition of new vehicles. There is no
 exact duplicate (md5).
 
+``groups`` is ``None``: the only physical unit, the vehicle (``TargetSerNum``
+of the Phoenix headers), is one per class and the same at 17 and 15 deg, so it
+cannot separate train from test; the file stem ``HBxxxxx`` is not a unit (the
+same stem appears in several classes). The validation part of ``"official"``
+is a stratified draw of the 17 deg chips.
+
 Chip sizes depend on the class (128 x 128 to 193 x 192): every chip is centre
 cropped to ``crop x crop`` (default 128, the smallest size).
 
@@ -57,7 +63,7 @@ from ..core.config import dataset_path
 from ..core.estimators import channel_mean
 from ..core.fetch import Bunch
 from ..manager import DatasetManager
-from ..utils.sources import source_dir
+from ..utils.sources import existing_dir, source_dir
 from ._common import finalize_labels
 
 DOMAIN, NAME = "SAR", "MSTAR_SOC"
@@ -153,7 +159,7 @@ class MSTARDataset(BaseDataset):
     source : {"jpg", "amplitude", "complex"}
     crop : int
         Side of the centre crop (``<= 128`` keeps every class).
-    verify, val_size
+    verify, val_size, cache_dir
         See :func:`fetch_mstar`.
     **kwargs
         :class:`~spdnet_datasets.base.BaseDataset` arguments; exactly one of
@@ -162,16 +168,21 @@ class MSTARDataset(BaseDataset):
 
     OUTPUTS = ("raw", "mean")
 
-    def __init__(self, data_dir=None, *, source="jpg", crop=128, verify="size", val_size=0.1, **kwargs):
+    def __init__(self, data_dir=None, *, source="jpg", crop=128, verify="size", val_size=0.1,
+                 cache_dir=None, **kwargs):
         root = dataset_path(DOMAIN, NAME, data_dir)
         self.source, self.crop = source, crop
-        self._fetch = {"source": source, "verify": verify, "val_size": val_size}
-        super().__init__(data_dir=str(root), **kwargs)
+        self._fetch = {"source": source, "verify": verify, "val_size": val_size,
+                       "cache_dir": cache_dir}
+        self._root = root
+        super().__init__(data_dir=str(existing_dir(root, cache_dir)), **kwargs)
         self._load_data()
 
     def _load_data(self):
-        b = fetch_mstar(self.data_dir, seed=self.seed, **self._fetch)
-        keep = finalize_labels(self, b.meta["label"].to_numpy(), b.meta["chip_id"].to_numpy(), b.splits)
+        b = fetch_mstar(self._root, seed=self.seed, **self._fetch)
+        self.data_dir = Path(b.root)
+        # no group: one vehicle (serial number) per class, the same at 17 and 15 deg
+        keep = finalize_labels(self, b.meta["label"].to_numpy(), None, b.splits)
         self.meta = b.meta.iloc[keep].reset_index(drop=True)
         self.samples = list(range(len(self.meta)))
         if self.verbose:

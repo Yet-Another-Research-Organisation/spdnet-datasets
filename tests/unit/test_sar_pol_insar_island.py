@@ -2,6 +2,7 @@
 
 import numpy as np
 import pytest
+import torch
 
 from spdnet_datasets.core.estimators import NotSPDError, check_spd
 from spdnet_datasets.sar import pol_insar_island
@@ -69,7 +70,7 @@ def test_logpower_covariances(pol_dir, tmp_path):
     check_spd(ds.covariances)
     assert (ds.meta["n_pixels"] >= 2 * 12).all()
     (cov, mean, raw), y = ds[0]
-    assert raw.shape == (CELL, CELL, 12) and mean.shape == (12,)
+    assert raw.shape == (CELL * CELL, 12) and mean.shape == (12,)  # labelled pixels
     assert ds.classes == ["coastal shrub", "tidal flat", "water"]
 
 
@@ -82,6 +83,33 @@ def test_normalisation_scales_mean_and_raw_by_sqrt_s(pol_dir, tmp_path):
     np.testing.assert_allclose(cov.numpy(), s * cov0.numpy(), rtol=1e-12)
     np.testing.assert_allclose(mean.numpy(), np.sqrt(s) * mean0.numpy(), rtol=1e-12)
     np.testing.assert_allclose(raw.numpy(), np.sqrt(s) * raw0.numpy(), rtol=1e-6)
+
+
+def test_raw_is_consistent_with_cov_and_mean(pol_dir, tmp_path):
+    """raw = the labelled pixels of the cell (default) or the grid with 0 elsewhere."""
+    from spdnet_datasets.core.estimators import estimate_covariance
+
+    for name in ("label_train", "label_test"):  # 16 unlabelled pixels in the FP1 cell (1, 1)
+        p = pol_dir / f"label/FP1/{name}.bin"
+        lab = np.fromfile(p, np.uint8).reshape(H, W)
+        lab[CELL:CELL + 2, CELL:2 * CELL] = 0
+        lab.tofile(p)
+    ds = _make(pol_dir, tmp_path, return_mean=True, return_raw=True)
+    k = int(np.flatnonzero((ds.meta["path"] == "FP1") & (ds.meta["row"] == 1)
+                           & (ds.meta["col"] == 1))[0])
+    assert ds.meta["n_pixels"].iat[k] == CELL * CELL - 16
+    (cov, mean, raw), _ = ds[k]
+    assert raw.shape == (CELL * CELL - 16, 12) and raw.dtype == torch.float32
+    X = raw.numpy().astype(float)
+    np.testing.assert_allclose(estimate_covariance(X), cov.numpy(), rtol=1e-4,
+                               atol=1e-5 * float(cov.abs().max()))
+    np.testing.assert_allclose(X.mean(0), mean.numpy(), rtol=1e-5)
+    (_, grid), _ = _make(pol_dir, tmp_path, return_raw=True, raw_layout="grid")[k]
+    assert grid.shape == (CELL, CELL, 12)
+    assert (grid[:2] == 0).all() and (grid[2:] != 0).all()
+    np.testing.assert_allclose(grid[2:].reshape(-1, 12).numpy(), raw.numpy(), rtol=1e-6)
+    with pytest.raises(ValueError, match="raw_layout"):
+        _make(pol_dir, tmp_path, raw_layout="image")
 
 
 @pytest.mark.parametrize("representation", ["logpower", "t6"])

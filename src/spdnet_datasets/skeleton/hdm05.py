@@ -172,7 +172,8 @@ def download_hdm05_eth(cache_dir=None, archive=None):
     elif (out / ".extracted").exists():
         root = out
     else:
-        zipped = download(ETH_URL, dest / "HDM05_SPDData.zip", checksum=FILES[ETH_URL])
+        zipped = download(ETH_URL, dest / "HDM05_SPDData.zip", checksum=FILES[ETH_URL],
+                          size=ETH_SIZE)
         root = extract_archive(zipped, out)
         zipped.unlink()
     found = sorted(Path(root).rglob("metadata.mat"))

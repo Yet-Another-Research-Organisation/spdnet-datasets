@@ -10,7 +10,7 @@
 * - Covariance
   - 204×204, n = 1 070 to 7 044 leaf pixels (median 2 747; n / 2p ≥ 2.6)
 * - Outputs
-  - cov · mean · raw (48 × 352 × 204); `mode="image"`: band images for CNNs
+  - cov · mean · raw (n leaf pixels × 204, n varies); `mode="image"`: band images for CNNs
 * - Samples
   - 1 590 labelled leaves (none discarded)
 * - Splits
@@ -59,8 +59,12 @@ fetch_hyperleaf(archive="~/Downloads/hyperleaf2024.zip")
 as (bands, rows, columns), uint16 raw DN (digital numbers). There is no
 white or dark reference, and saturated values (65 535) exist. The background
 is 0, which is 84 % of the pixels in the median image. `train.csv` holds the
-targets, with the cultivars one-hot encoded. The raw output is the
-48 × 352 × 204 image; the figure shows its band-mean image.
+targets, with the cultivars one-hot encoded. The raw output is the set of
+leaf pixels, an (n, p) float32 array: exactly the observations of the
+covariance (background excluded), so its covariance is `cov` and its mean is
+`mean`. Since n varies from leaf to leaf (1 070 to 7 044), use `batch_size=1`
+or a `collate_fn`; `mode="image"` gives the whole image. The figure shows the
+band-mean image.
 
 ```{raw} html
 <iframe src="../_static/figures/hyperleaf/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
@@ -93,7 +97,7 @@ The figures show the cultivar counts and the mean spectrum per cultivar.
 3. **Estimator**: SCM (sample covariance matrix) by default;
    `"ledoit_wolf"`, `"tyler"` or `"student"` are also available.
 4. **Normalisation**: covariances are scaled on the training part of `split`
-   (geometric mean of the eigenvalues = 1). Means and raw images are
+   (geometric mean of the eigenvalues = 1). Means and raw pixels are
    multiplied by √s.
 
 `mode="image"` keeps the former image mode. `x` is then the image restricted

@@ -62,7 +62,7 @@ from ..core.access import manual_source
 from ..core.config import dataset_path
 from ..core.fetch import Bunch, download, run_pipeline
 from ..manager import DatasetManager
-from ..utils.sources import source_dir
+from ..utils.sources import existing_dir, source_dir
 from ._common import check_split_groups, finalize_labels, group_kfold_splits
 
 DOMAIN, NAME = "SAR", "AIR-PolSAR-Seg"
@@ -81,7 +81,7 @@ EXPECTED = (f"{ZIP} ({ZIP_SIZE} bytes) from the Google Drive folder "
 
 def _download(dest_dir):
     try:
-        return download(URL, dest_dir / ZIP, checksum=ZIP_SHA256)
+        return download(URL, dest_dir / ZIP, checksum=ZIP_SHA256, size=ZIP_SIZE)
     except OSError as exc:  # quota page instead of the file, network error...
         manual_source("AIR-PolSAR-Seg", page_url=PAGE, expected=f"{EXPECTED} (automatic "
                       f"download failed: {exc})", dest_dir=dest_dir)
@@ -315,11 +315,13 @@ class AIRPolSARSegDataset(BaseDataset):
         root = dataset_path(DOMAIN, NAME, data_dir)
         self._fetch = {"cache_dir": cache_dir, "keep": keep, "cell": cell, "purity": purity,
                        "min_annotated": min_annotated, "macro": macro, "verify": verify}
-        super().__init__(data_dir=str(root), **kwargs)
+        self._root = root
+        super().__init__(data_dir=str(existing_dir(root, cache_dir)), **kwargs)
         self._load_data()
 
     def _load_data(self):
-        b = fetch_air_polsar_seg(self.data_dir, seed=self.seed, **self._fetch)
+        b = fetch_air_polsar_seg(self._root, seed=self.seed, **self._fetch)
+        self.data_dir = Path(b.root)
         keep = finalize_labels(self, b.meta["label"].to_numpy(), b.meta["block"].to_numpy(), b.splits)
         check_split_groups(self.splits, self.groups)
         self.meta = b.meta.iloc[keep].reset_index(drop=True)
