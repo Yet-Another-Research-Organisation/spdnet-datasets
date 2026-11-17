@@ -170,3 +170,12 @@ ds_test = ESC50Dataset(subset="test", fold=1, features="logmel")  # 64x64 log-me
 - The former `series_audio.esc50_series` (branch `timeseries`) builds a series
   of Ledoit-Wolf covariances per 1 s window; this loader gives one covariance
   per clip.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/esc50.md
+```
+````

@@ -186,3 +186,12 @@ test = ChikuseiDataset(subset="test", window=23, estimator="ledoit_wolf")
   default) keeps every sample.
 - Use `estimator=`. `cov_method=...` is silently absorbed by `**kwargs` and
   gives the SCM.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/chikusei.md
+```
+````

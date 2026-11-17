@@ -191,3 +191,12 @@ datasets' official servers or NEMAR) into `MNE_DATA`.
 | torch | 2.14.1 |
 | pyriemann | 0.12 |
 | Python | 3.11 |
+
+## How to cite
+
+````{admonition} If you use this adapter in a publication, cite
+:class: tip
+
+```{include} _cite/moabb.md
+```
+````

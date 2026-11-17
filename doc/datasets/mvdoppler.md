@@ -163,3 +163,12 @@ Changing the estimator recomputes the preprocessing stage (about 1 min,
   separate.
 - `scaling_factor` is replaced by `normalize=True`.
 - `subset=None` is the default: the instance holds every snapshot.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/mvdoppler.md
+```
+````

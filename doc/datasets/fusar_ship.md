@@ -147,3 +147,12 @@ ds = FUSARShipDataset(return_raw=True, image_size=224)
 x, y = ds[0]                         # (224, 224, 1) float32
 parts = ds.splits["recommended"]     # train / val / test indices
 ```
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/fusar_ship.md
+```
+````

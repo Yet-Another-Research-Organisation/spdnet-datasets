@@ -294,3 +294,12 @@ are too large for CI.
   connectome-based predictive models for resting-state fMRI. *NeuroImage*, 192,
   115–134.
 - spdlearn, [Classifying fMRI data with SPDNet](https://spdlearn.org/generated/auto_examples/applied_examples/plot_fmri.html).
+
+## How to cite
+
+````{admonition} If you use this adapter in a publication, cite
+:class: tip
+
+```{include} _cite/nilearn.md
+```
+````

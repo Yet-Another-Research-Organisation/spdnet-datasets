@@ -243,3 +243,12 @@ ds.meta[["s2_dates", "gap_s1a", "gap_s1d"]].head()
 # raw pixels: n varies, so use batch_size=1 or a custom collate_fn
 ds_raw = PastisRDataset(scenario="E", return_raw=True)
 ```
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/pastis_r.md
+```
+````

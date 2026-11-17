@@ -181,3 +181,12 @@ Through the manager: `{"name": "gsoff", "split": "recommended", ...}`.
 - The estimator is chosen with `estimator=`. A former keyword such as
   `cov_method="ledoit_wolf"` is silently absorbed by `**kwargs` and gives the
   SCM.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/gsoff.md
+```
+````

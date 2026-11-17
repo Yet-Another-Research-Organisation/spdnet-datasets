@@ -140,3 +140,12 @@ ds = MSTARDataset(source="jpg", crop=128, return_raw=True)
 x, y = ds[0]                         # (128, 128, 1) float32, class index
 train_idx = ds.splits["official"]["train"]
 ```
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/mstar.md
+```
+````

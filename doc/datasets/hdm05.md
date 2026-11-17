@@ -161,3 +161,12 @@ all31 = HDM05Dataset(subset=None, features="c31", max_classes=20)
   now gives normalised covariances.
 - Sequences with T < 186 are no longer kept with `c93`; use `c31` to keep all
   2 086 sequences.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/hdm05.md
+```
+````

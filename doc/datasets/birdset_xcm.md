@@ -160,3 +160,12 @@ crop = BirdSetXCMDataset(subset=None, crop_s=5.0)   # 5 s excerpts, as the atlas
 - `scaling_factor` is replaced by `normalize=True`.
 - The former covariance series (`series_audio.birdset_series`, branch
   `timeseries`) used the 5 s crop; the default is now the whole recording.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/birdset_xcm.md
+```
+````

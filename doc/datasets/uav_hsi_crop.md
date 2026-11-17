@@ -171,3 +171,12 @@ transfer = UAVDataset(scenes=("MJK_N", "MJK_S"), split="scene_transfer")
   default.
 - Use `estimator=`. `cov_method=...` is silently absorbed by `**kwargs` and
   gives the SCM.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/uav_hsi_crop.md
+```
+````

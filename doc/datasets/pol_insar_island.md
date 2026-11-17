@@ -184,3 +184,12 @@ ds = PolInSARIslandDataset(split="recommended")                 # logpower, 12×
 t6 = PolInSARIslandDataset(representation="t6")                 # 24×24, scm only
 off = PolInSARIslandDataset(cells="official", split="official")  # optimistic, warns
 ```
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/pol_insar_island.md
+```
+````

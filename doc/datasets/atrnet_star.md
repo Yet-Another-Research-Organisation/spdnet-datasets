@@ -182,3 +182,12 @@ x, y = ds[0]                         # (128, 128, 4) amplitudes
 protocol_overlap(a="SOC_40classes", b="EOC_depression")
 # {('train', 'train'): 3891, ('train', 'test'): 13112, ('test', 'train'): 1666, ('test', 'test'): 5577}
 ```
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/atrnet_star.md
+```
+````

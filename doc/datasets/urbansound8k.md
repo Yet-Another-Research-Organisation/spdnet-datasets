@@ -36,3 +36,12 @@ This code is kept as it is: it does not use the `core` interface of the other
 pages (no `split`, `normalize`, `task` or `keep` options, no checks against a
 data atlas sheet). For a maintained environmental sound dataset, use
 {doc}`esc50`.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/urbansound8k.md
+```
+````

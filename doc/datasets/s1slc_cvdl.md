@@ -148,3 +148,12 @@ from spdnet_datasets.sar.s1slc_cvdl import S1SLCCVDLDataset
 ds = S1SLCCVDLDataset(split="loco_Houston", features="complex", return_raw=True)
 x, y = ds[0]                         # (100, 100, 4) float32: Re HH, Im HH, Re HV, Im HV
 ```
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/s1slc_cvdl.md
+```
+````

@@ -197,3 +197,12 @@ xe = CI4RDataset(mode="xethru", return_raw=True)       # Ledoit-Wolf 32x32 by de
 - `scaling_factor` is replaced by `normalize=True`.
 - `subset=None` is the default: the instance holds every sample and
   `dataset.splits` indexes it.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/ci4r.md
+```
+````

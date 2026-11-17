@@ -159,3 +159,12 @@ lw = Rices90Dataset(estimator="ledoit_wolf")
   default.
 - Use `estimator=`. `cov_method=...` is silently absorbed by `**kwargs` and
   gives the SCM.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/rices90.md
+```
+````

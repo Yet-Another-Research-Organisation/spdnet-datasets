@@ -154,3 +154,12 @@ val_kaggle = fetch_kaggle_wheat(part="val")             # unlabelled competition
   default.
 - Use `estimator=`. `cov_method=...` is silently absorbed by `**kwargs` and
   gives the SCM.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/kaggle_wheat.md
+```
+````

@@ -167,3 +167,12 @@ lopo = DopNetDataset(split="recommended", fold=2)       # test = person C
 - Duplicates are removed and gestures with T < 96 are rejected (2 145
   gestures instead of 3 076).
 - `scaling_factor` is replaced by `normalize=True`.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/dopnet.md
+```
+````

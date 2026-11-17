@@ -206,3 +206,12 @@ cov, y = ds[0]                       # (40, 40)
 ds.dates                             # the 20 retained dates
 blocks = CPAZMaLDataset(block=16, min_pixels=120, return_raw=True)
 ```
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/cpazmal.md
+```
+````

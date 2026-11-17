@@ -167,3 +167,12 @@ ds = AIRPolSARSegDataset(cell=32, return_raw=True)
 x, y = ds[0]                         # (32, 32, 4) float32, log10(1 + A)
 ds.positions.head()                  # patch positions in the rebuilt mosaic
 ```
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/air_polsar_seg.md
+```
+````

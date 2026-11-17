@@ -179,3 +179,12 @@ with warnings.catch_warnings():
 - `return_mean=True` and `return_raw=True` raise an error.
 - `split="train"` raises an error: use `subset="train"`. `subset=None` is the
   default.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/deephsfruit.md
+```
+````

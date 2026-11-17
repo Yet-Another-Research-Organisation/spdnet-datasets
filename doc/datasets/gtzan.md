@@ -146,3 +146,12 @@ test = GTZANDataset(split="stratified", subset="test", fold=1)
 
 - `scaling_factor` is replaced by `normalize=True`.
 - Duplicates are now removed (985 excerpts instead of 999).
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/gtzan.md
+```
+````
