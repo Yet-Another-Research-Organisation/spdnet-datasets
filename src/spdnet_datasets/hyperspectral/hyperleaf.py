@@ -20,6 +20,10 @@ Split (atlas): StratifiedGroupKFold(5) by reconstructed plot, group =
 share its grain weight). A random split is much more optimistic (fiche:
 TS-LR cultivar 0.915 random vs 0.669 grouped).
 
+Outputs: covariance; mean = per-band mean of the leaf pixels; raw = the leaf
+pixels ``(n, p)`` float32, exactly the observations of the covariance (``n``
+varies from leaf to leaf: ``batch_size=1`` or a ``collate_fn``).
+
 ``mode="image"`` keeps the former image mode: ``x`` is the image restricted to
 ``bands`` (default approximate R, G, B), standardised per channel, float32
 (C, 48, 352), for CNN backbones; no covariance is computed.
@@ -171,6 +175,9 @@ class HyperLeafDataset(HSIDataset):
     regression_targets : tuple of str
         Columns returned with ``task="regression"``.
     mode : {"cov", "image"}
+        ``"cov"``: covariance, and with ``return_mean`` / ``return_raw`` the
+        mean and the leaf pixels ``(n, p)`` (the observations of the
+        covariance; ``n`` varies: ``batch_size=1`` or a ``collate_fn``).
         ``"image"``: ``x`` is the standardised band image (C, 48, 352).
     bands : list of int, optional
         ``mode="image"`` only: bands to read (default ``RGB_BANDS``).
@@ -223,8 +230,10 @@ class HyperLeafDataset(HSIDataset):
         self._setup(bunch, split, subset)
 
     def _load_raw(self, k):
+        """Leaf pixels of image ``k``, ``(n, p)`` float32: the observations of its covariance."""
         image_id = self.meta_all["ImageId"].iloc[k]
-        return read_leaf(self.bunch.root / "images" / f"{image_id}.tiff", self.bunch.bands)
+        leaf = read_leaf(self.bunch.root / "images" / f"{image_id}.tiff", self.bunch.bands)
+        return valid_pixels(leaf.reshape(-1, len(self.bunch.bands)))
 
     def __getitem__(self, i):
         if self.mode == "cov":
