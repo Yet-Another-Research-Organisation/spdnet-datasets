@@ -35,8 +35,11 @@ Representations (``representation``)
 
 Outputs: covariance; mean = per-channel mean over the labelled pixels
 (``logpower``: ``p`` log-powers; ``t6``: the 36 real T6 parameters per band,
-diagonals then ``Re``/``Im`` of the upper terms); raw (``logpower``) = the
-``(32, 32, p)`` features of every pixel of the cell (unlabelled ones included).
+diagonals then ``Re``/``Im`` of the upper terms); raw (``logpower``), chosen by
+``raw_layout``: ``"pixels"`` (default) = the ``(n, p)`` features of the labelled
+pixels of the cell, exactly the observations of the covariance and the mean
+(``n`` varies: ``batch_size=1`` or a ``collate_fn``); ``"grid"`` = the
+``(32, 32, p)`` grid of the cell with the unlabelled pixels set to 0.
 With ``normalize=True`` the covariances are multiplied by the geometric scale
 ``s``, the mean and raw by ``sqrt(s)`` (``t6`` means, which are T6 entries, by
 ``s``).
@@ -100,7 +103,7 @@ from ..core.estimators import (
 from ..core.fetch import Bunch, check_local, download, md5sum, run_pipeline
 from ..core.normalize import apply_scale
 from ..manager import DatasetManager
-from ..utils.sources import check_size, downloads_dir, find_root
+from ..utils.sources import check_size, downloads_dir, existing_dir, find_root
 from ._common import (
     check_split_groups,
     finalize_labels,
@@ -131,7 +134,7 @@ def _download_root(cache_dir, archive):
         if found is not None:
             return found
         try:
-            path = download(TAR_URL, out / TAR, checksum=TAR_MD5, algo="md5")
+            path = download(TAR_URL, out / TAR, checksum=TAR_MD5, algo="md5", size=TAR_SIZE)
         except OSError as exc:  # access refused (terms, login), md5 mismatch, network...
             manual_source(NAME, page_url=PAGE, dest_dir=out,
                           expected=f"the archive of the page ({TAR_SIZE} bytes, md5 {TAR_MD5}; "
@@ -447,6 +450,10 @@ class PolInSARIslandDataset(BaseDataset):
         Default ``"official"`` if ``split == "official"`` else ``"union"``.
     cache_dir, keep, representation, bands, cell, purity, min_labelled, block
         See :func:`fetch_pol_insar_island`.
+    raw_layout : {"pixels", "grid"}
+        Raw output (``logpower``): the labelled pixels ``(n, p)`` of the cell,
+        the observations of ``cov`` and ``mean`` (default), or the
+        ``(cell, cell, p)`` grid with the unlabelled pixels set to 0.
     **kwargs
         :class:`~spdnet_datasets.base.BaseDataset` arguments.
     """
@@ -455,7 +462,10 @@ class PolInSARIslandDataset(BaseDataset):
 
     def __init__(self, data_dir=None, *, split="recommended", cells=None, cache_dir=None, keep=None,
                  representation="logpower", bands=("L", "S"), cell=32, purity=0.75,
-                 min_labelled=None, block=512, **kwargs):
+                 min_labelled=None, block=512, raw_layout="pixels", **kwargs):
+        if raw_layout not in ("pixels", "grid"):
+            raise ValueError("raw_layout must be 'pixels' or 'grid'")
+        self.raw_layout = raw_layout
         root = dataset_path(DOMAIN, NAME, data_dir)
         cells = cells or ("official" if split == "official" else "union")
         if split == "official":
@@ -468,11 +478,13 @@ class PolInSARIslandDataset(BaseDataset):
         self._fetch = {"cache_dir": cache_dir, "keep": keep, "representation": representation,
                        "bands": tuple(bands), "cells": cells, "cell": cell, "purity": purity,
                        "min_labelled": min_labelled, "block": block}
-        super().__init__(data_dir=str(root), **kwargs)
+        self._root = root
+        super().__init__(data_dir=str(existing_dir(root, cache_dir)), **kwargs)
         self._load_data()
 
     def _load_data(self):
-        b = fetch_pol_insar_island(self.data_dir, estimator=self.estimator, **self._fetch)
+        b = fetch_pol_insar_island(self._root, estimator=self.estimator, **self._fetch)
+        self.data_dir = Path(b.root)
         if self.return_raw and b.processed_dir is None:
             raise ValueError("return_raw=True needs the preprocessed cells (keep != 'keep_covariance')")
         keep = finalize_labels(self, b.labels, b.groups, b.splits)
@@ -497,8 +509,11 @@ class PolInSARIslandDataset(BaseDataset):
         if self.return_raw:
             if not hasattr(self, "_raw"):
                 self._raw = np.load(Path(self._processed) / "raw.npy", mmap_mode="r")
-            raw = torch.from_numpy((np.asarray(self._raw[int(self.meta["proc_index"].iat[idx])])
-                                    * np.sqrt(self.scale)).astype(np.float32))
+                self._masks = np.load(Path(self._processed) / "masks.npy", mmap_mode="r")
+            k = int(self.meta["proc_index"].iat[idx])
+            cell, mask = np.asarray(self._raw[k]), np.asarray(self._masks[k])
+            x = cell[mask] if self.raw_layout == "pixels" else cell * mask[..., None]
+            raw = torch.from_numpy((x * np.sqrt(self.scale)).astype(np.float32))
         x = self._pack(cov, mean, raw)
         if self.transform is not None:
             x = self.transform(x)

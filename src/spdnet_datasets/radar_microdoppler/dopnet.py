@@ -102,7 +102,7 @@ def download_dopnet(cache_dir=None, archive=None):
                             size=ARCHIVE_SIZE)
     elif not (out / ".extracted").exists():
         zipped = download(ARCHIVE_URL, dest / "Gesture Data.zip", checksum=FILES[ARCHIVE_URL],
-                          algo="md5")
+                          algo="md5", size=ARCHIVE_SIZE)
         extract_archive(zipped, out)
         zipped.unlink()
     found = [d for d in [Path(out), *Path(out).rglob("*")] if (d / TEST_FILE).is_file()]

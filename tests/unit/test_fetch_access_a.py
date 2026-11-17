@@ -215,6 +215,7 @@ def test_hdm05_eth_download_conversion_and_idempotence(tmp_path, fake_net, monke
     archive = _eth_zip(tmp_path / "HDM05_SPDData.zip")
     monkeypatch.setattr(hdm05, "FILES", {
         hdm05.ETH_URL: serve(hdm05.ETH_URL, archive.read_bytes())})
+    monkeypatch.setattr(hdm05, "ETH_SIZE", archive.stat().st_size)
     cache = tmp_path / "cache"
     b = hdm05.fetch_hdm05(source="eth", cache_dir=cache)
     assert calls == [hdm05.ETH_URL] and b.covariances.shape == (30, 6, 6)
@@ -233,7 +234,6 @@ def test_hdm05_eth_download_conversion_and_idempotence(tmp_path, fake_net, monke
     with pytest.raises(ValueError, match="c93"):
         hdm05.fetch_hdm05(source="eth", cache_dir=cache, features="c31")
     # the zip given by hand: size and checksum checked, kept
-    monkeypatch.setattr(hdm05, "ETH_SIZE", archive.stat().st_size)
     c = hdm05.fetch_hdm05(source="eth", cache_dir=tmp_path / "c2", archive=archive)
     np.testing.assert_allclose(c.covariances, b.covariances)
     assert archive.exists() and len(calls) == 1
@@ -387,6 +387,7 @@ def test_dopnet_figshare_md5_extract_and_archive(tmp_path, fake_net, monkeypatch
     blob = archive.read_bytes()
     serve(dopnet.ARCHIVE_URL, blob)
     monkeypatch.setattr(dopnet, "FILES", {dopnet.ARCHIVE_URL: hashlib.md5(blob).hexdigest()})
+    monkeypatch.setattr(dopnet, "ARCHIVE_SIZE", len(blob))
     cache = tmp_path / "cache"
     b = dopnet.fetch_dopnet(tmp_path / "absent", cache, p=DOP_P, verify=None)
     ref = dopnet.fetch_dopnet(local, tmp_path / "local", p=DOP_P, verify=None)
@@ -396,7 +397,6 @@ def test_dopnet_figshare_md5_extract_and_archive(tmp_path, fake_net, monkeypatch
     dopnet.fetch_dopnet(tmp_path / "absent", cache, p=DOP_P, energy=0.9, verify=None)
     assert len(calls) == 1
     # archive: size and md5 checked, the user's zip is kept
-    monkeypatch.setattr(dopnet, "ARCHIVE_SIZE", len(blob))
     ds = dopnet.DopNetDataset(tmp_path / "absent", cache_dir=tmp_path / "c2", p=DOP_P,
                               archive=archive, verify=None, verbose=False)
     assert len(ds) == len(b.labels) and archive.exists() and len(calls) == 1

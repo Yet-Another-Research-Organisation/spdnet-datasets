@@ -99,7 +99,7 @@ from ..core.config import dataset_path, get_cache_dir
 from ..core.estimators import channel_mean
 from ..core.fetch import Bunch, verify_local
 from ..manager import DatasetManager
-from ..utils.sources import check_size, downloads_dir, extract_7z, find_root
+from ..utils.sources import downloads_dir, existing_dir, extract_7z, find_root
 from ._common import finalize_labels
 
 DOMAIN, NAME = "SAR", "ATRNet-STAR"
@@ -160,7 +160,7 @@ def _download_root(cache_dir, archive, representation, split):
                 raise FileNotFoundError(f"{given} holds no {split} folder nor {Path(name).name}.001")
     else:
         quoted = urllib.parse.quote(name)  # spaces and non-ASCII characters in the file name
-        vols = [check_size(hf_download(HF_REPO, f"{quoted}.{k:03d}", out / "hf", gated=True), size)
+        vols = [hf_download(HF_REPO, f"{quoted}.{k:03d}", out / "hf", gated=True, size=size)
                 for k, size in enumerate(sizes, start=1)]
         first = vols[0]
     if first is not None:
@@ -386,12 +386,14 @@ class ATRNetSTARDataset(BaseDataset):
         root = dataset_path(DOMAIN, NAME, data_dir)
         self.protocol, self.representation, self.slant_features = split, representation, slant_features
         self._fetch = {"cache_dir": cache_dir, "verify": verify, "val_size": val_size}
-        super().__init__(data_dir=str(root), **kwargs)
+        self._root = root
+        super().__init__(data_dir=str(existing_dir(root, cache_dir)), **kwargs)
         self._load_data()
 
     def _load_data(self):
-        b = fetch_atrnet_star(self.data_dir, split=self.protocol, representation=self.representation,
+        b = fetch_atrnet_star(self._root, split=self.protocol, representation=self.representation,
                               seed=self.seed, **self._fetch)
+        self.data_dir = Path(b.root)
         keep = finalize_labels(self, b.meta["label"].to_numpy(), b.meta["chip_id"].to_numpy(), b.splits)
         self.meta = b.meta.iloc[keep].reset_index(drop=True)
         self.n_empty = b.n_empty

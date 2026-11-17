@@ -236,14 +236,17 @@ def hf_token(interactive=None, required=True):
 
 
 def hf_download(repo_id: str, filename: str, dest_dir, *, revision="main", repo_type="dataset",
-                gated=False, checksum=None, algo="sha256", interactive=None) -> Path:
-    """Download one file of a Hugging Face repository (with a token if ``gated``)."""
+                gated=False, checksum=None, algo="sha256", interactive=None, size=None) -> Path:
+    """Download one file of a Hugging Face repository (with a token if ``gated``).
+
+    ``size``: expected size in bytes, see :func:`spdnet_datasets.core.fetch.download`.
+    """
     prefix = "datasets/" if repo_type == "dataset" else ""
     url = f"https://huggingface.co/{prefix}{repo_id}/resolve/{revision}/{filename}"
     token = hf_token(interactive, required=gated)
     headers = {"Authorization": f"Bearer {token}"} if token else None
     return download(url, Path(dest_dir) / filename, checksum=checksum, algo=algo,
-                    headers=headers)
+                    headers=headers, size=size)
 
 
 # --- Manual downloads -----------------------------------------------------------------------

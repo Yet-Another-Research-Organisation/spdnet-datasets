@@ -106,11 +106,15 @@ over pixel neighbourhoods. That choice is left to the user.
 | val | 275 | 10 % of the 17° chips (`val_size`), stratified by class |
 | test | 2 425 | 15° depression |
 
-The `groups` attribute holds the file stem (`HBxxxxx`). It is a file name, not
-a physical unit: the same stem appears in several classes (for example
-`HB03333` in BMP2, BTR60, BTR70 and T72). The group-size histogram below
-therefore says nothing about leakage. The right-hand panel shows group sizes
-of 1 to 6.
+`groups` is `None`: MSTAR SOC has no group that can separate the parts. The
+only physical unit, the vehicle (serial number `TargetSerNum` of the Phoenix
+headers), is one per class and the same at 17° and 15°: grouping by vehicle
+would group by class. The file stem (`HBxxxxx`) is a file name, not a physical
+unit: the same stem appears in several classes (for example `HB03333` in
+BMP2, BTR60, BTR70 and T72). The validation part is therefore a stratified
+draw of the 17° chips (`val_size`), not a grouped one. The right-hand panel
+of the figure below, drawn when `groups` held the file stems, only shows how
+often a stem repeats (1 to 6 times); it says nothing about leakage.
 
 ```{dataset-figure} mstar/split_schema
 ```

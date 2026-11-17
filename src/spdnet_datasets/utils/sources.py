@@ -1,7 +1,7 @@
 """Locate the files of a dataset: local copy, archive, download or manual source.
 
-Used by the ``fetch_<dataset>()`` functions of the hyperspectral and SAR
-modules on top of :mod:`spdnet_datasets.core.access` (which is not modified):
+Used by the ``fetch_<dataset>()`` functions and the dataset classes of the
+hyperspectral and SAR modules, on top of :mod:`spdnet_datasets.core.access`:
 
 - :func:`source_dir`: the order local copy -> ``archive=`` -> cache ->
   automatic download -> :func:`~spdnet_datasets.core.access.manual_source`;
@@ -25,6 +25,21 @@ SKIP_DIRS = ("__MACOSX",)
 def downloads_dir(name, cache_dir=None) -> Path:
     """``<cache_dir>/<name>/downloads``: downloads and extractions, outside the ``keep`` policy."""
     return Path(cache_dir or get_cache_dir()) / name / "downloads"
+
+
+def existing_dir(root, cache_dir=None) -> Path:
+    """``root`` if it exists, else the cache directory (created).
+
+    :class:`~spdnet_datasets.base.BaseDataset` needs an existing folder; without
+    a local copy, the dataset classes give it the cache, where their fetch
+    downloads (or finds) the sources, then set ``data_dir`` to ``bunch.root``.
+    """
+    root = Path(root)
+    if root.exists():
+        return root
+    cache = Path(cache_dir).expanduser() if cache_dir else get_cache_dir()
+    cache.mkdir(parents=True, exist_ok=True)
+    return cache
 
 
 def find_root(base, required, max_depth=4):
@@ -117,7 +132,11 @@ def expose_as(path, sub, parent):
 
 
 def check_size(path, size):
-    """Raise ``OSError`` if ``path`` does not have ``size`` bytes (``None``: no check)."""
+    """Raise ``OSError`` if ``path`` does not have ``size`` bytes (``None``: no check).
+
+    Guard for files given by the user (``archive=``); downloads are checked by
+    :func:`core.fetch.download` (``size=``) before they are renamed.
+    """
     if size is not None and Path(path).stat().st_size != size:
         raise OSError(f"{path}: {Path(path).stat().st_size} bytes, expected {size}; delete it and retry")
     return Path(path)
@@ -216,5 +235,5 @@ def extract_rar(archive, dest_dir) -> Path:
     return _finish(tmp, dest)
 
 
-__all__ = ["check_size", "downloads_dir", "expose_as", "extract_7z", "extract_rar", "find_root",
-           "source_dir"]
+__all__ = ["check_size", "downloads_dir", "existing_dir", "expose_as", "extract_7z", "extract_rar",
+           "find_root", "source_dir"]

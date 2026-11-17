@@ -57,7 +57,7 @@ from ..core.access import manual_source
 from ..core.config import dataset_path
 from ..core.fetch import Bunch, download
 from ..manager import DatasetManager
-from ..utils.sources import source_dir
+from ..utils.sources import existing_dir, source_dir
 from ._common import check_split_groups, finalize_labels, group_kfold_splits
 
 DOMAIN, NAME = "SAR", "FUSAR_Ship1.0"
@@ -76,7 +76,7 @@ EXPECTED = (f"{ZIP} ({ZIP_SIZE} bytes) from Google Drive "
 
 def _download(dest_dir):
     try:
-        return download(URL, dest_dir / ZIP, checksum=ZIP_SHA256)
+        return download(URL, dest_dir / ZIP, checksum=ZIP_SHA256, size=ZIP_SIZE)
     except OSError as exc:  # quota page instead of the file, network error...
         manual_source(NAME, page_url=PAGE, expected=f"{EXPECTED} (automatic download "
                       f"failed: {exc})", dest_dir=dest_dir)
@@ -164,6 +164,8 @@ class FUSARShipDataset(BaseDataset):
         Standardise each raw chip (mean 0, std 1).
     preload : bool
         Load every chip into memory at construction.
+    verify, cache_dir
+        See :func:`fetch_fusar_ship`.
     **kwargs
         :class:`~spdnet_datasets.base.BaseDataset` arguments; exactly one of
         ``return_raw`` / ``return_mean``.
@@ -173,20 +175,23 @@ class FUSARShipDataset(BaseDataset):
 
     def __init__(self, data_dir=None, *, class_level="basic", min_samples_per_class=30,
                  exclude_classes=None, image_size=224, standardize=True, preload=False,
-                 verify="size", **kwargs):
+                 verify="size", cache_dir=None, **kwargs):
         root = dataset_path(DOMAIN, NAME, data_dir)
         self.class_level, self.image_size, self.standardize = class_level, image_size, standardize
         self._fetch = {"class_level": class_level, "min_samples_per_class": min_samples_per_class,
-                       "exclude_classes": tuple(exclude_classes or ()), "verify": verify}
+                       "exclude_classes": tuple(exclude_classes or ()), "verify": verify,
+                       "cache_dir": cache_dir}
         self._cache = {}
-        super().__init__(data_dir=str(root), **kwargs)
+        self._root = root
+        super().__init__(data_dir=str(existing_dir(root, cache_dir)), **kwargs)
         self._load_data()
         if preload:
             for i in range(len(self)):
                 self._cache[i] = self._load(i)
 
     def _load_data(self):
-        b = fetch_fusar_ship(self.data_dir, seed=self.seed, **self._fetch)
+        b = fetch_fusar_ship(self._root, seed=self.seed, **self._fetch)
+        self.data_dir = Path(b.root)
         keep = finalize_labels(self, b.meta["label"].to_numpy(), b.meta["group"].to_numpy(), b.splits)
         check_split_groups(self.splits, self.groups)
         self.meta = b.meta.iloc[keep].reset_index(drop=True)
