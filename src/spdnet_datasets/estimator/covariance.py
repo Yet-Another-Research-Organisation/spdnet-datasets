@@ -2,10 +2,11 @@
 Covariance estimation methods for SPD matrices.
 """
 
+from typing import Literal
+
 import numpy as np
 import torch
 from sklearn.covariance import ledoit_wolf
-from typing import Literal
 
 
 class EstimateCovariance:
