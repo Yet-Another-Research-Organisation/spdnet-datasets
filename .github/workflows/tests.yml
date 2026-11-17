@@ -1,0 +1,66 @@
+name: Tests
+
+# Unit tests without any dataset (SPDNET_DATA_ROOT points nowhere), on the
+# supported Python versions, with coverage sent to Codecov. The tests that need
+# real data (`real_data`), Internet (`network`) or a long run (`slow`) are run
+# on the lab server, not here.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Unit tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # Codecov upload authenticated by OIDC: no token secret needed
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # CPU build of PyTorch: the tests never use a GPU
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[test,audio,sar,sits,radar,archives,moabb,nilearn]"
+          # Tyler / Student-t estimators (not on PyPI)
+          pip install "yetanotherspdnet @ git+https://github.com/Yet-Another-Research-Organisation/yetanotherspdnet"
+
+      - name: Run unit tests
+        env:
+          SPDNET_DATA_ROOT: /nonexistent
+          MPLBACKEND: Agg
+        run: >
+          pytest -m "not slow and not network and not real_data"
+          --cov=spdnet_datasets --cov-report=xml --cov-report=term
+
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.11' && !cancelled()
+        uses: codecov/codecov-action@v7
+        with:
+          files: coverage.xml
+          flags: unit
+          use_oidc: true
+          fail_ci_if_error: false

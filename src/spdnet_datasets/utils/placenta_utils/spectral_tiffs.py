@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2020, 2021, 2022 Joni Hyttinen, University of Eastern Finland
 #
 # Permission is hereby granted, free of charge, to any person obtaining
@@ -76,16 +75,18 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import Optional, Any
+from typing import Any
 
 import numpy as np
 from tifffile import TiffFile, TiffWriter
+from yaml import dump, load
 
-from yaml import load, dump
 try:
-    from yaml import CLoader as Loader, CDumper as Dumper
+    from yaml import CDumper as Dumper
+    from yaml import CLoader as Loader
 except ImportError:
-    from yaml import Loader as Loader, Dumper as Dumper
+    from yaml import Dumper as Dumper
+    from yaml import Loader as Loader
 
 
 def read_stiff(filename: str | Path, silent=False, rgb_only=False, normalize=True):
@@ -121,7 +122,7 @@ def read_stiff(filename: str | Path, silent=False, rgb_only=False, normalize=Tru
             # The older write_tiff writes it on all pages, though, so make
             # a note of it.
             tag = tiff.pages[band_page].tags.get(TIFFTAG_WAVELENGTHS)
-            tag_value = tag.value if tag else tuple()
+            tag_value = tag.value if tag else ()
             if tag_value:
                 if wavelengths is None:
                     wavelengths = tag_value
@@ -164,9 +165,9 @@ def read_stiff(filename: str | Path, silent=False, rgb_only=False, normalize=Tru
             wavelengths = range(0, len(tiff.pages) - 1 if rgb is not None else len(tiff.pages))
 
         if multiple_wavelength_lists and not silent:
-            warnings.warn(f'Spectral-Tiff "{filename}" contains duplicated wavelength lists!')
+            warnings.warn(f'Spectral-Tiff "{filename}" contains duplicated wavelength lists!', stacklevel=2)
         if multiple_metadata_fields and not silent:
-            warnings.warn(f'Spectral-Tiff "{filename}" contains duplicated metadata fields!')
+            warnings.warn(f'Spectral-Tiff "{filename}" contains duplicated metadata fields!', stacklevel=2)
 
         if not rgb_only:
             spim = tiff.asarray(key=range(first_band_page, len(tiff.pages)))
@@ -186,7 +187,7 @@ def read_stiff(filename: str | Path, silent=False, rgb_only=False, normalize=Tru
     return spim, np.array(wavelengths, 'float32'), rgb, metadata
 
 
-def write_stiff(filename: str, spim, wls, rgb: Optional[Any], metadata: str | dict = ''):
+def write_stiff(filename: str, spim, wls, rgb: Any | None, metadata: str | dict = ''):
     """
     Write a spectral image cube into a Spectral Tiff. A spectral tiff contains
     two custom tags to describe the data cube:
@@ -203,7 +204,7 @@ def write_stiff(filename: str, spim, wls, rgb: Optional[Any], metadata: str | di
     :param metadata:    a free-form metadata string or dictionary to be saved in the spectral tiff.
     """
     if wls.dtype != 'float32':
-        warnings.warn(f'Wavelength list dtype {wls.dtype} will be saved as float32. Precision may be lost.')
+        warnings.warn(f'Wavelength list dtype {wls.dtype} will be saved as float32. Precision may be lost.', stacklevel=2)
         wls = wls.astype('float32')
 
     if isinstance(metadata, dict) or isinstance(metadata, str):
@@ -226,7 +227,7 @@ def write_stiff(filename: str, spim, wls, rgb: Optional[Any], metadata: str | di
         raise TypeError(f'RGB preview image must have three channels! (ndim = {rgb.ndim} != 3)')
 
     if rgb is not None and rgb.dtype != 'uint8':
-        warnings.warn(f'RGB preview image is not a uint8 array (dtype: {rgb.dtype}).')
+        warnings.warn(f'RGB preview image is not a uint8 array (dtype: {rgb.dtype}).', stacklevel=2)
         if rgb.dtype == 'float':
             rgb = (rgb * (2**8-1)).astype('uint8')
         else:
@@ -261,7 +262,7 @@ def read_mtiff(filename):
                         mask: the boolean bitmap associated with the label.
     """
     TIFFTAG_MASK_LABEL = 65001
-    masks = dict()
+    masks = {}
     with TiffFile(filename) as tiff:
         for p in range(0, len(tiff.pages)):
             label_tag = tiff.pages[p].tags.get(TIFFTAG_MASK_LABEL)
