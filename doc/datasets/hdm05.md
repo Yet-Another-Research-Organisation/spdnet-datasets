@@ -27,6 +27,9 @@ SPDNet (a network for symmetric positive definite, SPD, matrices) uses 10 random
 bias. `HDM05Dataset` emits a `UserWarning`.
 ```
 
+```{dataset-preview} hdm05
+```
+
 ## Description and source
 
 HDM05 is a motion capture database of the University of Bonn: actions
@@ -74,16 +77,14 @@ Classes are named `"000"` to `"116"` (index in the SPDNet release; the action
 names are not in the copy). The class sizes are uneven: with `c93`, 1 to 31
 sequences per class; with `c31`, 4 to 52.
 
-```{raw} html
-<iframe src="../_static/figures/hdm05/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} hdm05/class_hist
 ```
 
 Without a mean output, the profile figure shows the mean log10 variance of the
 93 variables per class (first 8 classes): the three blocks of 31 values are the
 three coordinates.
 
-```{raw} html
-<iframe src="../_static/figures/hdm05/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} hdm05/class_means
 ```
 
 ## Covariance construction
@@ -105,9 +106,10 @@ symmetrised. With `normalize=True` (default), the covariances are multiplied
 by the scalar fitted on the training part (geometric mean of the eigenvalues
 = 1).
 
-```{raw} html
-<iframe src="../_static/figures/hdm05/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/hdm05/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} hdm05/cov_samples
+```
+
+```{dataset-figure} hdm05/eigen_spectrum
 ```
 
 ## Splits
@@ -120,8 +122,7 @@ sequences, so they are missing from the validation or test part of some
 folds. Groups are the sequences themselves (one group per sequence), so the
 right panel of the figure is trivial.
 
-```{raw} html
-<iframe src="../_static/figures/hdm05/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} hdm05/split_schema
 ```
 
 ## Leakage risks and measures
@@ -160,3 +161,12 @@ all31 = HDM05Dataset(subset=None, features="c31", max_classes=20)
   now gives normalised covariances.
 - Sequences with T < 186 are no longer kept with `c93`; use `c31` to keep all
   2 086 sequences.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/hdm05.md
+```
+````

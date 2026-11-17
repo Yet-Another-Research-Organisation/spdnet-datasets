@@ -17,6 +17,9 @@
   - {mod}`spdnet_datasets.sar.mstar` (`fetch_mstar`, `MSTARDataset`)
 ```
 
+```{dataset-preview} mstar
+```
+
 ## Description and source
 
 MSTAR (Moving and Stationary Target Acquisition and Recognition) is the public
@@ -66,9 +69,10 @@ all samples have the same shape. `source` selects the representation:
 - `"amplitude"`: (128, 128, 1) amplitude of the complex chip;
 - `"complex"`: (128, 128, 2) real and imaginary parts.
 
-```{raw} html
-<iframe src="../_static/figures/mstar/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/mstar/amplitude_hist.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} mstar/raw_samples
+```
+
+```{dataset-figure} mstar/amplitude_hist
 ```
 
 ## Classes
@@ -77,9 +81,10 @@ Ten vehicles: 2S1, BMP2, BRDM2, BTR60, BTR70, D7, T62, T72, ZIL131 and ZSU234.
 The classes are nearly balanced: 195 to 274 test chips per class. The second
 figure shows the distribution of the chip mean for each class.
 
-```{raw} html
-<iframe src="../_static/figures/mstar/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/mstar/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} mstar/class_hist
+```
+
+```{dataset-figure} mstar/class_means
 ```
 
 ## Covariance construction
@@ -111,8 +116,7 @@ draw of the 17° chips (`val_size`), not a grouped one. The right-hand panel
 of the figure below, drawn when `groups` held the file stems, only shows how
 often a stem repeats (1 to 6 times); it says nothing about leakage.
 
-```{raw} html
-<iframe src="../_static/figures/mstar/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} mstar/split_schema
 ```
 
 ## Leakage risks and measures
@@ -140,3 +144,12 @@ ds = MSTARDataset(source="jpg", crop=128, return_raw=True)
 x, y = ds[0]                         # (128, 128, 1) float32, class index
 train_idx = ds.splits["official"]["train"]
 ```
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/mstar.md
+```
+````

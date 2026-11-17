@@ -17,6 +17,9 @@
   - {mod}`spdnet_datasets.sar.fusar_ship` (`fetch_fusar_ship`, `FUSARShipDataset`; registry names `fusar_ship` and `fusar`)
 ```
 
+```{dataset-preview} fusar_ship
+```
+
 ## Description and source
 
 FUSAR-Ship 1.0 is a set of 8-bit amplitude chips cut from Gaofen-3 (GF-3)
@@ -68,9 +71,10 @@ The mean output is the mean of the resized `log1p` chip, computed before
 standardisation, which would make it zero. The figures show the standardised
 raw chips and the distribution of their values.
 
-```{raw} html
-<iframe src="../_static/figures/fusar_ship/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/fusar_ship/amplitude_hist.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} fusar_ship/raw_samples
+```
+
+```{dataset-figure} fusar_ship/amplitude_hist
 ```
 
 ## Classes
@@ -86,9 +90,10 @@ PortTender, SAR and WingInGrnd. That leaves 10 categories and 5 198 chips:
 Cargo and LawEnforce differ by a factor of 60, so use `balance="weights"` or a
 balanced metric.
 
-```{raw} html
-<iframe src="../_static/figures/fusar_ship/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/fusar_ship/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} fusar_ship/class_hist
+```
+
+```{dataset-figure} fusar_ship/class_means
 ```
 
 ## Covariance construction
@@ -113,8 +118,7 @@ The 5 198 chips form 3 871 groups. The splits `sgkf5_fold{k}` are
 (`check_split_groups`). `recommended` is fold 0: 3 118 train, 1 040
 validation, 1 040 test.
 
-```{raw} html
-<iframe src="../_static/figures/fusar_ship/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} fusar_ship/split_schema
 ```
 
 ## Leakage risks and measures
@@ -143,3 +147,12 @@ ds = FUSARShipDataset(return_raw=True, image_size=224)
 x, y = ds[0]                         # (224, 224, 1) float32
 parts = ds.splits["recommended"]     # train / val / test indices
 ```
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/fusar_ship.md
+```
+````

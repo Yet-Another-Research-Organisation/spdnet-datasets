@@ -19,6 +19,9 @@
   - `spdnet_datasets.audio.esc50` (`fetch_esc50`, `ESC50Dataset`, registry name `esc50`)
 ```
 
+```{dataset-preview} esc50
+```
+
 ## Description and source
 
 ESC-50 (Environmental Sound Classification, 50 classes) gathers 2 000 clips of
@@ -54,8 +57,7 @@ bytes in the `audio` column and decoded to float in [−1, 1]. The figure shows
 the preprocessed data the covariance is computed from: the 20 MFCC of each non-silent frame, as a (coefficient × frame)
 image.
 
-```{raw} html
-<iframe src="../_static/figures/esc50/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} esc50/raw_samples
 ```
 
 ## Classes
@@ -65,9 +67,10 @@ The 50 classes have 40 clips each before exclusion; 21 clips are excluded
 class in the train, validation and test parts of the official split with test
 fold 1. The second figure shows the mean MFCC profile of the first 8 classes.
 
-```{raw} html
-<iframe src="../_static/figures/esc50/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/esc50/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} esc50/class_hist
+```
+
+```{dataset-figure} esc50/class_means
 ```
 
 ## Covariance construction
@@ -106,9 +109,10 @@ With `normalize=True` (default) the covariances are multiplied by a scalar
 `s` fitted on the training part so that the geometric mean of their eigenvalues
 is 1; means and raw frames are multiplied by √s.
 
-```{raw} html
-<iframe src="../_static/figures/esc50/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/esc50/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} esc50/cov_samples
+```
+
+```{dataset-figure} esc50/eigen_spectrum
 ```
 
 ## Splits
@@ -127,8 +131,7 @@ shows the number of clips per recording. Its title says that groups never
 cross splits: for ESC-50 this holds except for the 4 recordings that span two
 official folds (see the next section).
 
-```{raw} html
-<iframe src="../_static/figures/esc50/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} esc50/split_schema
 ```
 
 ## Leakage risks and measures
@@ -167,3 +170,12 @@ ds_test = ESC50Dataset(subset="test", fold=1, features="logmel")  # 64x64 log-me
 - The former `series_audio.esc50_series` (branch `timeseries`) builds a series
   of Ledoit-Wolf covariances per 1 s window; this loader gives one covariance
   per clip.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/esc50.md
+```
+````

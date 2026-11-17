@@ -1,0 +1,1 @@
+- S. Hor, S. Yang, J. Choi and A. Arbabian, "MVDoppler: Unleashing the Power of Multi-View Doppler for MicroMotion-based Gait Classification", *Advances in Neural Information Processing Systems 36* (NeurIPS 2023 Datasets and Benchmarks), pp. 58064–58074. doi:[10.52202/075280-2530](https://doi.org/10.52202/075280-2530)

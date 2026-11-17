@@ -1,0 +1,2 @@
+- T. D. Ross, S. W. Worrell, V. J. Velten, J. C. Mossing and M. L. Bryant, "Standard SAR ATR evaluation experiments using the MSTAR public release data set", *Proc. SPIE 3370, Algorithms for Synthetic Aperture Radar Imagery V*, 1998, pp. 566–573. doi:[10.1117/12.321859](https://doi.org/10.1117/12.321859)
+- E. R. Keydel, S. W. Lee and J. T. Moore, "MSTAR extended operating conditions: a tutorial", *Proc. SPIE 2757*, 1996, pp. 228–242. doi:[10.1117/12.242059](https://doi.org/10.1117/12.242059)

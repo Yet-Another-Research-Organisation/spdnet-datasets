@@ -19,6 +19,9 @@
   - `spdnet_datasets.hyperspectral.placenta` (`fetch_placenta`, `PlacentaDataset`, registry name `placenta`)
 ```
 
+```{dataset-preview} placenta
+```
+
 ## Description and source
 
 The dataset holds 101 hyperspectral images of 1 024 × 1 024 pixels of four
@@ -70,8 +73,7 @@ images P007–P087 only:
 The raw output is the 24 × 24 × 37 window; the figure shows its band-mean
 image.
 
-```{raw} html
-<iframe src="../_static/figures/placenta/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} placenta/raw_samples
 ```
 
 ## Classes
@@ -80,9 +82,10 @@ Stroma 56 110, Artery 10 142, Vein 7 308, Umbilical 3 188 and Suture 114
 windows (imbalance ≈ 490). The mean spectra show a step near 645 nm in every
 class, probably a filter change of the sensor.
 
-```{raw} html
-<iframe src="../_static/figures/placenta/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/placenta/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} placenta/class_hist
+```
+
+```{dataset-figure} placenta/class_means
 ```
 
 ## Covariance construction
@@ -100,9 +103,10 @@ class, probably a filter change of the sensor.
    (geometric mean of the eigenvalues = 1). Means and raw windows are
    multiplied by √s.
 
-```{raw} html
-<iframe src="../_static/figures/placenta/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/placenta/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} placenta/cov_samples
+```
+
+```{dataset-figure} placenta/eigen_spectrum
 ```
 
 ## Splits
@@ -117,8 +121,7 @@ The article describes no classification split. The loader offers two:
   test on the 34 ICG images (30 559). There is no validation part. This
   measures transfer between dyes, not between subjects.
 
-```{raw} html
-<iframe src="../_static/figures/placenta/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} placenta/split_schema
 ```
 
 ## Leakage risks and measures
@@ -157,3 +160,12 @@ dye = PlacentaDataset(split="dye_transfer")
   default.
 - Use `estimator=`. `cov_method=...` is silently absorbed by `**kwargs` and
   gives the SCM.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/placenta.md
+```
+````

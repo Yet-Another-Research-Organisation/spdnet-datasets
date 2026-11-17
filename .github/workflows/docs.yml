@@ -54,13 +54,15 @@ jobs:
           python -m pip install --upgrade pip
           # CPU build of PyTorch: the documentation never uses a GPU
           pip install torch --index-url https://download.pytorch.org/whl/cpu
+          # Sphinx, pydata-sphinx-theme, sphinx-design, sphinx-gallery, MyST (extra "docs")
           pip install -e ".[docs]"
           # yetanotherspdnet (Tyler / Student-t estimators of the tutorials, not on PyPI)
           pip install -r doc/requirements.txt
 
       - name: Build Sphinx documentation (strict)
         env:
-          # no dataset in the CI: only the tutorials (synthetic data) are executed
+          # no dataset in the CI: only the tutorials (synthetic data) are executed; the
+          # dataset figures and previews are precomputed files under doc/_static/
           SPDNET_DATA_ROOT: /nonexistent
           MPLBACKEND: Agg
         run: make -C doc html

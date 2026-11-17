@@ -1,91 +1,278 @@
-/* narrower parameter lists, tables that scroll */
-.dualpath-table table { font-size: 0.88em; }
+/* ===========================================================================
+   spdnet-datasets: pydata-sphinx-theme customisation
+   - brand colour: the orange of the logo;
+   - one accent per section (Getting started, User guide, Datasets, Examples,
+     API, References), keyed off <body data-section> (doc/_templates/layout.html).
+     Mark colours (borders, icons) are the dataviz categorical slots, checked for
+     colour-vision deficiencies; text colours are darker (light mode) or lighter
+     (dark mode) steps of the same hues with a contrast of at least 4.5:1;
+   - dark mode is the default (conf.py, html_context["default_mode"]).
+   ========================================================================= */
+
+html[data-theme="light"] {
+  --pst-color-primary: #be542a;          /* logo orange, 4.7:1 on white */
+  --pst-color-secondary: #2974d0;
+  --pst-color-link: #b04d24;
+  --pst-color-link-hover: #2974d0;
+  --spd-surface-raised: #f7f6f3;
+  --spd-card-bg: #ffffff;
+  --spd-border: #e3e1dc;
+  --spd-shadow: 0 1px 2px rgba(20, 20, 20, 0.06), 0 2px 8px rgba(20, 20, 20, 0.05);
+  --spd-shadow-hover: 0 8px 24px rgba(20, 20, 20, 0.12);
+  --spd-figure-surface: #ffffff;
+  --spd-hero-glow: rgba(235, 104, 52, 0.10);
+
+  --spd-start: #eb6834;    --spd-start-text: #be542a;
+  --spd-guide: #2a78d6;    --spd-guide-text: #2974d0;
+  --spd-datasets: #1baf7a; --spd-datasets-text: #15855d;
+  --spd-examples: #6250d6; --spd-examples-text: #6250d6;
+  --spd-api: #e87ba4;      --spd-api-text: #ac5b79;
+  --spd-refs: #eda100;     --spd-refs-text: #9c6a00;
+}
+
+html[data-theme="dark"] {
+  --pst-color-primary: #f0995e;          /* lighter logo orange on the dark page */
+  --pst-color-secondary: #6da7ec;
+  --pst-color-link: #f0995e;
+  --pst-color-link-hover: #86b6ef;
+  --spd-surface-raised: #1b2028;
+  --spd-card-bg: #1b2028;
+  --spd-border: #2c333d;
+  --spd-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --spd-shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.55);
+  --spd-figure-surface: #1a1a19;
+  --spd-hero-glow: rgba(240, 153, 94, 0.12);
+
+  --spd-start: #d95926;    --spd-start-text: #f0995e;
+  --spd-guide: #3987e5;    --spd-guide-text: #86b6ef;
+  --spd-datasets: #199e70; --spd-datasets-text: #4cc597;
+  --spd-examples: #9085e9; --spd-examples-text: #aea6f0;
+  --spd-api: #d55181;      --spd-api-text: #eb8db0;
+  --spd-refs: #c98500;     --spd-refs-text: #e5ad3f;
+}
+
+/* Accent of the current section (default: brand orange) */
+body { --spd-accent: var(--spd-start); --spd-accent-text: var(--spd-start-text); }
+body[data-section="guide"] { --spd-accent: var(--spd-guide); --spd-accent-text: var(--spd-guide-text); }
+body[data-section="datasets"] { --spd-accent: var(--spd-datasets); --spd-accent-text: var(--spd-datasets-text); }
+body[data-section="auto_examples"] { --spd-accent: var(--spd-examples); --spd-accent-text: var(--spd-examples-text); }
+body[data-section="reference"] { --spd-accent: var(--spd-api); --spd-accent-text: var(--spd-api-text); }
+body[data-section="references"] { --spd-accent: var(--spd-refs); --spd-accent-text: var(--spd-refs-text); }
+
+/* ---------------------------------------------------------------------------
+   Typography and headings
+   ------------------------------------------------------------------------- */
+.bd-article { line-height: 1.65; }
+.bd-article h1 {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding-bottom: 0.35rem;
+  border-bottom: 3px solid var(--spd-accent);
+  margin-bottom: 1.4rem;
+}
+.bd-article h2 {
+  margin-top: 2.6rem;
+  padding-left: 0.7rem;
+  border-left: 4px solid var(--spd-accent);
+  font-weight: 650;
+}
+.bd-article h3 { margin-top: 1.8rem; color: var(--spd-accent-text); }
+/* the landing page has its own hero */
+body[data-section="index"] .bd-article h1 { border-bottom: 0; }
+body[data-section="index"] .bd-article h2 { border-left: 0; padding-left: 0; text-align: center; margin-top: 3rem; }
+
+/* navbar: current section underlined with its accent */
+.bd-header .navbar-nav li.current > .nav-link,
+.bd-header .navbar-nav li.active > .nav-link {
+  color: var(--spd-accent-text);
+  border-bottom: 3px solid var(--spd-accent);
+}
+.bd-header .navbar-nav li a.nav-link:hover { color: var(--spd-accent-text); }
+.navbar-brand .title { font-weight: 700; letter-spacing: -0.01em; }
+.navbar-brand img.logo__image { height: 2.2rem; }
+
+/* left sidebar: active page in the section accent */
+.bd-sidebar-primary li.active > a,
+.bd-sidebar-primary li.current > a {
+  color: var(--spd-accent-text);
+  box-shadow: inset 3px 0 0 var(--spd-accent);
+}
+
+/* tables: compact */
+.bd-article table { font-size: 0.92em; }
 .dualpath-table table td:nth-child(3) { min-width: 18em; }
 dl.py.class > dt, dl.py.function > dt { font-size: 0.95em; }
-.dataset-catalogue table { font-size: 0.9em; }
+.dataset-catalogue table { font-size: 0.88em; }
 .dataset-catalogue table td:nth-child(3) { min-width: 16em; }
-
-/* Plotly figures embedded as static HTML (doc/tools/make_figures.py) */
-iframe.plotly-figure {
-  width: 100%;
-  height: 460px;
-  border: 0;
-}
-
-/* The figures are drawn on a light surface (dataviz light palette): keep that
-   surface in dark mode instead of showing dark ink on a dark page. */
-iframe.plotly-figure,
-.sphx-glr-single-img,
-.sphx-glr-multi-img {
-  background: #ffffff;
-  border-radius: 8px;
-}
+.bd-article table th.stub { color: var(--spd-accent-text); }
 
 /* ---------------------------------------------------------------------------
-   Landing page cards (sphinx-design)
+   Cards and tiles (sphinx-design)
    ------------------------------------------------------------------------- */
-.landing-cards .sd-card {
-  border: 1px solid var(--color-background-border);
-  border-radius: 10px;
-  background: var(--color-background-primary);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+.sd-card {
+  border: 1px solid var(--spd-border) !important;
+  border-radius: 12px;
+  background: var(--spd-card-bg);
+  box-shadow: var(--spd-shadow) !important;
   transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+  overflow: hidden;
 }
-.landing-cards .sd-card:hover {
-  border-color: var(--color-brand-primary);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+.sd-card.sd-card-hover:hover {
+  box-shadow: var(--spd-shadow-hover) !important;
   transform: translateY(-2px);
+  border-color: var(--spd-accent) !important;
 }
-.landing-cards .sd-card-title {
-  color: var(--color-brand-content);
-  font-weight: 600;
+.sd-card .sd-card-title { font-weight: 650; color: var(--pst-color-text-base); }
+.sd-card .sd-card-footer { border-top: 1px solid var(--spd-border); background: transparent; }
+.sd-card-img-top {
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--spd-figure-surface);
+  border-bottom: 1px solid var(--spd-border);
 }
 
+/* Section tiles: coloured top edge, title and icon in the section colour */
+.tile .sd-card { border-top: 4px solid var(--tile) !important; }
+.tile .sd-card-title, .tile .sd-card-title .sd-octicon { color: var(--tile-text); fill: var(--tile-text); }
+.tile .sd-card.sd-card-hover:hover { border-color: var(--tile) !important; }
+.tile-start    { --tile: var(--spd-start);    --tile-text: var(--spd-start-text); }
+.tile-guide    { --tile: var(--spd-guide);    --tile-text: var(--spd-guide-text); }
+.tile-datasets { --tile: var(--spd-datasets); --tile-text: var(--spd-datasets-text); }
+.tile-examples { --tile: var(--spd-examples); --tile-text: var(--spd-examples-text); }
+.tile-api      { --tile: var(--spd-api);      --tile-text: var(--spd-api-text); }
+.tile-refs     { --tile: var(--spd-refs);     --tile-text: var(--spd-refs-text); }
+.tile-here     { --tile: var(--spd-accent);   --tile-text: var(--spd-accent-text); }
+.tile .sd-card-title .sd-octicon { margin-right: 0.45rem; vertical-align: -0.15em; }
+.tile .sd-card-text { color: var(--pst-color-text-muted); font-size: 0.94em; }
+
+/* Dataset tiles: thumbnail, name, one line, badges */
+.dataset-tiles .sd-card-title { font-size: 1.02rem; margin-bottom: 0.3rem; }
+.dataset-tiles .sd-card-body { padding: 0.75rem 0.9rem 0.9rem; }
+.dataset-tiles .sd-card-text { font-size: 0.88em; color: var(--pst-color-text-muted); margin-bottom: 0.4rem; }
+.dataset-tiles .sd-badge { font-weight: 500; font-size: 0.72em; }
+
 /* ---------------------------------------------------------------------------
-   Example gallery (sphinx-gallery) in the Furo palette, light and dark
+   Landing page
    ------------------------------------------------------------------------- */
-:root, body[data-theme] {
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 2rem;
+  align-items: center;
+  padding: 1.5rem 0 1rem;
+  background: radial-gradient(ellipse at 85% 40%, var(--spd-hero-glow), transparent 60%);
+}
+.hero-logo img { width: 100%; max-width: 220px; height: auto; }
+.hero .hero-title { font-size: 2.6rem; font-weight: 750; letter-spacing: -0.02em; margin: 0 0 0.4rem; line-height: 1.15; }
+.hero .tagline { font-size: 1.18rem; color: var(--pst-color-text-muted); margin: 0 0 1.2rem; max-width: 40rem; }
+.hero .sd-btn { margin: 0 0.5rem 0.5rem 0; border-radius: 8px; font-weight: 600; }
+@media (max-width: 720px) {
+  .hero { grid-template-columns: 1fr; }
+  .hero-logo { order: -1; }
+  .hero-logo img { max-width: 120px; }
+  .hero .hero-title { font-size: 2rem; }
+}
+.features .sd-card { background: var(--spd-surface-raised); box-shadow: none !important; }
+.features .sd-card-title { font-size: 0.98rem; }
+.features .sd-card-title .sd-octicon { color: var(--pst-color-primary); fill: var(--pst-color-primary); margin-right: 0.4rem; vertical-align: -0.15em; }
+.features .sd-card-text { font-size: 0.92em; color: var(--pst-color-text-muted); }
+
+/* ---------------------------------------------------------------------------
+   Figures: fixed images (light and dark variants) and Plotly divs
+   ------------------------------------------------------------------------- */
+.spd-figure { margin: 1.2rem 0 1.6rem; }
+.spd-figure img {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  border: 1px solid var(--spd-border);
+}
+.spd-figure figcaption, .spd-plotly figcaption {
+  font-size: 0.88em;
+  color: var(--pst-color-text-muted);
+  margin-top: 0.35rem;
+}
+.spd-plotly { margin: 1.2rem 0 1.6rem; }
+.spd-plotly-div {
+  width: 100%;
+  height: 440px;
+  border-radius: 10px;
+  border: 1px solid var(--spd-border);
+  background: var(--spd-figure-surface);
+  overflow: hidden;
+}
+.spd-plotly-div:empty::before {
+  content: "Interactive figure: loading…";
+  display: block;
+  padding: 1rem;
+  color: var(--pst-color-text-muted);
+  font-size: 0.9em;
+}
+html[data-theme="dark"] .spd-figure img.only-light,
+html[data-theme="light"] .spd-figure img.only-dark { display: none; }
+
+/* pydata gives every image a white background in dark mode; ours are drawn for
+   their surface (logo with transparency, thumbnails, light/dark figure pairs) */
+html[data-theme="dark"] .bd-content .hero-logo img,
+html[data-theme="dark"] .bd-content img.sd-card-img-top,
+html[data-theme="dark"] .bd-content .sphx-glr-thumbcontainer img {
+  background-color: var(--spd-figure-surface);
+}
+html[data-theme="dark"] .bd-content .hero-logo img { background-color: transparent; }
+
+/* landing page: title hidden (the hero shows it), buttons on one line */
+body[data-section="index"] .bd-article > section > h1 {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);
+}
+.hero-buttons { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 0.4rem 0 1.4rem; }
+.hero-buttons p { margin: 0; }
+.hero .hero-sub { font-size: 1.45rem; font-weight: 600; margin: 0 0 0.6rem; color: var(--pst-color-text-base); }
+
+/* sphinx-gallery output images are matplotlib figures on white */
+.sphx-glr-single-img, .sphx-glr-multi-img { background: #ffffff; border-radius: 8px; }
+
+/* ---------------------------------------------------------------------------
+   Example gallery (sphinx-gallery) in the pydata palette, light and dark
+   ------------------------------------------------------------------------- */
+html[data-theme] {
   --sg-thumb-box-shadow-color: rgba(0, 0, 0, 0.08);
-  --sg-thumb-hover-border: var(--color-brand-primary);
-  --sg-script-out: var(--color-foreground-secondary);
-  --sg-script-pre: var(--color-code-background);
-  --sg-download-a-background-color: var(--color-background-secondary);
+  --sg-thumb-hover-border: var(--spd-examples);
+  --sg-script-out: var(--pst-color-text-muted);
+  --sg-download-a-background-color: var(--pst-color-surface);
   --sg-download-a-background-image: none;
-  --sg-download-a-border-color: 1px solid var(--color-background-border);
-  --sg-download-a-color: var(--color-brand-content);
-  --sg-download-a-hover-background-color: var(--color-background-hover);
+  --sg-download-a-border-color: 1px solid var(--spd-border);
+  --sg-download-a-color: var(--pst-color-link);
+  --sg-download-a-hover-background-color: var(--spd-surface-raised);
   --sg-download-a-hover-box-shadow-1: transparent;
   --sg-download-a-hover-box-shadow-2: rgba(0, 0, 0, 0.12);
 }
 .sphx-glr-thumbnails {
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 18px;
 }
 .sphx-glr-thumbcontainer {
-  border: 1px solid var(--color-background-border);
-  border-radius: 10px;
-  background: var(--color-background-primary);
-  box-shadow: 0 1px 3px var(--sg-thumb-box-shadow-color);
+  border: 1px solid var(--spd-border);
+  border-top: 4px solid var(--spd-examples);
+  border-radius: 12px;
+  background: var(--spd-card-bg);
+  box-shadow: var(--spd-shadow);
   padding: 10px 10px 12px;
-  transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
 .sphx-glr-thumbcontainer:hover {
-  border-color: var(--color-brand-primary);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+  border-color: var(--spd-examples);
+  box-shadow: var(--spd-shadow-hover);
   transform: translateY(-2px);
 }
 .sphx-glr-thumbcontainer img {
   max-width: 100%;
-  max-height: 133px;
-  border-radius: 6px;
-  background: #ffffff;
+  max-height: 140px;
+  border-radius: 8px;
 }
 .sphx-glr-thumbnail-title {
-  color: var(--color-foreground-primary);
+  color: var(--pst-color-text-base);
   font-size: 0.92em;
   font-weight: 600;
   line-height: 1.3;
 }
-.sphx-glr-download a {
-  border-radius: 6px;
-}
+.sphx-glr-download a { border-radius: 6px; }

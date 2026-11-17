@@ -1,0 +1,2 @@
+- B. Niu, Q. Feng, B. Chen, C. Ou *et al.*, "HSI-TransUNet: A transformer based semantic segmentation model for crop mapping from UAV hyperspectral imagery", *Computers and Electronics in Agriculture* 201, 2022, 107297. doi:[10.1016/j.compag.2022.107297](https://doi.org/10.1016/j.compag.2022.107297)
+- Data: "UAV-HSI-Crop-Dataset", Science Data Bank, 2022. doi:[10.57760/sciencedb.01898](https://doi.org/10.57760/sciencedb.01898)

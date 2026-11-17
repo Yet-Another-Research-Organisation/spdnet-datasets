@@ -54,8 +54,9 @@ moabb = ["moabb>=1.7.2"]
 # nilearn adapter (spdnet_datasets.nilearn), tested with nilearn 0.14.1
 nilearn = ["nilearn>=0.14.1"]
 dev = ["ruff>=0.1.0", "pre-commit>=3.4.0"]
-docs = ["sphinx>=7.2.0", "myst-parser>=2.0.0", "furo>=2024.8.6", "sphinx-copybutton>=0.5.0",
-        "sphinx-design>=0.6.0", "sphinx-gallery>=0.17.0", "matplotlib>=3.7"]
+docs = ["sphinx>=7.2.0", "myst-parser>=2.0.0", "pydata-sphinx-theme>=0.16",
+        "sphinx-copybutton>=0.5.0", "sphinx-design>=0.6.0", "sphinx-gallery>=0.17.0",
+        "matplotlib>=3.7"]
 
 [project.urls]
 Repository = "https://github.com/Yet-Another-Research-Organisation/spdnet-datasets"

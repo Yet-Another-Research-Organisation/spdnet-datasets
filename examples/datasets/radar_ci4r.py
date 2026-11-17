@@ -23,7 +23,7 @@ from spdnet_datasets import create_dataloaders
 from spdnet_datasets.core.splits import assert_no_leakage
 from spdnet_datasets.radar_microdoppler.ci4r import CI4RDataset
 
-# sphinx_gallery_thumbnail_path = "_static/thumbnails/ci4r.png"
+# sphinx_gallery_thumbnail_path = "_static/previews/ci4r/thumb.png"
 ds = CI4RDataset(mode="77GHz", fold=0)
 cov, y = ds[0]
 print(len(ds), "spectrograms,", len(ds.classes), "activities; cov", tuple(cov.shape))
@@ -33,20 +33,18 @@ print(len(ds), "spectrograms,", len(ds.classes), "activities; cov", tuple(cov.sh
 # -----------------------
 # A few spectrograms (time x Doppler bin), then the class counts per split.
 #
-# .. raw:: html
+# .. dataset-figure:: ci4r_77ghz/raw_samples
 #
-#    <iframe src="../../_static/figures/ci4r_77ghz/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
-#    <iframe src="../../_static/figures/ci4r_77ghz/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
+# .. dataset-figure:: ci4r_77ghz/class_hist
 
 # %%
 # Covariance matrices
 # -------------------
 # Covariances between Doppler bins, and the spread of their eigenvalues.
 #
-# .. raw:: html
+# .. dataset-figure:: ci4r_77ghz/cov_samples
 #
-#    <iframe src="../../_static/figures/ci4r_77ghz/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-#    <iframe src="../../_static/figures/ci4r_77ghz/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+# .. dataset-figure:: ci4r_77ghz/eigen_spectrum
 
 # %%
 # Splitting the data
@@ -62,6 +60,4 @@ for k in range(4):
 train, val, test = create_dataloaders(ds, split="fold0", batch_size=16, num_workers=0)
 
 # %%
-# .. raw:: html
-#
-#    <iframe src="../../_static/figures/ci4r_77ghz/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+# .. dataset-figure:: ci4r_77ghz/split_schema

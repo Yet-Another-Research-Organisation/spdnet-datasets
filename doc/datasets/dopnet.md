@@ -19,6 +19,9 @@
   - `spdnet_datasets.radar_microdoppler.dopnet` (`fetch_dopnet`, `DopNetDataset`, registry name `dopnet`)
 ```
 
+```{dataset-preview} dopnet
+```
+
 ## Description and source
 
 Dop-NET is a micro-Doppler radar data challenge: complex spectrograms of 4 hand
@@ -62,8 +65,7 @@ Class indices of the dataset follow the alphabetical order
 order. The figure shows the preprocessed (frame × 48) log10 band power of four
 gestures.
 
-```{raw} html
-<iframe src="../_static/figures/dopnet/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} dopnet/raw_samples
 ```
 
 ## Classes
@@ -74,9 +76,10 @@ deduplication and the T ≥ 96 rule, 451 of the 1 000 Click gestures remain.
 Gesture durations differ by class: median T of the kept gestures is 131
 (Click), 118 (Pinch), 241 (Swipe) and 209 (Wave) frames.
 
-```{raw} html
-<iframe src="../_static/figures/dopnet/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/dopnet/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} dopnet/class_hist
+```
+
+```{dataset-figure} dopnet/class_means
 ```
 
 ## Covariance construction
@@ -99,9 +102,10 @@ With `normalize=True` (default), the covariances are multiplied by the scalar
 s fitted on the training part of the chosen split (geometric mean of the
 eigenvalues = 1), the means and raw data by √s.
 
-```{raw} html
-<iframe src="../_static/figures/dopnet/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/dopnet/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} dopnet/cov_samples
+```
+
+```{dataset-figure} dopnet/eigen_spectrum
 ```
 
 ## Splits
@@ -119,8 +123,7 @@ eigenvalues = 1), the means and raw data by √s.
 
 Validation parts are empty. Groups are persons. The figures show `official`.
 
-```{raw} html
-<iframe src="../_static/figures/dopnet/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} dopnet/split_schema
 ```
 
 ## Leakage risks and measures
@@ -164,3 +167,12 @@ lopo = DopNetDataset(split="recommended", fold=2)       # test = person C
 - Duplicates are removed and gestures with T < 96 are rejected (2 145
   gestures instead of 3 076).
 - `scaling_factor` is replaced by `normalize=True`.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/dopnet.md
+```
+````

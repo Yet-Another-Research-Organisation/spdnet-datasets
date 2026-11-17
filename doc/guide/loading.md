@@ -9,7 +9,7 @@ returns `(train_loader, val_loader, test_loader, num_classes)`.
 
 The keys are grouped by role. Keys that belong to neither the split nor the
 loaders are passed to the dataset constructor, so every dataset-specific
-option ({doc}`datasets`) goes in the same dictionary.
+option ({doc}`/datasets/catalogue`) goes in the same dictionary.
 
 | Role | Key | Default | Meaning |
 |---|---|---|---|

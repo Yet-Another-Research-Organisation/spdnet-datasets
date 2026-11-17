@@ -19,6 +19,9 @@
   - `spdnet_datasets.radar_microdoppler.ci4r` (`fetch_ci4r`, `CI4RDataset`, registry name `ci4r`)
 ```
 
+```{dataset-preview} ci4r
+```
+
 ## Description and source
 
 CI4R-MULTI3 is a dataset of the Laboratory of Computational Intelligence for
@@ -127,13 +130,22 @@ the split at least as strict as a split by date.
 
 ## 77 GHz mode
 
-```{raw} html
-<iframe src="../_static/figures/ci4r_77ghz/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/ci4r_77ghz/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/ci4r_77ghz/class_means.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/ci4r_77ghz/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/ci4r_77ghz/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/ci4r_77ghz/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} ci4r_77ghz/raw_samples
+```
+
+```{dataset-figure} ci4r_77ghz/class_hist
+```
+
+```{dataset-figure} ci4r_77ghz/class_means
+```
+
+```{dataset-figure} ci4r_77ghz/cov_samples
+```
+
+```{dataset-figure} ci4r_77ghz/eigen_spectrum
+```
+
+```{dataset-figure} ci4r_77ghz/split_schema
 ```
 
 The class histogram shows `fold0` (test = participant 29). The 645
@@ -143,13 +155,22 @@ decimated to 400 columns.
 
 ## Xethru mode
 
-```{raw} html
-<iframe src="../_static/figures/ci4r_xethru/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/ci4r_xethru/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/ci4r_xethru/class_means.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/ci4r_xethru/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/ci4r_xethru/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/ci4r_xethru/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} ci4r_xethru/raw_samples
+```
+
+```{dataset-figure} ci4r_xethru/class_hist
+```
+
+```{dataset-figure} ci4r_xethru/class_means
+```
+
+```{dataset-figure} ci4r_xethru/cov_samples
+```
+
+```{dataset-figure} ci4r_xethru/eigen_spectrum
+```
+
+```{dataset-figure} ci4r_xethru/split_schema
 ```
 
 The class histogram shows `fold0` (test = participant 30). The 633
@@ -176,3 +197,12 @@ xe = CI4RDataset(mode="xethru", return_raw=True)       # Ledoit-Wolf 32x32 by de
 - `scaling_factor` is replaced by `normalize=True`.
 - `subset=None` is the default: the instance holds every sample and
   `dataset.splits` indexes it.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/ci4r.md
+```
+````

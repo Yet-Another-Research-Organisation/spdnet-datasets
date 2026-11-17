@@ -17,6 +17,9 @@
   - {mod}`spdnet_datasets.sits.pastis_r` (`fetch_pastis_r`, `PastisRDataset`)
 ```
 
+```{dataset-preview} pastis_r
+```
+
 ## Description and source
 
 PASTIS-R contains 2 433 patches of 128 × 128 pixels at 10 m. The patches come
@@ -70,8 +73,7 @@ The figure shows four parcels of scenario C as returned by `return_raw=True`.
 Each column is one pixel and each row one of the 16 standardised channels.
 Parcels have irregular shapes, so `n` changes from one parcel to the next.
 
-```{raw} html
-<iframe src="../_static/figures/pastis_r/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} pastis_r/raw_samples
 ```
 
 ## Classes
@@ -81,9 +83,10 @@ Background (0) and void (19) are dropped, which leaves 18 crop classes. Meadow
 is by far the largest class and potatoes the smallest. The figures below are
 for scenario C (`official` split).
 
-```{raw} html
-<iframe src="../_static/figures/pastis_r/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/pastis_r/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} pastis_r/class_hist
+```
+
+```{dataset-figure} pastis_r/class_means
 ```
 
 ## Covariance construction
@@ -153,9 +156,10 @@ signed gaps (S1 − S2, in days) of each parcel are in `dataset.meta`
 full tables are written to the processed cache (`date_gaps.csv`,
 `gap_histogram.csv`).
 
-```{raw} html
-<iframe src="../_static/figures/pastis_r/date_gaps.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/pastis_r/date_timeline.html" class="plotly-figure" style="height:640px" loading="lazy"></iframe>
+```{dataset-figure} pastis_r/date_gaps
+```
+
+```{dataset-figure} pastis_r/date_timeline
 ```
 
 **Rejections** (default options). Of the 2 433 patches, 15 are cloudy for
@@ -185,9 +189,10 @@ B03, B04 and B08, which explains the high value. Numerically singular estimates 
 are excluded, as counted above. `estimator="ledoit_wolf"` gives better
 conditioned matrices.
 
-```{raw} html
-<iframe src="../_static/figures/pastis_r/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/pastis_r/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} pastis_r/cov_samples
+```
+
+```{dataset-figure} pastis_r/eigen_spectrum
 ```
 
 ## Splits
@@ -203,8 +208,7 @@ patches. The loader applies them by patch:
 The group of a sample is its patch. `make_splits` checks with
 `assert_no_leakage` that train, validation and test never share a patch.
 
-```{raw} html
-<iframe src="../_static/figures/pastis_r/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} pastis_r/split_schema
 ```
 
 ## Leakage risks and measures
@@ -239,3 +243,12 @@ ds.meta[["s2_dates", "gap_s1a", "gap_s1d"]].head()
 # raw pixels: n varies, so use batch_size=1 or a custom collate_fn
 ds_raw = PastisRDataset(scenario="E", return_raw=True)
 ```
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/pastis_r.md
+```
+````

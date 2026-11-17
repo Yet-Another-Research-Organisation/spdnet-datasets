@@ -19,6 +19,9 @@
   - `spdnet_datasets.hyperspectral.hyperleaf` (`fetch_hyperleaf`, `HyperLeafDataset`, registry name `hyperleaf`)
 ```
 
+```{dataset-preview} hyperleaf
+```
+
 ## Description and source
 
 HyperLeaf2024 comes from a Kaggle competition. It holds hyperspectral images
@@ -66,8 +69,7 @@ covariance (background excluded), so its covariance is `cov` and its mean is
 or a `collate_fn`; `mode="image"` gives the whole image. The figure shows the
 band-mean image.
 
-```{raw} html
-<iframe src="../_static/figures/hyperleaf/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} hyperleaf/raw_samples
 ```
 
 ## Classes
@@ -83,9 +85,10 @@ band-mean image.
 
 The figures show the cultivar counts and the mean spectrum per cultivar.
 
-```{raw} html
-<iframe src="../_static/figures/hyperleaf/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/hyperleaf/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} hyperleaf/class_hist
+```
+
+```{dataset-figure} hyperleaf/class_means
 ```
 
 ## Covariance construction
@@ -106,9 +109,10 @@ standardised per channel, as float32 of shape (C, 48, 352). It is meant for
 CNN (convolutional neural network) backbones, and no covariance is
 computed.
 
-```{raw} html
-<iframe src="../_static/figures/hyperleaf/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/hyperleaf/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} hyperleaf/cov_samples
+```
+
+```{dataset-figure} hyperleaf/eigen_spectrum
 ```
 
 ## Splits
@@ -121,8 +125,7 @@ reconstructs the plot as `GrainWeight | cultivar | Fertilizer` (24 groups of
 cultivar (seed 0): test = fold `fold`, validation = fold `fold + 1`. With
 `fold=0`: 960 / 310 / 320 leaves.
 
-```{raw} html
-<iframe src="../_static/figures/hyperleaf/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} hyperleaf/split_schema
 ```
 
 ## Leakage risks and measures
@@ -163,3 +166,12 @@ img = HyperLeafDataset(mode="image", bands=[81, 51, 21])
   default.
 - Use `estimator=`. `cov_method=...` is silently absorbed by `**kwargs` and
   gives the SCM.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/hyperleaf.md
+```
+````

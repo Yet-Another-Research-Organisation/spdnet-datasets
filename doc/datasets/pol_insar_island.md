@@ -17,6 +17,9 @@
   - {mod}`spdnet_datasets.sar.pol_insar_island` (`fetch_pol_insar_island`, `PolInSARIslandDataset`)
 ```
 
+```{dataset-preview} pol_insar_island
+```
+
 ## Description and source
 
 Pol-InSAR-Island, also referred to as "PolINSAR Iceland", is a benchmark for
@@ -70,8 +73,7 @@ cell (512 to 1 024), use `batch_size=1` or a `collate_fn`. With
 unlabelled pixels set to 0. The figure shows the mean over the 12 channels of
 the whole cell.
 
-```{raw} html
-<iframe src="../_static/figures/pol_insar_island/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} pol_insar_island/raw_samples
 ```
 
 ## Classes
@@ -81,9 +83,10 @@ white dune, peat bog, grey dune, couch grass, upper saltmarsh, lower
 saltmarsh, sand and settlement. Peat bog is rare and spatially concentrated:
 in fold 0, all its 53 cells fall in the training part.
 
-```{raw} html
-<iframe src="../_static/figures/pol_insar_island/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/pol_insar_island/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} pol_insar_island/class_hist
+```
+
+```{dataset-figure} pol_insar_island/class_means
 ```
 
 ## Covariance construction
@@ -125,9 +128,10 @@ upper terms. At load time, the geometric scale s of `core.normalize` is fitted
 on the training part; means and raw features are multiplied by √s (the `t6`
 means, which are T6 entries, by s).
 
-```{raw} html
-<iframe src="../_static/figures/pol_insar_island/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/pol_insar_island/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} pol_insar_island/cov_samples
+```
+
+```{dataset-figure} pol_insar_island/eigen_spectrum
 ```
 
 ## Splits
@@ -151,9 +155,10 @@ checkerboard, so neighbouring cells sit on both sides. The loader raises a
 (≥ 256 labelled pixels), which reproduces its 3 315 / 3 403 cells; at ≥ 512
 pixels there would be only 2 380 / 2 529.
 
-```{raw} html
-<iframe src="../_static/figures/pol_insar_island/split_map.html" class="plotly-figure" style="height:620px" loading="lazy"></iframe>
-<iframe src="../_static/figures/pol_insar_island/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} pol_insar_island/split_map
+```
+
+```{dataset-figure} pol_insar_island/split_schema
 ```
 
 ## Leakage risks and measures
@@ -183,3 +188,12 @@ ds = PolInSARIslandDataset(split="recommended")                 # logpower, 12×
 t6 = PolInSARIslandDataset(representation="t6")                 # 24×24, scm only
 off = PolInSARIslandDataset(cells="official", split="official")  # optimistic, warns
 ```
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/pol_insar_island.md
+```
+````

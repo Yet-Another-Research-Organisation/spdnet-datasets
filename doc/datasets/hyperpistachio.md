@@ -7,6 +7,9 @@ documented here for reference only. `spdnet-datasets` provides no loader, no
 the dataset atlas fiche.
 ```
 
+```{dataset-preview} hyperpistachio
+```
+
 ## Description and source
 
 HyperPistachio is the public subset of a dataset of pistachio nuts
@@ -52,3 +55,12 @@ level.
   the final consumer: 8 µg/kg (Regulation (EU) 2023/915).
 - Clip the specular highlights, where reflectance exceeds 1 (up to 14 % of the
   values of one cube).
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/hyperpistachio.md
+```
+````

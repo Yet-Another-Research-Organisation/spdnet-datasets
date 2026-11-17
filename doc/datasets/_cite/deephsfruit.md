@@ -1,0 +1,1 @@
+- L. A. Varga, J. Makowski and A. Zell, "Measuring the Ripeness of Fruit with Hyperspectral Imaging and Deep Learning", *International Joint Conference on Neural Networks (IJCNN)*, 2021, pp. 1–8. doi:[10.1109/IJCNN52387.2021.9533728](https://doi.org/10.1109/IJCNN52387.2021.9533728)
