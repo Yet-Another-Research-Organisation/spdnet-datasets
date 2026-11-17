@@ -3,7 +3,7 @@
  "kwargs": {},
  "split": "official",
  "n_samples": 5172,
- "n_groups": 1025,
+ "n_groups": null,
  "raw_shape": [
   128,
   128,

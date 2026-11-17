@@ -185,6 +185,8 @@ def render_static(fig: dict, path: Path, theme: str, width=9.6, height=4.4, dpi=
             ax.set_ylabel(ya["title"]["text"])
         if ya.get("type") == "log":
             ax.set_yscale("log")
+        if ya.get("scaleanchor"):  # same scale on both axes (images, maps)
+            ax.set_aspect("equal", adjustable="box")
         if ya.get("tickvals") is not None and ya.get("ticktext") is not None:
             ax.set_yticks(decode(ya["tickvals"]), ya["ticktext"])
             ax.set_ylim(min(decode(ya["tickvals"])) - 0.6, max(decode(ya["tickvals"])) + 0.6)
@@ -207,11 +209,13 @@ def render_static(fig: dict, path: Path, theme: str, width=9.6, height=4.4, dpi=
         label = tr.get("name") if tr.get("showlegend", True) is not False else None
         if typ == "heatmap":
             z = np.asarray(decode(tr["z"]), dtype=float)
-            ax.imshow(z, aspect="auto", interpolation="nearest", origin="lower",
+            square = ax.get_aspect() == 1.0  # scaleanchor: keep the pixels square
+            ax.imshow(z, aspect="equal" if square else "auto",
+                      interpolation="nearest", origin="lower",
                       cmap=_cmap(tr.get("colorscale", [[0, "#cde2fb"], [1, "#0d366b"]]), theme),
                       vmin=tr.get("zmin"), vmax=tr.get("zmax"))
             ax.grid(False)
-            if z.shape[0] > 1 and z.shape[1] / z.shape[0] > 6:
+            if not square and z.shape[0] > 1 and z.shape[1] / z.shape[0] > 6:
                 ax.set_aspect("auto")
             ax.set_xticks([]), ax.set_yticks([])
         elif typ == "bar":
