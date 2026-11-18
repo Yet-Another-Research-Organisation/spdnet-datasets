@@ -102,16 +102,18 @@ def test_standardized_series_give_correlations(cache, abide):
 @pytest.mark.parametrize("return_mean,return_raw", [(False, False), (True, False),
                                                     (False, True), (True, True)])
 def test_output_tuples(cache, abide, return_mean, return_raw):
-    x, _ = _make(cache, return_mean=return_mean, return_raw=return_raw)[1]
+    ds = _make(cache, return_mean=return_mean, return_raw=return_raw)
+    root = np.sqrt(ds.scale)  # mean and raw are scaled by sqrt(s), like cov by s
+    x, _ = ds[1]
     parts = x if isinstance(x, tuple) else (x,)
     assert len(parts) == 1 + return_mean + return_raw
     if return_mean:
         assert tuple(parts[1].shape) == (P_TT,)
-        assert abs(float(parts[1].mean()) - 10.0) < 1.0  # mean before standardization
+        assert abs(float(parts[1].mean()) / root - 10.0) < 1.0  # mean before standardization
     if return_raw:
         raw = parts[-1]
         assert tuple(raw.shape) == (2 * P_TT + 10, P_TT) and str(raw.dtype) == "torch.float32"
-        np.testing.assert_allclose(raw.numpy().std(axis=0, ddof=1), 1.0, rtol=1e-4)
+        np.testing.assert_allclose(raw.numpy().std(axis=0, ddof=1), root, rtol=1e-4)
 
 
 def test_raw_series_match_covariance(cache, abide):
@@ -119,6 +121,18 @@ def test_raw_series_match_covariance(cache, abide):
     cov, raw = ds[2][0]
     np.testing.assert_allclose(Covariances().fit_transform([raw.numpy().astype(float)])[0],
                                cov.numpy(), atol=1e-5)
+
+
+def test_normalised_raw_matches_covariance(cache, abide):
+    """With a split, cov is scaled by s and raw / mean by sqrt(s)."""
+    plain = _make(cache, return_raw=True, return_mean=True, normalize=False, split="stratified")
+    ds = _make(cache, return_raw=True, return_mean=True, split="stratified")
+    assert ds.scale != 1.0
+    cov, mean, raw = ds[2][0]
+    np.testing.assert_allclose(Covariances().fit_transform([raw.numpy().astype(float)])[0],
+                               cov.numpy(), rtol=1e-4, atol=1e-6)
+    np.testing.assert_allclose(mean.numpy(), plain[2][0][1].numpy() * np.sqrt(ds.scale),
+                               rtol=1e-6)
 
 
 def test_allow_small_n_keeps_everyone_with_ledoit_wolf(cache, abide):

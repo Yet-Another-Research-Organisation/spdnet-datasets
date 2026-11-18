@@ -146,7 +146,10 @@ example with `core.splits.group_split`.
 The covariances can be multiplied by a geometric scale, so that the geometric
 mean of the eigenvalues over the training covariances is 1. That scale is only
 computed when you pass `split=`, and it is fitted on that split's training
-indices. Without `split`, the covariances are left unscaled.
+indices. Without `split`, the covariances are left unscaled. With the scale `s`,
+the channel means (`return_mean`) and the epochs (`return_raw`) are multiplied
+by `sqrt(s)`, so that the covariance of the returned epoch is still the returned
+covariance.
 
 Pass the same split name to `MOABBCovariances(split=...)` and to
 `create_dataloaders(split=...)`. With two different names, the scale is fitted

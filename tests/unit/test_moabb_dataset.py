@@ -92,6 +92,19 @@ def test_raw_epoch_matches_covariance(cache):
                                cov.numpy(), rtol=1e-5)
 
 
+def test_normalised_raw_and_mean_match_covariance(cache):
+    """With a split, cov is scaled by s and raw / mean by sqrt(s)."""
+    plain = _make(cache, return_raw=True, return_mean=True)
+    name = sorted(plain.splits)[0]
+    ds = _make(cache, return_raw=True, return_mean=True, split=name)
+    assert ds.scale != 1.0
+    cov, mean, raw = ds[3][0]
+    np.testing.assert_allclose(epochs_to_covariances(raw.numpy().T[None].astype(float))[0],
+                               cov.numpy(), rtol=1e-4)
+    np.testing.assert_allclose(raw.numpy().mean(0), mean.numpy(), rtol=1e-4, atol=1e-6)
+    np.testing.assert_allclose(mean.numpy(), plain[3][0][1].numpy() * np.sqrt(ds.scale))
+
+
 def test_too_short_epochs_raise(cache):
     # every trial fails: nothing left to exclude, the error is raised
     with pytest.raises(InsufficientSamplesError):

@@ -248,7 +248,8 @@ class NilearnConnectomes(BaseDataset):
         Name of a split of :attr:`splits` (default ``"recommended"``); with
         ``normalize=True`` the geometric scale is fitted on its training indices.
     normalize : bool
-        Apply the geometric scale fitted on ``splits[split]["train"]``.
+        Apply the geometric scale ``s`` fitted on ``splits[split]["train"]``:
+        covariances times ``s``, means and raw signals times ``sqrt(s)``.
     data_dir : path, optional
         nilearn data directory (default: nilearn's, ``$NILEARN_DATA`` or
         ``~/nilearn_data``).
@@ -470,9 +471,11 @@ class NilearnConnectomes(BaseDataset):
         return len(self.labels)
 
     def __getitem__(self, idx):
+        # covariance scaled by s, mean and raw by sqrt(s): the three stay consistent
+        root = float(np.sqrt(self.scale))
         cov = torch.from_numpy(self.covs[idx] * self.scale)
-        mean = torch.from_numpy(self.means[idx]) if self.return_mean else None
-        raw = (torch.from_numpy(np.array(self.series[self.subject_index[idx]], dtype=np.float32))
+        mean = torch.from_numpy(self.means[idx] * root) if self.return_mean else None
+        raw = (torch.from_numpy(np.array(self.series[self.subject_index[idx]], dtype=np.float32) * np.float32(root))
                if self.return_raw else None)
         label = self.labels[idx]
         return self._pack(cov, mean, raw), (float(label) if self.task == "regression"
