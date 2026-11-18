@@ -224,8 +224,9 @@ raises a `ValueError` that gives the reason.
 
 For `adhd`, the cohorts `Peking_1`, `Peking_2` and `Peking_3` count as one site,
 `Peking`. With `normalize=True`, the geometric scale (see
-{doc}`/guide/outputs`) is fitted on the training indices of `split`. Pass the same
-name to `create_dataloaders(split=...)`.
+{doc}`/guide/outputs`) is fitted on the training indices of `split`; the means
+and the time series are then multiplied by `sqrt(s)`, so that they stay consistent
+with the covariances. Pass the same name to `create_dataloaders(split=...)`.
 
 ### Indicative score
 

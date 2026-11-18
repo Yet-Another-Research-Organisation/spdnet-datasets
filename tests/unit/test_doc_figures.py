@@ -34,6 +34,7 @@ class _ToyFigures(BaseDataset):
 
 
 def test_make_figures_writes_every_kind(tmp_path, monkeypatch):
+    monkeypatch.syspath_prepend(str(TOOL.parent))  # make_figures imports figures_io
     spec = importlib.util.spec_from_file_location("make_figures", TOOL)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
@@ -42,6 +43,12 @@ def test_make_figures_writes_every_kind(tmp_path, monkeypatch):
     summary = mod.build("_toy_figures", {"data_dir": str(tmp_path)}, "official", "toy")
     kinds = {"raw_samples", "class_hist", "cov_samples", "class_means", "split_schema",
              "eigen_spectrum"}
-    assert {f.stem for f in (tmp_path / "toy").glob("*.html")} == kinds
+    # interactive kinds as JSON, the others as a light and a dark PNG
+    import figures_io
+
+    static = kinds - set(figures_io.INTERACTIVE)
+    out = tmp_path / "toy"
+    assert {f.stem for f in out.glob("*.json")} - {"summary"} == kinds - static
+    assert {f.stem for f in out.glob("*.png")} == static | {f"{k}_dark" for k in static}
     assert summary["p"] == 4 and summary["counts"]["train"] == [10, 10, 0]
     assert json.loads((tmp_path / "toy" / "summary.json").read_text())["n_samples"] == 30

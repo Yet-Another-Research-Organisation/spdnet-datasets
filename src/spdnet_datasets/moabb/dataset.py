@@ -163,7 +163,8 @@ class MOABBCovariances(BaseDataset):
         scale is fitted on its training indices. Without a split no scale is
         applied (there is no training set to fit it on).
     normalize : bool
-        Apply the geometric scale fitted on ``splits[split]["train"]``.
+        Apply the geometric scale ``s`` fitted on ``splits[split]["train"]``:
+        covariances times ``s``, means and raw signals times ``sqrt(s)``.
     n_folds : int
         Folds of the within-session protocol.
     cache_dir : path, optional
@@ -303,8 +304,10 @@ class MOABBCovariances(BaseDataset):
         return len(self.labels)
 
     def __getitem__(self, idx):
+        # covariance scaled by s, mean and raw by sqrt(s): the three stay consistent
+        root = float(np.sqrt(self.scale))
         cov = torch.from_numpy(self.covs[idx] * self.scale)
-        mean = torch.from_numpy(self.means[idx]) if self.return_mean else None
-        raw = (torch.from_numpy(np.array(self.epochs[self.trial_index[idx]].T, dtype=np.float32))
+        mean = torch.from_numpy(self.means[idx] * root) if self.return_mean else None
+        raw = (torch.from_numpy(np.array(self.epochs[self.trial_index[idx]].T, dtype=np.float32) * np.float32(root))
                if self.return_raw else None)
         return self._pack(cov, mean, raw), int(self.labels[idx])
