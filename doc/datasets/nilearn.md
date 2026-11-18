@@ -7,13 +7,15 @@ matrix per subject: a *connectome*, ready for SPDNet models or a Riemannian
 scikit-learn pipeline. nilearn does everything else: download, atlases and
 signal extraction.
 
-Three nilearn datasets are supported:
+Five nilearn datasets are supported:
 
-| `dataset` | nilearn fetcher | Subjects | Label | Groups |
+| `dataset` | nilearn fetcher | Samples | Label | Groups |
 |---|---|---|---|---|
-| `"abide"` | `fetch_abide_pcp` | 871 (quality-checked) | autism (1) vs control (0) | acquisition site (20) |
-| `"adhd"` | `fetch_adhd` | 40 | ADHD (1) vs control (0) | acquisition site (5) |
-| `"development"` | `fetch_development_fmri` | 155 | child vs adult | subject (single site) |
+| `"abide"` | `fetch_abide_pcp` | 871 subjects (quality-checked) | autism (1) vs control (0) | acquisition site (20) |
+| `"adhd"` | `fetch_adhd` | 40 subjects | ADHD (1) vs control (0) | acquisition site (5) |
+| `"development"` | `fetch_development_fmri` | 155 subjects | child vs adult | subject (single site) |
+| `"nki"` | `fetch_surf_nki_enhanced` | 102 subjects | sex (F / M), or age | subject (single site) |
+| `"haxby"` | `fetch_haxby` | 6 subjects × 96 stimulus blocks | 8 object categories | run (12 per subject) |
 
 - ABIDE: Autism Brain Imaging Data Exchange.
 - PCP: the Preprocessed Connectomes Project, which shares ABIDE time series
@@ -21,6 +23,12 @@ Three nilearn datasets are supported:
 - ADHD: attention-deficit/hyperactivity disorder. nilearn ships a 40-subject
   sample of ADHD-200.
 - MSDL: multi-subject dictionary learning, a probabilistic atlas of 39 regions.
+- NKI: the Nathan Kline Institute Rockland Sample. nilearn ships the resting
+  state of 102 adults projected on the fsaverage5 cortical surface; the adapter
+  averages it in the 148 regions of the Destrieux atlas.
+- Haxby: the visual object recognition study of Haxby et al. (2001), a block
+  design (faces, houses, cats, bottles, scissors, shoes, chairs, scrambled
+  pictures) with 12 runs per subject.
 
 ```{dataset-preview} nilearn
 ```
@@ -244,6 +252,66 @@ These numbers are only indicative: 85 subjects, a single seed, no tuning.
 
 The gap between the last two rows is the site effect described above.
 
+## NKI enhanced (surface)
+
+```python
+from spdnet_datasets.nilearn import NilearnConnectomes
+
+ds = NilearnConnectomes("nki")                      # sex, 148 x 148 covariances
+age = NilearnConnectomes("nki", task="regression")  # age in years
+```
+
+- Regions: the 74 Destrieux labels of each hemisphere, `Unknown` and
+  `Medial_wall` excluded (p = 148); a region signal is the mean of its vertices.
+  With 895 time points per subject, the n ≥ 2p rule holds.
+- The covariances are very ill-conditioned (κ around 1e10, measured on the
+  first subjects): neighbouring regions of the smoothed surface data are highly
+  correlated. Ledoit-Wolf (`estimator="ledoit_wolf"`) improves this.
+- Single site: the groups are the subjects and only the `stratified` split
+  exists.
+
+```{note}
+nilearn 0.14.1 reads the NKI phenotypic file with `header=1`, so its first
+subject (A00028185) becomes the header row and has no age or sex. The adapter
+reads the downloaded file again with its real header, so every subject keeps
+its phenotype.
+```
+
+## Haxby (block design)
+
+```python
+ds = NilearnConnectomes("haxby", return_raw=True)          # 6 subjects, VT mask
+one = NilearnConnectomes("haxby", fetcher_kwargs={"subjects": (2,)})
+```
+
+One sample is a stimulus block: 9 volumes (22.5 s, TR 2.5 s). Nine time points
+are far too few to estimate a covariance between regions, so the roles are
+swapped:
+
+- variables: the 9 volumes of the block (p = 9);
+- observations: the voxels of the mask (`atlas="vt"`, `"face"` or `"house"`,
+  several hundred voxels), detrended and z-scored per run;
+- `raw`: the `(n_voxels, 9)` array, `mean`: the mean signal of each volume.
+
+The covariance therefore describes how the spatial pattern evolves during the
+block, not which voxels respond.
+
+```{warning}
+On subject 2 (VT mask, `run_grouped` split, 8 classes, chance 0.125), tangent
+space + logistic regression on these 9 × 9 covariances scores **0.08**
+(0.125 when the block is shifted by two volumes for the hemodynamic delay),
+while a logistic regression on the `raw` voxel pattern averaged over the block
+scores **0.67**. The category is carried by the spatial pattern, which this
+covariance discards: use Haxby for models on `raw`, or as a negative control
+for covariance models.
+```
+
+Splits: `run_grouped` (recommended: no run on two sides, the within-subject
+protocol of the original study), `subject_grouped` (cross-subject, from two
+subjects) and `stratified` (blocks of a run on both sides: optimistic).
+`metadata` has `run` and `block` columns; `n_timepoints` holds the number of
+voxels.
+
 ## Cache and `keep`
 
 nilearn manages its files under `data_dir`, and the adapter never deletes them.
@@ -282,8 +350,9 @@ recomputes both.
 
 The real-data test (`tests/unit/test_nilearn_real.py`, `-m "slow and network"`)
 covers ABIDE, `tt`, with 20 subjects from PITT, USM, UM_1 and YALE.
-`adhd` and `development` are covered by unit tests only, because their images
-are too large for CI.
+`adhd`, `development`, `nki` and `haxby` are covered by unit tests only,
+because their images are too large for CI; they were run on real data in the
+end-to-end validation.
 
 ## References
 
@@ -294,6 +363,14 @@ are too large for CI.
 - Dadi, K., Rahim, M., Abraham, A., et al. (2019). Benchmarking functional
   connectome-based predictive models for resting-state fMRI. *NeuroImage*, 192,
   115–134.
+- Nooner, K. B., et al. (2012). The NKI-Rockland Sample: a model for
+  accelerating the pace of discovery science in psychiatry. *Frontiers in
+  Neuroscience*, 6, 152.
+- Haxby, J. V., et al. (2001). Distributed and overlapping representations of
+  faces and objects in ventral temporal cortex. *Science*, 293, 2425–2430.
+- Destrieux, C., Fischl, B., Dale, A., Halgren, E. (2010). Automatic
+  parcellation of human cortical gyri and sulci using standard anatomical
+  nomenclature. *NeuroImage*, 53, 1–15.
 - spdlearn, [Classifying fMRI data with SPDNet](https://spdlearn.org/generated/auto_examples/applied_examples/plot_fmri.html).
 
 ## How to cite

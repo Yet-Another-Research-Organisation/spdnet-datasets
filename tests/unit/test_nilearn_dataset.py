@@ -333,3 +333,144 @@ def test_infeasible_stratified_split_does_not_block_site_grouped(cache, abide):
         with pytest.warns(UserWarning):
             _make(cache, n_subjects=5, split="stratified",
                   fetcher_kwargs={"SITE_ID": ["NYU", "UM_1"]})
+
+
+# ---------------------------------------------------------------- NKI enhanced
+N_VERT, T_NKI = 60, 80
+
+
+class FakeNKI:
+    """Stand-in for ``fetch_surf_nki_enhanced`` and ``fetch_atlas_surf_destrieux``:
+    3 labels per hemisphere plus Unknown and Medial_wall, 6 subjects."""
+
+    def __init__(self, tmp_path):
+        self.root = tmp_path / "nki"
+        self.surfaces = {}
+        rng = np.random.default_rng(1)
+        ids = [f"A000{k}" for k in range(6)]
+        for k, sid in enumerate(ids):
+            for hemi in ("left", "right"):
+                path = self.root / sid / f"{sid}_{hemi}_preprocessed_fwhm6.gii"
+                self.surfaces[str(path)] = rng.standard_normal((N_VERT, T_NKI)) + k
+        # phenotypic table in another order than the files, with an extra subject
+        self.ph = pd.DataFrame({"Subject": ids[::-1] + ["A000X"],
+                                "Age": [20.0 + k for k in range(7)],
+                                "Dominant Hand": "R",
+                                "Sex": ["F", "M"] * 3 + ["F"]})
+        self.ids = ids
+
+    def fetch(self, n_subjects=10, data_dir=None, verbose=1, **kwargs):
+        ids = self.ids[:n_subjects]
+        return Bunch(func_left=[str(self.root / s / f"{s}_left_preprocessed_fwhm6.gii")
+                                for s in ids],
+                     func_right=[str(self.root / s / f"{s}_right_preprocessed_fwhm6.gii")
+                                 for s in ids],
+                     phenotypic=self.ph, description="")
+
+    def atlas(self, data_dir=None, verbose=1, **kwargs):
+        # vertices: 10 Unknown (0), 10 Medial_wall (4), 40 split over labels 1..3
+        labels = np.array([0] * 10 + [4] * 10 + [1, 2, 3] * 13 + [1])
+        return Bunch(labels=["Unknown", "a", "b", "c", "Medial_wall"],
+                     map_left=labels, map_right=labels[::-1].copy())
+
+
+@pytest.fixture
+def nki(monkeypatch, tmp_path):
+    fake = FakeNKI(tmp_path)
+    monkeypatch.setattr(nl_datasets, "fetch_surf_nki_enhanced", fake.fetch)
+    monkeypatch.setattr(nl_datasets, "fetch_atlas_surf_destrieux", fake.atlas)
+    monkeypatch.setattr(nl_mod, "_read_surface", lambda path: fake.surfaces[str(path)])
+    return fake
+
+
+def test_nki_regions_labels_and_phenotypes(cache, nki):
+    ds = _make(cache, dataset="nki", normalize=False, return_raw=True, standardize=False)
+    assert len(ds) == 6 and ds.covariances.shape == (6, 6, 6)  # 3 labels x 2 hemispheres
+    assert ds.classes == ["F", "M"]
+    # phenotypic rows follow the files, not the table order
+    assert ds.metadata["subject"].tolist() == nki.ids
+    assert ds.metadata["age"].tolist() == [25.0, 24.0, 23.0, 22.0, 21.0, 20.0]
+    # region 0 = mean of the left vertices of label 1
+    labels = nki.atlas().map_left
+    left = nki.surfaces[nki.fetch()["func_left"][0]]
+    np.testing.assert_allclose(ds[0][0][1].numpy()[:, 0], left[labels == 1].mean(0), rtol=1e-5)
+    assert set(ds.groups) == set(nki.ids)  # single site: subjects as groups
+    age = _make(cache, dataset="nki", task="regression")
+    assert age.labels.dtype == np.float32 and "site_grouped" not in age.splits
+
+
+# ---------------------------------------------------------------- Haxby
+N_VOX = 40
+
+
+class FakeHaxby:
+    """Stand-in for ``fetch_haxby``: 2 runs of [rest 3, cat 9, rest 2, face 9, house 5]."""
+
+    def __init__(self):
+        lab = ["rest"] * 3 + ["cat"] * 9 + ["rest"] * 2 + ["face"] * 9 + ["house"] * 5
+        self.labels = np.array(lab * 2)
+        self.runs = np.repeat([0, 1], len(lab))
+        self.calls = []
+
+    def fetch(self, data_dir=None, subjects=(2,), verbose=1, **kwargs):
+        self.calls.append(subjects)
+        subjects = [subjects] if np.isscalar(subjects) else list(subjects)
+        names = [f"s{k}" for k in subjects]
+        return Bunch(func=names, session_target=names, mask_vt=names, mask_face=names,
+                     mask_house=names)
+
+    def signals(self, func, target, mask):
+        rng = np.random.default_rng(int(func[1:]))
+        X = rng.standard_normal((len(self.labels), N_VOX))
+        X[self.labels == "face"] *= 3.0
+        return X, self.labels, self.runs
+
+
+@pytest.fixture
+def haxby(monkeypatch):
+    fake = FakeHaxby()
+    monkeypatch.setattr(nl_datasets, "fetch_haxby", fake.fetch)
+    monkeypatch.setattr(nl_mod, "_haxby_run_signals", fake.signals)
+    return fake
+
+
+def test_haxby_blocks_runs_and_splits(cache, haxby):
+    ds = _make(cache, dataset="haxby", n_subjects=3, return_raw=True, return_mean=True)
+    assert haxby.calls == [(1, 2, 3)]
+    # per subject: cat and face blocks in 2 runs; house (5 volumes) and rest dropped
+    assert len(ds) == 12 and ds.covariances.shape == (12, 9, 9)
+    assert ds.classes[ds.labels[0]] == "cat"
+    assert set(ds.metadata["label"]) == {"cat", "face"}
+    assert {"run", "block"} <= set(ds.metadata.columns)
+    assert (ds.metadata["n_timepoints"] == N_VOX).all()
+    cov, mean, raw = ds[0][0]
+    assert tuple(raw.shape) == (N_VOX, 9)
+    np.testing.assert_allclose(Covariances().fit_transform([raw.numpy().astype(float)])[0],
+                               cov.numpy(), rtol=1e-4, atol=1e-6)
+    assert ds.groups[0] == "subj1_run0"
+    assert {"run_grouped", "subject_grouped", "stratified"} <= set(ds.splits)
+    sp = ds.splits["recommended"]
+    assert sp is ds.splits["run_grouped"]
+    assert_no_leakage(ds.groups[sp["train"]], ds.groups[sp["test"]])
+    sub = ds.splits["subject_grouped"]
+    subj = ds.metadata["subject"].to_numpy()
+    assert not set(subj[sub["train"]]) & set(subj[sub["test"]])
+
+
+def test_haxby_rejects_regression_and_unknown_mask(cache, haxby):
+    with pytest.raises(ValueError, match="haxby has no age"):
+        _make(cache, dataset="haxby", task="regression")
+    with pytest.raises(ValueError, match="atlas"):
+        _make(cache, dataset="haxby", atlas="msdl")
+
+
+def test_nki_phenotypic_first_row_is_kept(cache, nki):
+    """nilearn drops the first subject of the CSV (header=1): it is read again."""
+    nki.root.mkdir(parents=True, exist_ok=True)
+    (nki.root / nl_mod.NKI_PHENOTYPIC).write_text(
+        ",Age,Dominant Hand,Sex\n"
+        + "".join(f"{s},{30 + k},R,{'MF'[k % 2]}\n" for k, s in enumerate(nki.ids)))
+    nki.ph = nki.ph[nki.ph["Subject"] != nki.ids[0]]  # what nilearn returns
+    ds = _make(cache, dataset="nki", split=None)
+    assert ds.metadata["subject"].tolist() == nki.ids
+    assert ds.metadata["age"].tolist() == [30.0 + k for k in range(6)]
