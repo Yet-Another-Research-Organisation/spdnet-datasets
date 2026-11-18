@@ -29,8 +29,9 @@ paradigms, with MOABB's evaluations.
 :img-alt: a functional connectome
 :class-card: sd-card-hover
 
-One connectome per subject for ABIDE, ADHD-200 and the development fMRI
-dataset, with site-grouped splits.
+One connectome per subject for ABIDE, ADHD-200, the development fMRI
+dataset and NKI enhanced (surface), with site-grouped splits; Haxby stimulus
+blocks with run-grouped splits.
 
 {bdg-secondary-line}`regions × regions` {bdg-info-line}`extra nilearn`
 :::

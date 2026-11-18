@@ -35,14 +35,24 @@ from spdnet_datasets.core.splits import assert_no_leakage
 from spdnet_datasets.nilearn.covariances import series_covariance
 
 PIPELINE_VERSION = 1
-DATASETS = ("abide", "adhd", "development")
+DATASETS = ("abide", "adhd", "development", "nki", "haxby")
 # ABIDE PCP ROI derivatives: short name -> number of regions p
 ABIDE_ATLASES = {"tt": 97, "ho": 111, "aal": 116, "ez": 116, "dosenbach160": 161,
                  "cc200": 200, "cc400": 392}
 MASKER_ATLASES = ("msdl",)
-DEFAULT_ATLAS = {"abide": "tt", "adhd": "msdl", "development": "msdl"}
+# Haxby masks shipped with the dataset (ventral temporal cortex, face and house areas)
+HAXBY_MASKS = ("vt", "face", "house")
+ATLASES = {"abide": tuple(ABIDE_ATLASES), "adhd": MASKER_ATLASES,
+           "development": MASKER_ATLASES, "nki": ("destrieux",), "haxby": HAXBY_MASKS}
+DEFAULT_ATLAS = {"abide": "tt", "adhd": "msdl", "development": "msdl", "nki": "destrieux",
+                 "haxby": "vt"}
+HAXBY_CATEGORIES = ["bottle", "cat", "chair", "face", "house", "scissors", "scrambledpix",
+                    "shoe"]
 CLASSES = {"abide": ["control", "autism"], "adhd": ["control", "adhd"],
-           "development": ["adult", "child"]}
+           "development": ["adult", "child"], "nki": ["F", "M"], "haxby": HAXBY_CATEGORIES}
+HAXBY_TR = 2.5  # seconds
+HAXBY_BLOCK = 9  # volumes per stimulus block (22.5 s)
+HAXBY_SUBJECTS = 6
 META_COLUMNS = ["subject", "site", "label", "age", "sex", "n_timepoints"]
 
 
@@ -143,6 +153,122 @@ def _load_development(atlas, n_subjects, data_dir, fetcher_kwargs, confounds):
     return series, meta, ph
 
 
+def _read_surface(path):
+    """Vertex time series (n_vertices, T) of a GIfTI file."""
+    import nibabel as nib
+
+    return np.asarray(nib.load(path).agg_data(), dtype=np.float64)
+
+
+NKI_PHENOTYPIC = "NKI_enhanced_surface_phenotypics.csv"
+
+
+def _nki_phenotypic(bunch):
+    """Phenotypic table of all NKI subjects.
+
+    nilearn (0.14.1) reads ``NKI_enhanced_surface_phenotypics.csv`` with
+    ``header=1``, so its first subject (A00028185) becomes the header and is
+    lost; the downloaded file is read again here with its real header.
+    """
+    path = Path(bunch.func_left[0]).parents[1] / NKI_PHENOTYPIC if bunch.func_left else None
+    if path is None or not path.exists():
+        return bunch.phenotypic
+    ph = pd.read_csv(path, header=0, dtype={0: str})
+    ph.columns = ["Subject", "Age", "Dominant Hand", "Sex"]
+    return ph
+
+
+def _load_nki(atlas, n_subjects, data_dir, fetcher_kwargs):
+    """NKI enhanced resting state on fsaverage5, averaged in the Destrieux regions.
+
+    The regions are the Destrieux labels of each hemisphere except ``Unknown``
+    and ``Medial_wall`` (p = 148): the time series of a region is the mean of
+    its vertices.
+    """
+    from nilearn import datasets
+
+    bunch = datasets.fetch_surf_nki_enhanced(n_subjects=n_subjects, data_dir=data_dir,
+                                             verbose=0, **fetcher_kwargs)
+    destrieux = datasets.fetch_atlas_surf_destrieux(data_dir=data_dir, verbose=0)
+    names = [n.decode() if isinstance(n, bytes) else str(n) for n in destrieux.labels]
+    keep = [k for k, n in enumerate(names) if n not in ("Unknown", "Medial_wall")]
+    maps = [np.asarray(destrieux.map_left), np.asarray(destrieux.map_right)]
+    regions = [(h, k) for h in (0, 1) for k in keep if (maps[h] == k).any()]
+    series = []
+    for left, right in zip(bunch.func_left, bunch.func_right, strict=True):
+        data = [_read_surface(left), _read_surface(right)]
+        series.append(np.stack([data[h][maps[h] == k].mean(axis=0) for h, k in regions],
+                               axis=1))
+    # phenotypic rows in the order of the fetched files (folder name = subject ID)
+    ids = [Path(f).parent.name for f in bunch.func_left]
+    ph = _nki_phenotypic(bunch).set_index("Subject")
+    missing = sorted(set(ids) - set(ph.index))
+    if missing:
+        raise ValueError(f"NKI subjects without phenotypic row: {missing[:5]}")
+    ph = ph.loc[ids].reset_index()
+    meta = pd.DataFrame({
+        "subject": ph["Subject"].astype(str),
+        "site": "nki",  # single-site study
+        "label": ph["Sex"].astype(str).where(ph["Sex"].isin(CLASSES["nki"])),
+        "age": ph["Age"].astype(float),
+        "sex": ph["Sex"].astype(str),
+    })
+    return series, meta, ph
+
+
+def _haxby_run_signals(func, target, mask):
+    """Voxel signals (T, n_voxels) of one Haxby subject, detrended and z-scored per run,
+    with the block labels and the runs (``chunks``) of ``labels.txt``."""
+    from nilearn.maskers import NiftiMasker
+    from nilearn.signal import clean
+
+    st = pd.read_csv(target, sep=" ")
+    runs = st["chunks"].to_numpy()
+    X = NiftiMasker(mask_img=mask, standardize=None).fit_transform(func)
+    X = clean(X, runs=runs, detrend=True, standardize="zscore_sample", t_r=HAXBY_TR)
+    return X, st["labels"].astype(str).to_numpy(), runs
+
+
+def _blocks(labels, runs):
+    """(start, length, label, run) of each run of identical labels inside a run."""
+    out, start = [], 0
+    for i in range(1, len(labels) + 1):
+        if i == len(labels) or labels[i] != labels[i - 1] or runs[i] != runs[i - 1]:
+            out.append((start, i - start, labels[start], runs[start]))
+            start = i
+    return out
+
+
+def _load_haxby(atlas, n_subjects, data_dir, fetcher_kwargs):
+    """One sample per stimulus block: the voxels of the mask as observations of the
+    ``HAXBY_BLOCK`` volumes of the block, an array (n_voxels, 9).
+
+    A block lasts 9 volumes, too few to estimate a covariance between regions,
+    so the variables are the volumes of the block and the observations the
+    voxels of the mask (several hundred): the covariance describes how the
+    spatial pattern evolves during the block. Rest periods are left out; a
+    block shorter than 9 volumes is dropped.
+    """
+    from nilearn import datasets
+
+    kw = dict(fetcher_kwargs)
+    kw.setdefault("subjects", tuple(range(1, (n_subjects or HAXBY_SUBJECTS) + 1)))
+    subjects = [kw["subjects"]] if np.isscalar(kw["subjects"]) else list(kw["subjects"])
+    bunch = datasets.fetch_haxby(data_dir=data_dir, verbose=0, **kw)
+    series, rows = [], []
+    for subj, func, target, mask in zip(subjects, bunch.func, bunch.session_target,
+                                        bunch[f"mask_{atlas}"], strict=True):
+        X, labels, runs = _haxby_run_signals(func, target, mask)
+        for start, length, label, run in _blocks(labels, runs):
+            if label == "rest" or length < HAXBY_BLOCK:
+                continue
+            series.append(X[start:start + HAXBY_BLOCK].T)
+            rows.append({"subject": f"subj{int(subj)}", "site": "haxby", "label": label,
+                         "age": np.nan, "sex": "", "run": int(run), "block": len(rows)})
+    meta = pd.DataFrame(rows)
+    return series, meta, meta.copy()
+
+
 def stratified_split(y, *, stratify=True, val_size=0.1, test_size=0.1, seed=0):
     """Subject-level train/val/test split, stratified on ``y`` if ``stratify``.
 
@@ -200,24 +326,47 @@ class NilearnConnectomes(BaseDataset):
 
     Parameters
     ----------
-    dataset : {"abide", "adhd", "development"}
+    dataset : {"abide", "adhd", "development", "nki", "haxby"}
         ``"abide"``: ABIDE PCP ROI time series (``fetch_abide_pcp``), autism vs
         control, sites as groups. ``"adhd"``: ADHD-200 sample of 40 subjects
         (``fetch_adhd``), ADHD vs control, sites as groups. ``"development"``:
         155 children and adults watching a movie (``fetch_development_fmri``),
-        child vs adult, single site.
+        child vs adult, single site. ``"nki"``: NKI enhanced resting state of
+        102 adults on the fsaverage5 surface (``fetch_surf_nki_enhanced``), sex
+        or age, single site. ``"haxby"``: Haxby et al. (2001) visual object
+        recognition, 6 subjects (``fetch_haxby``); one sample per stimulus
+        block, 8 categories, runs as groups (see below).
     atlas : str, optional
         ``abide``: one of :data:`ABIDE_ATLASES` (``"tt"``, ``"ho"``, ``"aal"``,
         ``"ez"``, ``"dosenbach160"``, ``"cc200"``, ``"cc400"``, the ``rois_*``
-        derivatives). ``adhd`` and ``development``: ``"msdl"``. Default:
+        derivatives). ``adhd`` and ``development``: ``"msdl"``. ``nki``:
+        ``"destrieux"`` (148 surface regions). ``haxby``: the mask, ``"vt"``
+        (ventral temporal cortex), ``"face"`` or ``"house"``. Default:
         :data:`DEFAULT_ATLAS`.
     n_subjects : int, optional
         Passed to the nilearn fetcher (``None``: all subjects). The fetchers take
         the first rows of their phenotypic table, which for ABIDE are sorted by
-        site: use ``fetcher_kwargs={"SITE_ID": [...]}`` to pick sites.
+        site: use ``fetcher_kwargs={"SITE_ID": [...]}`` to pick sites. For
+        ``haxby``, the subjects ``1..n_subjects`` (or ``fetcher_kwargs={"subjects":
+        (2,)}``).
     task : {"fine", "regression"}
-        ``"fine"``: the diagnosis (or age group) classes of :data:`CLASSES`.
-        ``"regression"``: age in years (float labels).
+        ``"fine"``: the classes of :data:`CLASSES` (diagnosis, age group, sex
+        for ``nki``, object category for ``haxby``). ``"regression"``: age in
+        years (float labels; not for ``haxby``).
+
+    Notes
+    -----
+    ``haxby``: a stimulus block lasts 9 volumes (TR 2.5 s), too few to estimate
+    a covariance between regions. Each sample is therefore the block seen as
+    ``n_voxels`` observations (the voxels of the mask, detrended and z-scored
+    per run) of 9 variables (the volumes of the block): a 9 x 9 covariance of
+    how the spatial pattern evolves during the block. ``raw`` is that
+    ``(n_voxels, 9)`` array, ``mean`` the mean signal of each volume, and
+    ``metadata`` has ``run`` and ``block`` columns (``n_timepoints`` holds the
+    number of voxels). Splits: ``run_grouped`` (no run on two sides, the
+    within-subject protocol of the original study; recommended),
+    ``subject_grouped`` (cross-subject, with at least two subjects) and
+    ``stratified``.
     estimator : {"scm", "ledoit_wolf", "tyler", "student"}
         Covariance estimator. ``T >= 2p`` is enforced: subjects with fewer time
         points are excluded and counted (``n_excluded_short``).
@@ -270,7 +419,8 @@ class NilearnConnectomes(BaseDataset):
     labels : ndarray
         Index into :attr:`classes` (``task="fine"``) or age (``"regression"``).
     groups : ndarray of str
-        Acquisition site (``abide``, ``adhd``) or subject (``development``).
+        Acquisition site (``abide``, ``adhd``), subject (``development``,
+        ``nki``) or ``<subject>_run<k>`` (``haxby``).
     splits : dict
         ``stratified`` (sites mixed: optimistic on multi-site data),
         ``site_grouped`` (no site shared, ``abide`` and ``adhd`` with at least
@@ -293,11 +443,13 @@ class NilearnConnectomes(BaseDataset):
         if dataset not in DATASETS:
             raise ValueError(f"dataset must be one of {DATASETS}, got {dataset!r}")
         atlas = atlas or DEFAULT_ATLAS[dataset]
-        allowed = tuple(ABIDE_ATLASES) if dataset == "abide" else MASKER_ATLASES
+        allowed = ATLASES[dataset]
         if atlas not in allowed:
             raise ValueError(f"atlas for {dataset!r} must be one of {allowed}, got {atlas!r}")
         if task not in ("fine", "regression"):
             raise ValueError(f"task must be 'fine' or 'regression', got {task!r}")
+        if dataset == "haxby" and task == "regression":
+            raise ValueError("haxby has no age: task must be 'fine'")
         if return_raw and keep == "keep_covariance":
             raise ValueError("return_raw=True needs the cached time series: use "
                              "keep='keep_processed' or 'keep_full', not 'keep_covariance'.")
@@ -323,19 +475,21 @@ class NilearnConnectomes(BaseDataset):
     def _params(self):
         return {"dataset": self.dataset, "atlas": self.atlas, "n_subjects": self.n_subjects,
                 "standardize": self.standardize,
-                "confounds": self.confounds if self.dataset != "abide" else None,
+                "confounds": self.confounds if self.dataset in ("adhd", "development") else None,
                 "fetcher_kwargs": _plain(self.fetcher_kwargs),
                 "version": PIPELINE_VERSION}
 
     def _process(self, _source, out):
-        if self.dataset == "abide":
-            series, meta, ph = _load_abide(self.atlas, self.n_subjects, self.nilearn_dir,
-                                           self.fetcher_kwargs)
+        if self.dataset in ("abide", "nki", "haxby"):
+            loader = {"abide": _load_abide, "nki": _load_nki, "haxby": _load_haxby}[self.dataset]
+            series, meta, ph = loader(self.atlas, self.n_subjects, self.nilearn_dir,
+                                      self.fetcher_kwargs)
         else:
             loader = _load_adhd if self.dataset == "adhd" else _load_development
             series, meta, ph = loader(self.atlas, self.n_subjects, self.nilearn_dir,
                                       self.fetcher_kwargs, self.confounds)
-        dup = meta["subject"][meta["subject"].duplicated()]
+        key = ["subject", "run", "block"] if self.dataset == "haxby" else ["subject"]
+        dup = meta["subject"][meta.duplicated(key)]
         if len(dup):
             raise ValueError(f"Duplicate subjects in the nilearn phenotypic table: "
                              f"{sorted(set(dup))[:5]}")
@@ -400,7 +554,8 @@ class NilearnConnectomes(BaseDataset):
         self.n_excluded = self.n_excluded_short + self.n_excluded_not_spd
         self.metadata = _read_csv(d / "metadata.csv")
         self.phenotypic = _read_csv(d / "phenotypic.csv")
-        if self.metadata["subject"].duplicated().any():
+        key = ["subject", "run", "block"] if self.dataset == "haxby" else ["subject"]
+        if self.metadata.duplicated(key).any():
             raise AssertionError("a subject appears twice")
 
         if self.task == "regression":
@@ -415,8 +570,13 @@ class NilearnConnectomes(BaseDataset):
             self.samples = [{"class_name": self.classes[k]} for k in self.labels]
             stratify = True
         self.sites = self.metadata["site"].to_numpy()
-        multi_site = self.dataset != "development"
-        self.groups = self.sites if multi_site else self.metadata["subject"].to_numpy()
+        multi_site = self.dataset in ("abide", "adhd")
+        subjects = self.metadata["subject"].to_numpy()
+        if self.dataset == "haxby":
+            self.groups = (self.metadata["subject"] + "_run"
+                           + self.metadata["run"].astype(str)).to_numpy()
+        else:
+            self.groups = self.sites if multi_site else subjects
 
         self.series = None
         if self.return_raw:
@@ -434,6 +594,12 @@ class NilearnConnectomes(BaseDataset):
         if multi_site and len(np.unique(self.sites)) >= 2:
             builders["site_grouped"] = lambda: site_grouped_split(
                 self.labels, self.sites, stratify=stratify, seed=self.seed)
+        if self.dataset == "haxby":  # same splitter, with runs or subjects as groups
+            builders["run_grouped"] = lambda: site_grouped_split(
+                self.labels, self.groups, stratify=stratify, seed=self.seed)
+            if len(np.unique(subjects)) >= 2:
+                builders["subject_grouped"] = lambda: site_grouped_split(
+                    self.labels, subjects, stratify=stratify, seed=self.seed)
         self.splits, self.split_errors = {}, {}
         for name, build in builders.items():
             try:
@@ -442,7 +608,7 @@ class NilearnConnectomes(BaseDataset):
                 self.split_errors[name] = str(exc)
                 warnings.warn(f"split {name!r} cannot be built on {len(self.labels)} "
                               f"subjects and is left out: {exc}", UserWarning, stacklevel=3)
-        for name in ("site_grouped", "stratified"):
+        for name in ("run_grouped", "site_grouped", "stratified"):
             if name in self.splits:
                 self.splits["recommended"] = self.splits[name]
                 break
@@ -464,7 +630,7 @@ class NilearnConnectomes(BaseDataset):
     # ------------------------------------------------------------ access
     @property
     def covariances(self) -> np.ndarray:
-        """All covariances (n_subjects, p, p), scaled by :attr:`scale`."""
+        """All covariances (n_samples, p, p), scaled by :attr:`scale`."""
         return self.covs * self.scale
 
     def __len__(self) -> int:
@@ -475,7 +641,8 @@ class NilearnConnectomes(BaseDataset):
         root = float(np.sqrt(self.scale))
         cov = torch.from_numpy(self.covs[idx] * self.scale)
         mean = torch.from_numpy(self.means[idx] * root) if self.return_mean else None
-        raw = (torch.from_numpy(np.array(self.series[self.subject_index[idx]], dtype=np.float32) * np.float32(root))
+        raw = (torch.from_numpy(np.array(self.series[self.subject_index[idx]], dtype=np.float32)
+                                * np.float32(root))
                if self.return_raw else None)
         label = self.labels[idx]
         return self._pack(cov, mean, raw), (float(label) if self.task == "regression"
