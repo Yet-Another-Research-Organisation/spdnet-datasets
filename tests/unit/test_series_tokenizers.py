@@ -117,8 +117,26 @@ def test_every_registered_mode_meets_its_rules():
     for name, modes in SERIES_MODES.items():
         for mode in modes.values():
             S, p, n_t = mode.nominal()
-            assert n_t >= mode.min_n_over_p * p, (name, mode.name, n_t, p)
+            assert mode.family in ("temporal", "vision")
+            if not mode.allow_small_n:  # documented derogations (R23 large p) only
+                assert n_t >= mode.min_n_over_p * p, (name, mode.name, n_t, p)
             assert 4 <= S <= 32, (name, mode.name, S)
+
+
+def test_modes_reproduce_the_former_series_builders():
+    # real.series.ci4r_series: 13 windows of 200 columns, 16 bands, Ledoit-Wolf
+    ci4r = get_mode("ci4r")
+    assert ci4r.nominal() == (13, 16, 200) and ci4r.estimator == "ledoit_wolf"
+    # R23: HyperLeaf windows of 48 / 64 / 96 bands, step 16 -> T = 10 / 9 / 7
+    assert [get_mode("hyperleaf", f"spectral_w{p}").nominal()[0] for p in (48, 64, 96)] == [10, 9, 7]
+    # R23 UAV w48 / w64 (100 bands, step 8 / 6) -> T = 7 / 7
+    assert [get_mode("uav", f"spectral_w{p}").nominal()[0] for p in (48, 64)] == [7, 7]
+    assert get_mode("esc50", "temporal_mel64").allow_small_n
+    assert not get_mode("gtzan", "temporal_mel64").allow_small_n
+    assert get_mode("dopnet").nominal() == (6, 16, 48)
+    families = {m.family for modes in SERIES_MODES.values() for m in modes.values()}
+    assert families == {"temporal", "vision"}
+    assert get_mode("gsoff").family == "vision" and get_mode("esc50").family == "temporal"
 
 
 def test_registry_defaults_of_the_user_example():

@@ -27,8 +27,12 @@ __all__ = ["axis_windows", "n_windows", "parts", "pool_channels", "spatial", "sp
            "spatio_temporal", "spectral", "spectro_temporal", "temporal"]
 
 
-def axis_windows(n, window=None, step=None, n_windows=None):
-    """``(start, stop)`` of the windows along an axis of ``n`` positions (see module docstring)."""
+def axis_windows(n, window=None, step=None, n_windows=None, cover=True):
+    """``(start, stop)`` of the windows along an axis of ``n`` positions (see module docstring).
+
+    ``cover=False`` keeps the regular starts only (the end of the axis may stay uncovered), as
+    :func:`~spdnet_datasets.real.series.sliding_covariances` does.
+    """
     if window is None:
         if n_windows is None:
             raise ValueError("give window or n_windows")
@@ -42,15 +46,15 @@ def axis_windows(n, window=None, step=None, n_windows=None):
         step = int(step) if step is not None else max(1, window // 2)
         if step < 1:
             raise ValueError(f"step must be >= 1, got {step}")
-        starts = window_starts(n, window, step, cover=True)
+        starts = window_starts(n, window, step, cover=cover)
     else:
         starts = window_starts(n, window, n_windows=int(n_windows))
     return [(s, s + window) for s in starts]
 
 
-def n_windows(n, window=None, step=None, n_windows=None):
+def n_windows(n, window=None, step=None, n_windows=None, cover=True):
     """Number of windows :func:`axis_windows` gives along an axis of ``n`` positions."""
-    return len(axis_windows(n, window, step, n_windows))
+    return len(axis_windows(n, window, step, n_windows, cover))
 
 
 def pool_channels(x, n_channels=None):
@@ -70,25 +74,26 @@ def _full(x):
     return [(0, n) for n in x.shape]
 
 
-def temporal(x, window=None, step=None, n_windows=None):
+def temporal(x, window=None, step=None, n_windows=None, cover=True):
     """Windows along the first axis of ``x`` (T, ..., p); observations = the frames of the window
     (and every middle axis), variables = the last axis."""
     obs, pos = [], []
-    for a, b in axis_windows(x.shape[0], window, step, n_windows):
+    for a, b in axis_windows(x.shape[0], window, step, n_windows, cover):
         obs.append(x[a:b].reshape(-1, x.shape[-1]))
         pos.append([(a, b), *_full(x)[1:]])
     return obs, pos
 
 
-def spectral(x, band_window, band_step=None, n_windows=None):
+def spectral(x, band_window, band_step=None, n_windows=None, cover=True):
     """Windows along the last axis of ``x`` (..., B); observations = every other position.
 
     Same windows as :func:`spdnet_datasets.real.series.spectral_windows` when ``band_step``
-    tiles the axis; otherwise a last window flush with the end is added.
+    tiles the axis; otherwise a last window flush with the end is added (unless ``cover=False``,
+    which gives exactly the windows of ``spectral_windows``).
     """
     rows = x.reshape(-1, x.shape[-1])
     obs, pos = [], []
-    for a, b in axis_windows(x.shape[-1], band_window, band_step, n_windows):
+    for a, b in axis_windows(x.shape[-1], band_window, band_step, n_windows, cover):
         obs.append(rows[:, a:b])
         pos.append([*_full(x)[:-1], (a, b)])
     return obs, pos

@@ -121,10 +121,12 @@ class CovarianceSeries(Dataset):
     loader_kwargs : dict, optional
         Arguments of the loader when ``dataset`` is a name (``data_dir``, ``cache_dir``,
         ``fold``, ``band_step``...); they update the mode's ``loader_defaults``.
-    estimator : {"scm", "ledoit_wolf", "tyler", "student"}
-    allow_small_n : bool
+    estimator : {"scm", "ledoit_wolf", "tyler", "student"}, optional
+        Default: the mode's estimator.
+    allow_small_n : bool, optional
         Accept tokens with fewer than ``2p`` observations; they are then estimated with
-        Ledoit-Wolf, whatever ``estimator``.
+        Ledoit-Wolf, whatever ``estimator``. Default: the mode's (``False`` except for the
+        documented large-p derogations).
     return_mean : bool
     normalize : bool
         Multiply the tokens by the geometric scale fitted on the unmasked training tokens.
@@ -142,7 +144,7 @@ class CovarianceSeries(Dataset):
     """
 
     def __init__(self, dataset, mode=None, *, split=None, subset=None, loader_kwargs=None,
-                 estimator="scm", allow_small_n=False, return_mean=False, normalize=True,
+                 estimator=None, allow_small_n=None, return_mean=False, normalize=True,
                  cache_dir=None, force=False, verbose=True, **params):
         if subset == "all":
             subset = None
@@ -160,7 +162,9 @@ class CovarianceSeries(Dataset):
             self.loader = dataset
         _check_loader(self.loader, self.mode)
         self.params = self.mode.resolve(**params)
-        self.estimator = "ledoit_wolf" if allow_small_n else estimator
+        if allow_small_n is None:
+            allow_small_n = self.mode.allow_small_n
+        self.estimator = "ledoit_wolf" if allow_small_n else (estimator or self.mode.estimator)
         self.allow_small_n = allow_small_n
         self.return_mean = return_mean
         self.normalize = normalize
@@ -311,7 +315,7 @@ class CovarianceSeries(Dataset):
     def describe(self):
         """Size of the series for the current parameters, and measured token statistics.
 
-        Returns a dict with ``dataset``, ``mode``, ``params``, ``S`` (largest number of
+        Returns a dict with ``dataset``, ``mode``, ``family``, ``params``, ``S`` (largest number of
         tokens), ``S_median``, ``p``, ``n_t`` (median over the unmasked tokens), ``n_t_min``,
         ``n_t_over_p``, ``spd_fraction`` (unmasked tokens) and ``kappa`` (5, 50 and 95 %
         quantiles of the condition number of the unmasked tokens, on at most 2 000 samples).
@@ -323,7 +327,8 @@ class CovarianceSeries(Dataset):
         eig = np.linalg.eigvalsh(np.asarray(self._tokens[rows])[self._mask[rows]])
         kappa = eig[:, -1] / eig[:, 0] if len(eig) else np.array([np.nan])
         n_t = float(np.median(n_ok)) if len(n_ok) else 0.0
-        return {"dataset": self.name, "mode": self.mode.name, "params": dict(self.params),
+        return {"dataset": self.name, "mode": self.mode.name, "family": self.mode.family,
+                "params": dict(self.params),
                 "S": int(self.lengths.max()), "S_median": float(np.median(self.lengths)),
                 "p": int(p), "n_t": n_t, "n_t_min": int(n_ok.min()) if len(n_ok) else 0,
                 "n_t_over_p": n_t / p, "spd_fraction": float(self._mask[valid].mean()),

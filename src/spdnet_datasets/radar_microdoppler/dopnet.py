@@ -286,3 +286,29 @@ class DopNetDataset(RadarCovarianceDataset):
                              min_frames=min_frames, fold=fold, archive=archive)
         super().__init__(bunch, split=split, subset=subset, data_dir=bunch.source_dir,
                          estimator=estimator, **kwargs)
+
+    def doppler_bands(self, i, n_bins=128, n_bands=16):
+        """``(T, n_bands)`` log10 power of the ``n_bins`` central Doppler bins of gesture ``i``,
+        averaged by blocks: the front end of :func:`spdnet_datasets.real.series.dopnet_series`
+        (unlike ``raw``, which holds the energy band of the loader). Re-reads the ``.mat`` files
+        (one at a time, so read the gestures in order)."""
+        from scipy.io import loadmat
+
+        r = self._bunch.meta.iloc[int(self._index[i])]
+        root = Path(self._bunch.source_dir)
+        key = ("train", r.person) if r.source == "train" else ("test",)
+        if getattr(self, "_mat", (None,))[0] != key:
+            cells = (loadmat(root / TRAIN_GLOB.replace("*", r.person))["Data_Training"]
+                     ["Doppler_Signals"][0, 0] if r.source == "train"
+                     else loadmat(root / TEST_FILE)["Data_rand"])
+            self._mat = (key, cells)
+        cells = self._mat[1]
+        if r.source == "train":
+            signal = np.asarray(cells[0, CELL_CLASSES.index(r.class_name)].ravel()[int(r["index"])])
+        else:
+            signal = np.asarray(cells[int(r["index"]), 0])
+            if signal.shape == (1, 1):
+                signal = np.asarray(signal[0, 0])
+        centre = signal.shape[0] // 2
+        power = np.abs(signal[centre - n_bins // 2: centre + n_bins // 2]) ** 2
+        return np.log10(power.reshape(n_bands, -1, power.shape[1]).mean(1) + 1e-12).T

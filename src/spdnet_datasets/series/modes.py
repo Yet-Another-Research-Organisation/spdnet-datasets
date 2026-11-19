@@ -18,13 +18,15 @@ tables of :doc:`/datasets/series_overview` from it).
 """
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
 from . import tokenizers as tok
 
-__all__ = ["SERIES_MODES", "SeriesMode", "get_mode"]
+__all__ = ["FAMILIES", "SERIES_MODES", "SeriesMode", "get_mode"]
+
+FAMILIES = ("temporal", "vision")
 
 
 def structured_raw(ds, i):
@@ -53,6 +55,16 @@ class SeriesMode:
     loader_defaults : dict
         Loader arguments the mode needs (e.g. ``features="logmel"``): used when the loader is
         built by name, and checked against a loader instance.
+    family : {"temporal", "vision"}
+        ``"temporal"``: a time series of covariances (tokens ordered along time: audio frames,
+        radar time windows, dates). ``"vision"``: tokens "as in a vision transformer", windows
+        of one measurement (spatial and/or spectral windows of a hyperspectral cube, sub-bands
+        of a whole recording). The two families are never mixed in the tables.
+    estimator : str
+        Default covariance estimator of the tokens.
+    allow_small_n : bool
+        Default of ``allow_small_n``: ``True`` only for the documented derogations of R23
+        (large-p tokens with ``n_t < 2p``, Ledoit-Wolf).
     source : callable(ds, i) -> array
         Structured sample ``i`` of the wrapped loader (unscaled).
     drop_invalid : bool
@@ -68,10 +80,17 @@ class SeriesMode:
     defaults: dict
     description: str
     example_shape: tuple
+    family: str = "vision"
+    estimator: str = "scm"
+    allow_small_n: bool = False
     loader_defaults: dict = field(default_factory=dict)
     source: Callable = structured_raw
     drop_invalid: bool = False
     min_n_over_p: float = 2.0
+
+    def __post_init__(self):
+        if self.family not in FAMILIES:
+            raise ValueError(f"family must be one of {FAMILIES}, got {self.family!r}")
 
     def resolve(self, **params):
         """Default parameters updated with ``params`` (unknown names raise ``ValueError``)."""
@@ -93,12 +112,12 @@ class SeriesMode:
 # Tokenize functions of the modes (keyword parameters = the mode defaults)
 
 
-def _temporal(x, *, window=None, step=None, n_windows=None, n_channels=None):
-    return tok.temporal(tok.pool_channels(x, n_channels), window, step, n_windows)
+def _temporal(x, *, window=None, step=None, n_windows=None, n_channels=None, cover=True):
+    return tok.temporal(tok.pool_channels(x, n_channels), window, step, n_windows, cover)
 
 
-def _spectral(x, *, band_window, band_step=None, n_windows=None):
-    return tok.spectral(x, band_window, band_step, n_windows)
+def _spectral(x, *, band_window, band_step=None, n_windows=None, cover=True):
+    return tok.spectral(x, band_window, band_step, n_windows, cover)
 
 
 def _spectro_temporal(x, *, n_windows=4, window=None, band_window=16, band_step=None):
@@ -118,84 +137,147 @@ def _spatio_spectral(x, *, window, step=None, n_windows=None, band_window, band_
 
 
 # ---------------------------------------------------------------------------
-# Families
+# Families of datasets
 
 
-def _spectrogram_modes(shape, *, window, step, n_channels, band_step=8, loader_spectral=None,
-                       unit="frames"):
+def _spectrogram_modes(shape, *, window=None, step=None, n_windows=None, n_channels,
+                       band_step=8, loader_spectral=None, estimator="scm", unit="frames",
+                       cover=True):
     """Modes of a (T, F) sample: audio frames x MFCC / log-mel, micro-Doppler time x bins."""
     loader_spectral = loader_spectral or {}
     spectral_shape = (shape[0], 64) if loader_spectral else shape
+    cut = (f"{n_windows} windows of {window} {unit}" if n_windows
+           else f"window of {window} {unit} (step {step}"
+           + (", end not padded)" if not cover else ")"))
     return {
         "temporal": SeriesMode(
             "temporal", _temporal, ("T", "F"),
-            {"window": window, "step": step, "n_windows": None, "n_channels": n_channels},
-            f"window of {window} {unit} (step {step}); variables = the F channels"
-            + (f" pooled into {n_channels}" if n_channels else ""), shape),
+            {"window": window, "step": step, "n_windows": n_windows, "n_channels": n_channels,
+             "cover": cover},
+            f"{cut}; variables = the F channels"
+            + (f" pooled into {n_channels}" if n_channels else ""), shape,
+            family="temporal", estimator=estimator),
         "spectral": SeriesMode(
             "spectral", _spectral, ("T", "F"),
-            {"band_window": 16, "band_step": band_step, "n_windows": None},
-            f"sub-band of 16 channels (step {band_step}); observations = every {unit[:-1]}",
-            spectral_shape, loader_defaults=loader_spectral),
+            {"band_window": 16, "band_step": band_step, "n_windows": None, "cover": True},
+            f"sub-band of 16 channels (step {band_step}) over the whole recording; "
+            f"observations = every {unit[:-1]}", spectral_shape, family="vision",
+            estimator=estimator, loader_defaults=loader_spectral),
         "spectro_temporal": SeriesMode(
             "spectro_temporal", _spectro_temporal, ("T", "F"),
             {"n_windows": 4, "window": None, "band_window": 16, "band_step": 16},
             "4 time windows (50 % overlap) x sub-bands of 16 channels, time-major",
-            spectral_shape, loader_defaults=loader_spectral),
+            spectral_shape, family="temporal", estimator=estimator,
+            loader_defaults=loader_spectral),
     }
 
 
 def _patch_modes(shape, *, band_window=16, band_step=8, window, step, n_channels, half,
-                 band_window_ss=16):
-    """Modes of an (H, W, B) hyperspectral patch."""
+                 band_window_ss=16, estimator="scm"):
+    """Modes of an (H, W, B) hyperspectral patch (all of the "vision" family)."""
     return {
         "spectral": SeriesMode(
             "spectral", _spectral, ("H", "W", "B"),
-            {"band_window": band_window, "band_step": band_step, "n_windows": None},
+            {"band_window": band_window, "band_step": band_step, "n_windows": None,
+             "cover": True},
             f"window of {band_window} bands (step {band_step}); observations = the pixels",
-            shape, drop_invalid=True),
+            shape, estimator=estimator, drop_invalid=True),
         "spatial": SeriesMode(
             "spatial", _spatial, ("H", "W", "B"),
             {"window": window, "step": step, "n_windows": None, "n_channels": n_channels},
             f"{window[0]} x {window[1]} sub-window (step {step[0]}); variables = the bands"
-            + (f" pooled into {n_channels}" if n_channels else ""), shape, drop_invalid=True),
+            + (f" pooled into {n_channels}" if n_channels else ""), shape,
+            estimator=estimator, drop_invalid=True),
         "spatio_spectral": SeriesMode(
             "spatio_spectral", _spatio_spectral, ("H", "W", "B"),
             {"window": half, "step": half, "n_windows": None, "band_window": band_window_ss,
              "band_step": band_window_ss, "band_n_windows": None},
             f"{half[0]} x {half[1]} quadrant x window of {band_window_ss} bands, spatial-major",
-            shape, drop_invalid=True),
+            shape, estimator=estimator, drop_invalid=True),
     }
+
+
+def _variant(mode, name, description, **changes):
+    """Copy of ``mode`` under another name, with other defaults (``defaults=``) or attributes."""
+    defaults = {**mode.defaults, **changes.pop("defaults", {})}
+    return replace(mode, name=name, description=description, defaults=defaults, **changes)
+
+
+def _large_p_spectral(modes, windows):
+    """R23 (``real/series_large_p.py``, ``experiments/real_data.py``): spectral windows of
+    48 / 64 / 96 bands, ``{p: band_step}``."""
+    for p, step in windows.items():
+        modes[f"spectral_w{p}"] = _variant(
+            modes["spectral"], f"spectral_w{p}",
+            f"R23 large p: window of {p} bands (step {step}, end not padded, as in R23); "
+            "observations = the pixels",
+            defaults={"band_window": p, "band_step": step, "cover": False})
+    return modes
 
 
 _AUDIO_LOGMEL = {"features": "logmel"}
 
+
+def _audio_modes(shape, window, step):
+    modes = _spectrogram_modes(shape, window=window, step=step, n_channels=None,
+                               loader_spectral=_AUDIO_LOGMEL)
+    modes["temporal_mel64"] = _variant(
+        modes["temporal"], "temporal_mel64",
+        f"R23 large p: window of {window} frames (step {step}), 64 log-mel bands",
+        example_shape=(shape[0], 64), loader_defaults=_AUDIO_LOGMEL, estimator="ledoit_wolf",
+        allow_small_n=2 * 64 > window)
+    return modes
+
+
+def _dopnet_bands(ds, i):
+    """Dop-NET source: 128 central Doppler bins in 16 bands (``real.series.dopnet_series``)."""
+    return ds.doppler_bands(i)
+
+
 SERIES_MODES = {
-    # audio: frames x 20 MFCC (temporal) or x 64 log-mel bands (spectral modes)
-    "esc50": _spectrogram_modes((427, 20), window=86, step=43, n_channels=None,
-                                loader_spectral=_AUDIO_LOGMEL),
-    "gtzan": _spectrogram_modes((2584, 20), window=258, step=129, n_channels=None,
-                                loader_spectral=_AUDIO_LOGMEL),
+    # audio: frames x 20 MFCC (temporal) or x 64 log-mel bands (other modes); 1 s / 3 s windows
+    "esc50": _audio_modes((427, 20), 86, 43),
+    "gtzan": _audio_modes((2584, 20), 258, 129),
     "birdset_xcm": _spectrogram_modes((312, 20), window=62, step=31, n_channels=None,
                                       loader_spectral=_AUDIO_LOGMEL),
-    # micro-Doppler: time x Doppler bins of the loader (64, 2 views x 32, 48)
-    "ci4r": _spectrogram_modes((1475, 64), window=200, step=100, n_channels=16),
+    # micro-Doppler: time x Doppler bins of the loader
+    # CI4R (real.series.ci4r_series): central half of the Doppler axis in 16 bands, 13 windows
+    # of 200 columns, Ledoit-Wolf
+    "ci4r": _spectrogram_modes((1475, 64), window=200, step=100, n_channels=16,
+                               estimator="ledoit_wolf", unit="columns", cover=False),
     "mvdoppler": _spectrogram_modes((256, 64), window=64, step=32, n_channels=16, band_step=16),
-    "dopnet": _spectrogram_modes((180, 48), window=48, step=24, n_channels=16),
+    "dopnet": _spectrogram_modes((180, 48), window=48, step=24, n_channels=16, cover=False),
     # hyperspectral patches: H x W x bands of the loader
     "gsoff": _patch_modes((15, 15, 63), window=(8, 8), step=(4, 4), n_channels=16, half=(8, 8)),
     "chikusei": _patch_modes((15, 15, 64), window=(8, 8), step=(4, 4), n_channels=16,
                              half=(8, 8)),
-    "uav": _patch_modes((15, 15, 100), window=(8, 8), step=(4, 4), n_channels=16, half=(8, 8)),
-    "kaggle_wheat": _patch_modes((32, 32, 107), window=(16, 16), step=(8, 8), n_channels=16,
-                                 half=(16, 16)),
+    "uav": _large_p_spectral(
+        _patch_modes((15, 15, 100), window=(8, 8), step=(4, 4), n_channels=16, half=(8, 8),
+                     estimator="ledoit_wolf"), {48: 8, 64: 6}),
+    "kaggle_wheat": _large_p_spectral(
+        _patch_modes((32, 32, 107), window=(16, 16), step=(8, 8), n_channels=16,
+                     half=(16, 16), estimator="ledoit_wolf"), {48: 8, 64: 8}),
     "placenta": _patch_modes((24, 24, 37), band_window=8, band_step=4, window=(12, 12),
                              step=(6, 6), n_channels=None, half=(12, 12), band_window_ss=8),
 }
 
+# Dop-NET temporal (real.series.dopnet_series): log power of the 128 central bins in 16 bands,
+# read again from the .mat files; windows of 48 frames, step 24; identity padding
+# (collate_series). The other modes cut the 48 energy-band channels of the loader.
+SERIES_MODES["dopnet"]["temporal"] = _variant(
+    SERIES_MODES["dopnet"]["temporal"], "temporal",
+    "window of 48 frames (step 24); variables = the 128 central Doppler bins in 16 bands",
+    defaults={"n_channels": None}, source=_dopnet_bands, example_shape=(180, 16))
+
+# MVDoppler, R23 large p: the 64 channels (2 views x 32 bins) without pooling, Ledoit-Wolf
+SERIES_MODES["mvdoppler"]["temporal_w64"] = _variant(
+    SERIES_MODES["mvdoppler"]["temporal"], "temporal_w64",
+    "R23 large p: window of 64 frames (step 32), the 64 channels (2 views x 32 bins)",
+    defaults={"n_channels": None}, estimator="ledoit_wolf", allow_small_n=True)
+
 # HyperLeaf: whole image 48 x 352 x 204, user example first (6 spatial x 4 band windows)
 _HYPERLEAF = (48, 352, 204)
-SERIES_MODES["hyperleaf"] = {
+SERIES_MODES["hyperleaf"] = _large_p_spectral({
     "spatio_spectral": SeriesMode(
         "spatio_spectral", _spatio_spectral, ("H", "W", "B"),
         {"window": (48, 58), "step": None, "n_windows": (1, 6), "band_window": 48,
@@ -209,10 +291,10 @@ SERIES_MODES["hyperleaf"] = {
         "pixels", _HYPERLEAF, drop_invalid=True),
     "spectral": SeriesMode(
         "spectral", _spectral, ("H", "W", "B"),
-        {"band_window": 16, "band_step": 8, "n_windows": None},
+        {"band_window": 16, "band_step": 8, "n_windows": None, "cover": True},
         "window of 16 bands (step 8); observations = the leaf pixels", _HYPERLEAF,
         drop_invalid=True),
-}
+}, {48: 16, 64: 16, 96: 16})
 
 
 def get_mode(dataset, mode=None):
