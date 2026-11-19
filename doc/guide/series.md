@@ -198,6 +198,13 @@ train, val, test = create_dataloaders(series, split="recommended", batch_size=16
 test_only = CovarianceSeries("ci4r", subset="test")   # one part of the split
 ```
 
+Built by name, the loader estimates its own (unused) covariance with Ledoit-Wolf
+(`estimator="ledoit_wolf"`, changed through `loader_kwargs`): a sample is never lost because
+its single `p × p` covariance is singular, since every token is checked on its own. The
+exclusions of the loader's preprocessing are inherited: silent or empty recordings, files
+without data, and sequences shorter than `2p` frames or pixels for the loader's own `p`
+(the dataset pages count them).
+
 The loader must expose every sample (`subset=None`); pass `subset` to
 `CovarianceSeries` instead. A loader instance can also be wrapped:
 `CovarianceSeries(ESC50Dataset(features="logmel"), "spectral")`. The mode then

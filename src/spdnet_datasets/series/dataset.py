@@ -22,6 +22,7 @@ from .modes import get_mode
 __all__ = ["CovarianceSeries", "collate_series"]
 
 SUBSETS = (None, "train", "val", "test")
+LOADER_ESTIMATOR_FIXED = {"hdm05", "deephsfruit"}  # given covariances: no estimator choice
 
 
 def _registry_name(ds):
@@ -39,7 +40,11 @@ def _build_loader(name, mode, loader_kwargs):
 
     if name not in DatasetManager.DATASETS:
         raise ValueError(f"Unknown dataset {name!r}")
-    kwargs = {**mode.loader_defaults, **(loader_kwargs or {})}
+    # Ledoit-Wolf for the loader's own covariance: a sample must not be dropped because its
+    # single p x p covariance is singular (the tokens are checked one by one); exclusions of
+    # the preprocessing (silence, too few frames or pixels, empty files) are kept.
+    base = {} if name in LOADER_ESTIMATOR_FIXED else {"estimator": "ledoit_wolf"}
+    kwargs = {**base, **mode.loader_defaults, **(loader_kwargs or {})}
     if kwargs.get("subset") not in (None, "all"):
         raise ValueError("the wrapped loader must expose every sample: pass subset to "
                          "CovarianceSeries, not to the loader")
@@ -120,7 +125,9 @@ class CovarianceSeries(Dataset):
         Part of ``split`` exposed (``None``: every sample, and :attr:`splits` indexes them).
     loader_kwargs : dict, optional
         Arguments of the loader when ``dataset`` is a name (``data_dir``, ``cache_dir``,
-        ``fold``, ``band_step``...); they update the mode's ``loader_defaults``.
+        ``fold``, ``band_step``...); they update the mode's ``loader_defaults``. By default
+        the loader estimates its own covariance with Ledoit-Wolf, so that no sample is lost
+        because its single covariance is singular (pass ``estimator`` to change it).
     estimator : {"scm", "ledoit_wolf", "tyler", "student"}, optional
         Default: the mode's estimator.
     allow_small_n : bool, optional
