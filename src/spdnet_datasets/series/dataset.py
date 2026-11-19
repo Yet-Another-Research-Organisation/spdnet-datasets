@@ -51,15 +51,16 @@ def _build_loader(name, mode, loader_kwargs):
     return DatasetManager.DATASETS[name](**kwargs)
 
 
-def _check_loader(ds, mode):
-    """The loader instance must match the mode's loader requirements and expose every sample."""
+def _check_loader(ds, mode, overridden=()):
+    """The loader instance must match the mode's loader settings (except those the user
+    overrode with ``loader_kwargs``) and expose every sample."""
     if getattr(ds, "subset", None) is not None:
         raise ValueError("the wrapped loader was built with subset="
                          f"{ds.subset!r}: build it with subset=None and pass subset to "
                          "CovarianceSeries")
     settings = {**vars(ds), **getattr(ds, "feature_kwargs", {})}
     for key, value in mode.loader_defaults.items():
-        if key in settings and settings[key] != value:
+        if key not in overridden and key in settings and settings[key] != value:
             raise ValueError(f"mode {mode.name!r} needs a loader with {key}={value!r}, got "
                              f"{settings[key]!r}")
 
@@ -173,7 +174,7 @@ class CovarianceSeries(Dataset):
             self.name = _registry_name(dataset)
             self.mode = get_mode(self.name, mode)
             self.loader = dataset
-        _check_loader(self.loader, self.mode)
+        _check_loader(self.loader, self.mode, set(loader_kwargs or ()))
         self.params = self.mode.resolve(**params)
         if allow_small_n is None:
             allow_small_n = self.mode.allow_small_n
