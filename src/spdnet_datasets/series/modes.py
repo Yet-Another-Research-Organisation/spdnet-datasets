@@ -253,8 +253,12 @@ SERIES_MODES = {
     # audio: frames x 20 MFCC (temporal) or x 64 log-mel bands (other modes); 1 s / 3 s windows
     "esc50": _audio_modes((427, 20), 86, 43),
     "gtzan": _audio_modes((2584, 20), 258, 129),
-    "birdset_xcm": _spectrogram_modes((312, 20), window=62, step=31, n_channels=None,
-                                      loader_spectral=_AUDIO_LOGMEL),
+    # BirdSet: 5 s excerpt centred on the first detected event (loader crop_s=5), as the
+    # atlas and real.series_audio.birdset_series; whole recordings last up to minutes
+    "birdset_xcm": {name: replace(mode, loader_defaults={**mode.loader_defaults, "crop_s": 5})
+                    for name, mode in _spectrogram_modes(
+                        (312, 20), window=62, step=31, n_channels=None,
+                        loader_spectral=_AUDIO_LOGMEL).items()},
     # micro-Doppler: time x Doppler bins of the loader
     # CI4R (real.series.ci4r_series): central half of the Doppler axis in 16 bands, 13 windows
     # of 200 columns, Ledoit-Wolf
