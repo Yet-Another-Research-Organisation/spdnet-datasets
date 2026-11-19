@@ -66,7 +66,9 @@ class DatasetFigure(SphinxDirective):
         depth = self.env.docname.count("/")
         url = "../" * depth + "_static/figures/" + ref
         kind = ref.rsplit("/", 1)[-1]
-        alt = html.escape(self.options.get("alt", ALT.get(kind, kind.replace("_", " "))))
+        default = (f"Covariance-series diagram of the {kind[7:]} mode: sample, tokens and "
+                   "series" if kind.startswith("series_") else kind.replace("_", " "))
+        alt = html.escape(self.options.get("alt", ALT.get(kind, default)))
         caption = self.options.get("caption")
         cap = f"<figcaption>{html.escape(caption)}</figcaption>" if caption else ""
 

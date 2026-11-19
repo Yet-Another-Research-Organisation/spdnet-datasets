@@ -14,6 +14,11 @@ one series per agricultural parcel, the observations of a covariance being the p
 - ``pooled`` (baseline B3, no series): one covariance over the pixels x periods, (N, 1, 14, 14).
 - Official folds: 1-3 train, 4 validation, 5 test, each capped by a stratified subsample drawn once (seed 0):
   ``caps`` = (train, val, test).
+
+.. note::
+   :class:`spdnet_datasets.series.CovarianceSeries` now builds these series on top of the main
+   loaders (their samples, splits and groups) for the S1 + S2 fusion (``CovarianceSeries("pastis_r", "s1s2_fusion")``). See the guide page
+   "Covariance series". This module is kept to reproduce earlier results.
 """
 
 import ast

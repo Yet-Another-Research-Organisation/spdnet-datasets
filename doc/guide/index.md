@@ -64,6 +64,16 @@ Groups, official and recommended splits, and how leakage is measured.
 The configuration-dictionary entry point used by the Hydra configs of
 `spdnet-training`.
 :::
+
+:::{grid-item-card} {octicon}`stack` Covariance series
+:link: series
+:link-type: doc
+:class-card: sd-card-hover
+:class-item: tile tile-here
+
+Sequences of SPD tokens per sample: time windows or vision tokens, defaults,
+masking, normalisation and how to override the parameters.
+:::
 ::::
 
 ```{seealso}
@@ -80,4 +90,5 @@ tasks
 fetch
 splits
 loading
+series
 ```

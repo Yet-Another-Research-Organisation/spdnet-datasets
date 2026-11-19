@@ -17,6 +17,11 @@ of ``window_s`` seconds (step = half a window). Positions are time windows: they
   n/p = 4.3); groups = source recording.
 - BirdSet XCM (21 downloaded shards): 5 s crop centred on the first detected event, 1 s windows (T = 8, n = 62
   frames, n/p = 3.1); species with >= ``min_recordings`` recordings; groups = recordist.
+
+.. note::
+   :class:`spdnet_datasets.series.CovarianceSeries` now builds these series on top of the main
+   loaders (their samples, splits and groups) for ESC-50, GTZAN and BirdSet XCM (``CovarianceSeries("esc50")``); UrbanSound8K stays here only. See the guide page
+   "Covariance series". This module is kept to reproduce earlier results.
 """
 
 import glob

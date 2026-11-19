@@ -58,6 +58,11 @@ only (``fit_mask`` or the internal split, see each builder).
 - :func:`kaggle_wheat_series`: Kaggle wheat (Health / Other / Rust), 32 x 32 hyperspectral patches: spectral
   windows of b bands over the 1 024 pixels of the first 125 bands; the 23 all-zero patches are dropped.
   Ledoit-Wolf, for the same reason (0.7 % of the empirical tokens at the loading floor).
+
+.. note::
+   :class:`spdnet_datasets.series.CovarianceSeries` now builds these series on top of the main
+   loaders (their samples, splits and groups) for the builders of HyperLeaf, DeepHS-Fruit, CI4R, PASTIS-R, Dop-NET, UAV-HSI-Crop and Kaggle wheat (``CovarianceSeries("hyperleaf", "spectral")``, ``CovarianceSeries("ci4r")``, ``CovarianceSeries("dopnet")``, ``CovarianceSeries("pastis_r")``...); FMCW stays here only. See the guide page
+   "Covariance series". This module is kept to reproduce earlier results.
 """
 
 import glob

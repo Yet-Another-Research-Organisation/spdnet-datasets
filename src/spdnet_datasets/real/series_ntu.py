@@ -15,6 +15,11 @@ actions; drink / eat / brush teeth / brush hair are close to each other), body 0
 
 The standardisations of :func:`ntu_part_series`, :func:`ntu_jointcov_series` and :func:`ntu_axis_series` are
 fitted on the training sequences only (``split == 0``) and applied to every split.
+
+.. note::
+   :class:`spdnet_datasets.series.CovarianceSeries` now builds these series on top of the main
+   loaders (their samples, splits and groups) for every builder of this module (``CovarianceSeries("ntu120", "joint" | "frame" | "part" | "jointcov" | "axis")``). See the guide page
+   "Covariance series". This module is kept to reproduce earlier results.
 """
 
 import glob

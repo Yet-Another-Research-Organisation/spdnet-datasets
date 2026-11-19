@@ -32,6 +32,7 @@ extensions = [
     "sphinx_gallery.gen_gallery",
     "catalogue",  # _ext/catalogue.py: table of the registered datasets
     "dataset_figures",  # _ext/dataset_figures.py: fixed or interactive dataset figures
+    "series_table",  # _ext/series_table.py: covariance-series modes from the registry
 ]
 
 # Example gallery (../examples). Only the tutorials run at build time: they use

@@ -9,6 +9,11 @@ Covariance series from MVDoppler (atlas v2 sheet "mvdoppler"): mmWave Doppler sn
   capped by a stratified subsample drawn once (seed 0): ``caps`` = (train, val, test). Snapshots of one recording
   overlap by 50 % but never cross folds. Files without the HDF5 signature are skipped (two zero-filled files in the
   BERTHA copy, 9/11: phone_call_02515, texting_12478).
+
+.. note::
+   :class:`spdnet_datasets.series.CovarianceSeries` now builds these series on top of the main
+   loaders (their samples, splits and groups) for MVDoppler (``CovarianceSeries("mvdoppler")``). See the guide page
+   "Covariance series". This module is kept to reproduce earlier results.
 """
 
 from multiprocessing import Pool

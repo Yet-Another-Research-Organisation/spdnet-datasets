@@ -16,6 +16,11 @@ These series break the n >= 2p rule by design (ESC-50 log-mel: 86 frames for p =
 p = 64; NTU: a quarter of the sequence for p = 45 or 75; GTZAN log-mel, 258 frames, does satisfy it). They raise
 :class:`spdnet_datasets.core.InsufficientSamplesError` unless called with ``allow_small_n=True``, a documented
 derogation: Ledoit-Wolf shrinkage keeps the tokens SPD, but they are poorly conditioned estimates.
+
+.. note::
+   :class:`spdnet_datasets.series.CovarianceSeries` now builds these series on top of the main
+   loaders (their samples, splits and groups) for the R23 large-p series (``CovarianceSeries("ntu120", "window_p45")``, ``"esc50"`` / ``"gtzan"`` mode ``"temporal_mel64"``, ``"mvdoppler"`` mode ``"temporal_w64"``). See the guide page
+   "Covariance series". This module is kept to reproduce earlier results.
 """
 
 import glob

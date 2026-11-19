@@ -10,6 +10,11 @@ covariance, T = 1).
 Split (fixed, official): train = bundle 1 (20 % of its grains drawn as validation), test = bundle 2. For 73
 varieties both bundles come from the same session (variety confounded with the session); ``cross_session_test``
 keeps in the test set only the 17 varieties whose bundles come from two sessions (the only unconfounded score).
+
+.. note::
+   :class:`spdnet_datasets.series.CovarianceSeries` now builds these series on top of the main
+   loaders (their samples, splits and groups) for Rices_90 (``CovarianceSeries("rices90")``). See the guide page
+   "Covariance series". This module is kept to reproduce earlier results.
 """
 
 import os

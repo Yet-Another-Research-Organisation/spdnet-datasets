@@ -4,6 +4,11 @@ Normalisation statistics (band powers, feature standardisation) are fitted on th
 a boolean (N,) array in the output order, or a callable ``fit_mask(labels, groups) -> mask`` evaluated once the
 cells are known (e.g. the training blocks of a grouped split). ``None`` fits them on every cell, test included,
 with a warning.
+
+.. note::
+   :class:`spdnet_datasets.series.CovarianceSeries` now builds these series on top of the main
+   loaders (their samples, splits and groups) for the log-power patches of :func:`polinsar_logpower_series` (``CovarianceSeries("pol_insar_island")``); the T6 variants stay here only. See the guide page
+   "Covariance series". This module is kept to reproduce earlier results.
 """
 
 import re

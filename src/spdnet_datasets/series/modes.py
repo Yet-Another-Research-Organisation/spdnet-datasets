@@ -42,8 +42,9 @@ class SeriesMode:
     ----------
     name : str
         Mode name (``"temporal"``, ``"spectral"``, ...).
-    tokenize : callable(x, **params) -> (observations, positions)
-        Built on :mod:`spdnet_datasets.series.tokenizers`.
+    tokenize : callable
+        ``tokenize(x, **params) -> (observations, positions)``,
+        built on :mod:`spdnet_datasets.series.tokenizers`.
     axes : tuple of str
         Names of the axes of the structured sample (``("T", "F")``, ``("H", "W", "B")``).
     defaults : dict
@@ -349,9 +350,9 @@ def _centred_16(x):
 
 def _joints(x, *, joints=None):
     """One token per joint: its trajectory over every frame, p = 3."""
-    J = x.shape[1]
-    groups = [(3 * j, 3 * j + 1, 3 * j + 2) for j in (joints or range(J))]
-    return tok.parts(x.reshape(len(x), -1), groups)
+    joints = list(joints) if joints is not None else range(x.shape[1])
+    return ([x[:, j] for j in joints],
+            [[(0, len(x)), (j, j + 1), (0, x.shape[2])] for j in joints])
 
 
 def _frames(x, *, n_windows=12):
@@ -374,7 +375,7 @@ def _parts_in_windows(x, *, parts, width=1 / 3, n_windows=6):
         w = x[a:b]
         for joints in parts.values():
             obs.append(w[:, list(joints)].reshape(b - a, -1))
-            pos.append([(a, b), tuple(joints), (0, 3)])
+            pos.append([(a, b), list(joints), (0, 3)])  # list: a set of joints
     return obs, pos
 
 
@@ -403,8 +404,10 @@ def _axis_covariance(x, *, width=1 / 3, n_windows=4):
 def _windows_all_joints(x, *, joints=None, n_windows=8):
     """R23 ``ntu_window_series``: windows of a quarter of the sequence, evenly spread, over
     the 3 x J coordinates (camera axes, not centred)."""
+    J = list(joints) if joints is not None else (0, x.shape[1])
     x = x if joints is None else x[:, list(joints)]
-    return tok.temporal(x.reshape(len(x), -1), max(len(x) // 4, 3), n_windows=n_windows)
+    obs, pos = tok.temporal(x.reshape(len(x), -1), max(len(x) // 4, 3), n_windows=n_windows)
+    return obs, [[p[0], J, (0, 3)] for p in pos]
 
 
 def _skeleton_modes(shape, *, ntu=True):

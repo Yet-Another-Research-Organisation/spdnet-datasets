@@ -11,6 +11,11 @@ spectral windows: each has its own identity.
 - GSOFF (Gaofeng): 1 106 non-overlapping 16 x 16 windows (top-left corners in ``positions``, checked against the
   source scene); windows with at least ``min_labelled`` labelled pixels in the ground truth and classes with at
   least ``min_windows`` of them; groups = (64-pixel block, class), as UAV-HSI-Crop.
+
+.. note::
+   :class:`spdnet_datasets.series.CovarianceSeries` now builds these series on top of the main
+   loaders (their samples, splits and groups) for Chikusei and GSOFF (``CovarianceSeries("chikusei", "spectral")``). See the guide page
+   "Covariance series". This module is kept to reproduce earlier results.
 """
 
 import os

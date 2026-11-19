@@ -138,6 +138,16 @@ Generators of SPD datasets whose class differences are known.
 
 Subclass `BaseDataset`, register it, write its fetch, tests and page.
 :::
+
+:::{grid-item-card} {octicon}`stack` Covariance series
+:link: series_overview
+:link-type: doc
+:class-card: sd-card-hover
+:class-item: tile tile-here
+
+Every mode of `CovarianceSeries` per dataset, with its S, p, n_t and defaults,
+generated from the registry.
+:::
 ::::
 
 ```{toctree}
@@ -161,4 +171,5 @@ catalogue
 covariance
 synthetic
 adding
+series_overview
 ```
