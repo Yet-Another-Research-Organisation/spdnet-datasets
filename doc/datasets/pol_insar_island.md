@@ -10,11 +10,14 @@
 * - Covariance
   - 12×12 real (`logpower`, default; n = labelled pixels of a 32 m cell, ≥ 512) · 24×24 block-diagonal (`t6`)
 * - Outputs
-  - cov · mean · raw (32, 32, 12) (`logpower` only)
+  - cov · mean · raw (`logpower` only): labelled pixels (n, 12), or the (32, 32, 12) grid with `raw_layout="grid"`
 * - Splits
   - `spatial512_fold0` … `fold4` (`recommended` = fold 0; 2 700 / 982 / 1 107) · `fp1_to_fp2` · `official` checkerboard (optimistic)
 * - Module
   - {mod}`spdnet_datasets.sar.pol_insar_island` (`fetch_pol_insar_island`, `PolInSARIslandDataset`)
+```
+
+```{dataset-preview} pol_insar_island
 ```
 
 ## Description and source
@@ -61,13 +64,16 @@ label/<FP>/label_{train,test}.bin   12 classes, 0 = unlabelled
 ```
 
 The georeferencing comes from the label headers, because the FP1 L-band
-headers are wrong (zone 30, origin 0). The default raw output is the
-(32, 32, 12) array of log-powers log T11 … log T66 of the L and S bands for
-every pixel of the cell, unlabelled pixels included. The figure shows the mean
-over the 12 channels.
+headers are wrong (zone 30, origin 0). The raw output holds the log-powers
+log T11 … log T66 of the L and S bands. By default (`raw_layout="pixels"`) it
+is the (n, 12) array of the labelled pixels of the cell: exactly the
+observations of the covariance and of the mean. Since n varies from cell to
+cell (512 to 1 024), use `batch_size=1` or a `collate_fn`. With
+`raw_layout="grid"` it is the (32, 32, 12) grid of the cell, with the
+unlabelled pixels set to 0. The figure shows the mean over the 12 channels of
+the whole cell.
 
-```{raw} html
-<iframe src="../_static/figures/pol_insar_island/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} pol_insar_island/raw_samples
 ```
 
 ## Classes
@@ -77,9 +83,10 @@ white dune, peat bog, grey dune, couch grass, upper saltmarsh, lower
 saltmarsh, sand and settlement. Peat bog is rare and spatially concentrated:
 in fold 0, all its 53 cells fall in the training part.
 
-```{raw} html
-<iframe src="../_static/figures/pol_insar_island/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/pol_insar_island/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} pol_insar_island/class_hist
+```
+
+```{dataset-figure} pol_insar_island/class_means
 ```
 
 ## Covariance construction
@@ -121,9 +128,10 @@ upper terms. At load time, the geometric scale s of `core.normalize` is fitted
 on the training part; means and raw features are multiplied by √s (the `t6`
 means, which are T6 entries, by s).
 
-```{raw} html
-<iframe src="../_static/figures/pol_insar_island/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/pol_insar_island/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} pol_insar_island/cov_samples
+```
+
+```{dataset-figure} pol_insar_island/eigen_spectrum
 ```
 
 ## Splits
@@ -147,9 +155,10 @@ checkerboard, so neighbouring cells sit on both sides. The loader raises a
 (≥ 256 labelled pixels), which reproduces its 3 315 / 3 403 cells; at ≥ 512
 pixels there would be only 2 380 / 2 529.
 
-```{raw} html
-<iframe src="../_static/figures/pol_insar_island/split_map.html" class="plotly-figure" style="height:620px" loading="lazy"></iframe>
-<iframe src="../_static/figures/pol_insar_island/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} pol_insar_island/split_map
+```
+
+```{dataset-figure} pol_insar_island/split_schema
 ```
 
 ## Leakage risks and measures
@@ -179,3 +188,12 @@ ds = PolInSARIslandDataset(split="recommended")                 # logpower, 12×
 t6 = PolInSARIslandDataset(representation="t6")                 # 24×24, scm only
 off = PolInSARIslandDataset(cells="official", split="official")  # optimistic, warns
 ```
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/pol_insar_island.md
+```
+````

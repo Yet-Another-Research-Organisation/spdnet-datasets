@@ -1,11 +1,12 @@
-"""Build the five interactive figures of a dataset page (Plotly, static HTML).
+"""Build the figures of a dataset page (Plotly figures, written by figures_io.py).
 
 Run on a machine that holds the data (BERTHA); the documentation build only
-embeds the resulting HTML files, so the CI never needs the datasets::
+embeds the resulting files, so the CI never needs the datasets::
 
     python doc/tools/make_figures.py pastis_r --kwargs '{"scenario": "A"}' --split official
 
-Writes ``doc/_static/figures/<page>/<kind>.html`` and ``summary.json`` (class
+Writes ``doc/_static/figures/<page>/<kind>.{png,json}`` (fixed or interactive,
+see ``figures_io.py``) and ``summary.json`` (class
 counts per split, p, n). The five figure kinds follow the dataset-atlas contract,
 plus the eigenvalue spectrum:
 
@@ -22,6 +23,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+from figures_io import write_figure
 
 # Reference categorical palette (dataviz skill), light mode, fixed order.
 SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6",
@@ -131,7 +133,7 @@ def build(name, kwargs, split, page, max_samples=600, seed=0):
     figs["class_hist"] = fig
 
     # cov_samples
-    k = min(4 if p <= 128 else 2, len(covs))  # fewer panels for large p (HTML size)
+    k = min(4 if p <= 128 else 2, len(covs))  # fewer panels for large p (file size)
     fig = make_subplots(rows=1, cols=k, subplot_titles=[names[ys[j]] if ys[j] >= 0 else "?"
                                                         for j in range(k)])
     for j in range(k):
@@ -171,8 +173,7 @@ def build(name, kwargs, split, page, max_samples=600, seed=0):
     figs["split_schema"] = fig
 
     for kind, f in figs.items():
-        (out / f"{kind}.html").write_text(
-            f.to_html(include_plotlyjs="cdn", full_html=True, config={"responsive": True}))
+        write_figure(f, out, kind)
     summary = {"name": name, "kwargs": kwargs, "split": split, "p": int(p),
                "n_samples": int(len(ds)), "classes": names, "counts": counts}
     (out / "summary.json").write_text(json.dumps(summary, indent=1))

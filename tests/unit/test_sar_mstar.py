@@ -66,3 +66,12 @@ def test_official_split_by_depression(mstar_dir):
     assert set(ds.meta["part"][s["test"]]) == {"test"} and len(s["test"]) == 12
     assert set(ds.meta["part"][np.r_[s["train"], s["val"]]]) == {"train"}
     assert_no_leakage(ds.meta["chip_id"][s["train"]], ds.meta["chip_id"][s["test"]])
+
+
+def test_no_groups_and_stratified_validation(mstar_dir):
+    """The file stem is not a physical unit and the vehicle is the class: no groups."""
+    ds = MSTARDataset(mstar_dir, crop=16, return_raw=True, verbose=False, val_size=0.5)
+    assert ds.groups is None
+    s = ds.splits["official"]
+    # stratified draw in the 17 deg chips: 3 of the 6 training chips of each class
+    assert ds.meta["label"][s["val"]].value_counts().to_dict() == dict.fromkeys(ds.classes, 3)

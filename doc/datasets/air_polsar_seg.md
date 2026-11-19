@@ -17,6 +17,9 @@
   - {mod}`spdnet_datasets.sar.air_polsar_seg` (`fetch_air_polsar_seg`, `AIRPolSARSegDataset`)
 ```
 
+```{dataset-preview} air_polsar_seg
+```
+
 ## Description and source
 
 AIR-PolSAR-Seg contains 500 patches of 512 × 512 pixels. They are cut from
@@ -60,9 +63,10 @@ fetch_air_polsar_seg(archive="~/Downloads/Raw_AIR-PolarSAR-Seg.zip")
 `log10(1 + A)` for each polarisation. The mean is the per-channel mean of that
 raw cell.
 
-```{raw} html
-<iframe src="../_static/figures/air_polsar_seg/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/air_polsar_seg/amplitude_hist.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} air_polsar_seg/raw_samples
+```
+
+```{dataset-figure} air_polsar_seg/amplitude_hist
 ```
 
 ## Classes
@@ -81,9 +85,10 @@ The ground-truth colours map to six classes:
 Black (0, 0, 0) marks unannotated pixels. With 32 × 32 cells, housing has
 23 210 cells and land use only 660.
 
-```{raw} html
-<iframe src="../_static/figures/air_polsar_seg/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/air_polsar_seg/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} air_polsar_seg/class_hist
+```
+
+```{dataset-figure} air_polsar_seg/class_means
 ```
 
 ## Covariance construction
@@ -134,8 +139,7 @@ For `recommended` (fold 0), the split is 33 407 train, 11 013 validation and
 11 710 test cells. The guard band removes 1 137 cells. No cell is shared by
 train and test, checked by md5.
 
-```{raw} html
-<iframe src="../_static/figures/air_polsar_seg/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} air_polsar_seg/split_schema
 ```
 
 ## Leakage risks and measures
@@ -163,3 +167,12 @@ ds = AIRPolSARSegDataset(cell=32, return_raw=True)
 x, y = ds[0]                         # (32, 32, 4) float32, log10(1 + A)
 ds.positions.head()                  # patch positions in the rebuilt mosaic
 ```
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/air_polsar_seg.md
+```
+````

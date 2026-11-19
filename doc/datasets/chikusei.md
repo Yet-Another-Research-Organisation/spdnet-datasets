@@ -19,6 +19,9 @@
   - `spdnet_datasets.hyperspectral.chikusei` (`fetch_chikusei`, `ChikuseiDataset`, registry name `chikusei`)
 ```
 
+```{dataset-preview} chikusei
+```
+
 ## Description and source
 
 Airborne scene over Chikusei (Ibaraki, Japan), acquired on 29 July 2014 by a
@@ -70,8 +73,7 @@ The raw output is the 15 × 15 × 64 window (uint16 reflectance, integer values
 from 0 to 15 133, scale undocumented). The figure shows the band-mean image of
 four windows.
 
-```{raw} html
-<iframe src="../_static/figures/chikusei/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} chikusei/raw_samples
 ```
 
 ## Classes
@@ -92,9 +94,10 @@ smallest:
 | Bare soil (school) | 176 | Paved ground | 11 |
 | Plastic house | 124 | | |
 
-```{raw} html
-<iframe src="../_static/figures/chikusei/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/chikusei/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} chikusei/class_hist
+```
+
+```{dataset-figure} chikusei/class_means
 ```
 
 ## Covariance construction
@@ -120,9 +123,10 @@ The windows are not re-extracted from the source scene. The block assignment
 of the split exists only in `prepared_v2`, and a re-extraction gives the same
 windows.
 
-```{raw} html
-<iframe src="../_static/figures/chikusei/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/chikusei/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} chikusei/cov_samples
+```
+
+```{dataset-figure} chikusei/eigen_spectrum
 ```
 
 ## Splits
@@ -143,8 +147,7 @@ the atlas:
   farmland, Rice field (first stage), Manmade grass and Paved ground. Seven
   classes are absent from validation and eight from test.
 
-```{raw} html
-<iframe src="../_static/figures/chikusei/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} chikusei/split_schema
 ```
 
 ## Leakage risks and measures
@@ -183,3 +186,12 @@ test = ChikuseiDataset(subset="test", window=23, estimator="ledoit_wolf")
   default) keeps every sample.
 - Use `estimator=`. `cov_method=...` is silently absorbed by `**kwargs` and
   gives the SCM.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/chikusei.md
+```
+````

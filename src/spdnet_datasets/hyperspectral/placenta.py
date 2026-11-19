@@ -50,7 +50,7 @@ from ..core.config import dataset_path
 from ..core.estimators import check_sample_size
 from ..core.fetch import Bunch, check_local, download, md5sum, run_pipeline
 from ..manager import DatasetManager
-from ..utils.sources import check_size, downloads_dir
+from ..utils.sources import check_size, downloads_dir, existing_dir
 from ._common import (
     HSIDataset,
     band_index,
@@ -100,7 +100,7 @@ def _download_root(cache_dir, archive):
                     raise OSError(f"Checksum mismatch for {z}")
             else:
                 z = download(ZENODO + urllib.parse.quote(name) + "?download=1", out / name,
-                             checksum=md5, algo="md5")
+                             checksum=md5, algo="md5", size=size)
             extract_archive(z, out / name[:-4])
     build_windows(src, out / "imagettes")
     return out
@@ -200,9 +200,10 @@ class PlacentaDataset(HSIDataset):
                  split="recommended", subset=None, cache_dir=None, keep=None, force=False,
                  verify="size", **kwargs):
         root = dataset_path(DOMAIN, NAME, data_dir)
-        super().__init__(data_dir=str(root), **kwargs)
+        super().__init__(data_dir=str(existing_dir(root, cache_dir)), **kwargs)
         bunch = fetch_placenta(root, cache_dir, keep, self.estimator, force, verify,
                                band_step=band_step, n_splits=n_splits, fold=fold)
+        self.data_dir = Path(bunch.root)
         self._setup(bunch, split, subset)
         self._windows = np.load(bunch.windows_path, mmap_mode="r")
 

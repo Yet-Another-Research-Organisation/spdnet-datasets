@@ -1,0 +1,1 @@
+- X. Hou *et al.*, "FUSAR-Ship: building a high-resolution SAR-AIS matchup dataset of Gaofen-3 for ship detection and recognition", *Science China Information Sciences* 63, 2020, 140303. doi:[10.1007/s11432-019-2772-5](https://doi.org/10.1007/s11432-019-2772-5)

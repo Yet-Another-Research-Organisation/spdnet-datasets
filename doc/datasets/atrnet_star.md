@@ -17,6 +17,9 @@
   - {mod}`spdnet_datasets.sar.atrnet_star` (`fetch_atrnet_star`, `ATRNetSTARDataset`, `protocol_overlap`)
 ```
 
+```{dataset-preview} atrnet_star
+```
+
 ## Description and source
 
 ATRNet-STAR holds 128 × 128 SAR chips of 40 civilian vehicles: cars, vans,
@@ -70,8 +73,7 @@ The mean output is the per-channel mean of the raw chip. The loader builds the
 list of chips of a protocol from `MANIFEST_NAS.tsv`, without walking the
 2.1 million files, and caches it as JSON in `<cache_dir>/atrnet_star/index/`.
 
-```{raw} html
-<iframe src="../_static/figures/atrnet_star/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} atrnet_star/raw_samples
 ```
 
 ## Classes
@@ -80,9 +82,10 @@ There are 40 vehicle models, with 266 to 530 training chips per class in
 `SOC_40classes` (`Slant_Range`). The mean-profile figure shows the first 8
 classes in the four polarisations.
 
-```{raw} html
-<iframe src="../_static/figures/atrnet_star/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/atrnet_star/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} atrnet_star/class_hist
+```
+
+```{dataset-figure} atrnet_star/class_means
 ```
 
 ## Covariance construction
@@ -135,8 +138,7 @@ chips: 12 993 train, 1 444 validation and 30 085 test.
 The group of a chip is its own id, so every group has size 1 in the figure
 below. The protocols are defined by acquisition conditions, not by groups.
 
-```{raw} html
-<iframe src="../_static/figures/atrnet_star/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} atrnet_star/split_schema
 ```
 
 ## Leakage risks and measures
@@ -152,8 +154,7 @@ with `protocol_overlap()`, the chips (same class and file name) shared by the
 train and test parts of every pair of protocols. The diagonal blocks of each
 protocol have zero train–test overlap.
 
-```{raw} html
-<iframe src="../_static/figures/atrnet_star/protocol_overlap.html" class="plotly-figure" style="height:580px" loading="lazy"></iframe>
+```{dataset-figure} atrnet_star/protocol_overlap
 ```
 
 | Risk | Measure | Residual |
@@ -181,3 +182,12 @@ x, y = ds[0]                         # (128, 128, 4) amplitudes
 protocol_overlap(a="SOC_40classes", b="EOC_depression")
 # {('train', 'train'): 3891, ('train', 'test'): 13112, ('test', 'train'): 1666, ('test', 'test'): 5577}
 ```
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/atrnet_star.md
+```
+````

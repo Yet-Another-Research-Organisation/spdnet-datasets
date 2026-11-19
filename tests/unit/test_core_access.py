@@ -14,10 +14,13 @@ from spdnet_datasets.core import fetch as F
 
 
 @pytest.fixture(autouse=True)
-def _no_keyring(monkeypatch):
+def _no_keyring(monkeypatch, tmp_path_factory):
     monkeypatch.setattr(A, "_keyring_get", lambda name: None)
-    for var in ("KAGGLE_USERNAME", "KAGGLE_KEY", "HF_TOKEN", "HUGGING_FACE_HUB_TOKEN"):
+    for var in ("KAGGLE_USERNAME", "KAGGLE_KEY", "KAGGLE_API_TOKEN", "HF_TOKEN",
+                "HUGGING_FACE_HUB_TOKEN"):
         monkeypatch.delenv(var, raising=False)
+    # never read the real ~/.kaggle of the machine running the tests
+    monkeypatch.setenv("KAGGLE_CONFIG_DIR", str(tmp_path_factory.mktemp("kaggle_home")))
 
 
 # --- secrets ---------------------------------------------------------------------------------
@@ -56,8 +59,38 @@ def test_kaggle_credentials_from_env_and_file(monkeypatch, tmp_path):
 
 def test_kaggle_credentials_missing(monkeypatch, tmp_path):
     monkeypatch.setenv("KAGGLE_CONFIG_DIR", str(tmp_path))
-    with pytest.raises(A.MissingCredentialsError, match="kaggle.json"):
+    with pytest.raises(A.MissingCredentialsError, match="access_token"):
         A.kaggle_credentials(interactive=False)
+    with pytest.raises(A.MissingCredentialsError, match="Generate New Token"):
+        A.kaggle_auth_header(interactive=False)
+
+
+def test_kaggle_access_token_lookup_order(monkeypatch, tmp_path):
+    monkeypatch.setenv("KAGGLE_CONFIG_DIR", str(tmp_path))
+    (tmp_path / "kaggle.json").write_text(json.dumps({"username": "u", "key": "k"}))
+    (tmp_path / "kaggle.json").chmod(0o600)
+    legacy = "Basic " + base64.b64encode(b"u:k").decode()
+    assert A.kaggle_auth_header(interactive=False) == legacy  # legacy file only
+    tok = tmp_path / "access_token"
+    tok.write_text("KGAT_file\n")
+    tok.chmod(0o644)
+    with pytest.warns(UserWarning, match="chmod 600"):
+        assert A.kaggle_auth_header(interactive=False) == "Bearer KGAT_file"
+    tok.chmod(0o600)
+    assert A.kaggle_auth_header(interactive=False) == "Bearer KGAT_file"  # token first
+    monkeypatch.setenv("KAGGLE_API_TOKEN", "KGAT_env")
+    assert A.kaggle_auth_header(interactive=False) == "Bearer KGAT_env"
+    monkeypatch.delenv("KAGGLE_API_TOKEN")
+    tok.unlink()
+    monkeypatch.setattr(A, "_keyring_get",
+                        lambda name: "KGAT_ring" if name == "kaggle_token" else None)
+    assert A.kaggle_auth_header(interactive=False) == "Bearer KGAT_ring"
+
+
+def test_kaggle_token_prompt(monkeypatch, tmp_path):
+    monkeypatch.setenv("KAGGLE_CONFIG_DIR", str(tmp_path))
+    monkeypatch.setattr(A.getpass, "getpass", lambda prompt: "KGAT_typed")
+    assert A.kaggle_auth_header(interactive=True) == "Bearer KGAT_typed"
 
 
 # --- authenticated downloads -------------------------------------------------------------------
@@ -70,6 +103,22 @@ class _Resp(io.BytesIO):
 
     def __exit__(self, *exc):
         self.close()
+
+
+def test_kaggle_download_sends_bearer_token_not_in_url(monkeypatch, tmp_path):
+    seen = {}
+
+    class _Opener:
+        def open(self, req, timeout=None):
+            seen["url"], seen["auth"] = req.full_url, req.get_header("Authorization")
+            return _Resp(b"zipbytes")
+
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *h: _Opener())
+    monkeypatch.setenv("KAGGLE_API_TOKEN", "KGAT_secret")
+    A.kaggle_download("comp-name", tmp_path, competition=True)
+    assert seen["url"] == ("https://www.kaggle.com/api/v1/competitions/data/download-all/"
+                           "comp-name")
+    assert "KGAT_secret" not in seen["url"] and seen["auth"] == "Bearer KGAT_secret"
 
 
 def test_kaggle_download_sends_basic_auth_not_in_url(monkeypatch, tmp_path):

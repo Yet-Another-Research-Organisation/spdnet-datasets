@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright (c) 2020, 2021, 2022 Joni Hyttinen, University of Eastern Finland
 #
 # Permission is hereby granted, free of charge, to any person obtaining
@@ -33,14 +32,13 @@
 #   overlay_rgb_mask    Overlay masks on an RGB color image with an optional legend on
 #                       the right side of the image.
 
-from typing import Union
 
+import numpy as np
 import PIL.Image
 import PIL.ImageDraw
 import PIL.ImageFont
-import numpy as np
 
-ParsedLabel = tuple[str, str, dict[str, Union[int, str]], list[int], list[tuple[int, int]]]
+ParsedLabel = tuple[str, str, dict[str, int | str], list[int], list[tuple[int, int]]]
 
 
 def parse(input_string: str) -> list[ParsedLabel]:
@@ -82,7 +80,7 @@ def parse(input_string: str) -> list[ParsedLabel]:
 def create_masks(parsed_labels: list[ParsedLabel], image_width: int, image_height: int) -> dict[str: list[np.ndarray]]:
     masks = {parsed_label[0]: [] for parsed_label in parsed_labels}
 
-    for label_name, label_type, label_type_params, label_color, label_points in parsed_labels:
+    for label_name, label_type, label_type_params, _label_color, label_points in parsed_labels:
         img = PIL.Image.new('L', (image_width, image_height), 0)
 
         if label_type == 'polygon':
@@ -156,7 +154,7 @@ def overlay_rgb_mask(rgb: np.ndarray, masks: dict[str, np.ndarray], label_colors
         labels = list(masks.keys())
 
     if rgb.dtype != 'uint8':
-        print('RGB: {}, {}'.format(rgb.shape, rgb.dtype))
+        print(f'RGB: {rgb.shape}, {rgb.dtype}')
     if rgb.dtype == 'float64':
         rgb = rgb * (2 ** 8 - 1)
         rgb = rgb.astype('uint8')

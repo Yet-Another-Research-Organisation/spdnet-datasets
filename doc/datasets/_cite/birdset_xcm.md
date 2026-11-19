@@ -1,0 +1,1 @@
+- L. Rauch *et al.*, "BirdSet: A Large-Scale Dataset for Audio Classification in Avian Bioacoustics", arXiv:2403.10380, 2024 (ICLR 2025). doi:[10.48550/arXiv.2403.10380](https://doi.org/10.48550/arXiv.2403.10380)

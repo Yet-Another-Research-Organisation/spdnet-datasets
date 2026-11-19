@@ -1,0 +1,1 @@
+- G. Tzanetakis and P. Cook, "Musical genre classification of audio signals", *IEEE Transactions on Speech and Audio Processing* 10(5), 2002, pp. 293–302. doi:[10.1109/TSA.2002.800560](https://doi.org/10.1109/TSA.2002.800560)

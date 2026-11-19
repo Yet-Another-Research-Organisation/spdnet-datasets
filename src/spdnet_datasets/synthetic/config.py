@@ -5,12 +5,11 @@ Defines ExperimentConfig dataclass and all experiment grid presets
 (quick, medium, full, filtered, filtered-extended, wishart-inverse).
 """
 
-from dataclasses import dataclass, asdict
-from typing import List, Dict, Optional, Literal, Iterator
-from itertools import product
 import hashlib
-import numpy as np
-
+from collections.abc import Iterator
+from dataclasses import asdict, dataclass
+from itertools import product
+from typing import Literal
 
 # =============================================================================
 # BatchNorm method definitions
@@ -59,7 +58,7 @@ class ExperimentConfig:
     class_separation_ratio: float = 0.01
 
     # Wishart-specific
-    df: Optional[int] = 50
+    df: int | None = 50
 
     # Model
     batchnorm_method: str = "arithmetic"
@@ -74,7 +73,7 @@ class ExperimentConfig:
     # Reproducibility
     seed: int = 42
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return asdict(self)
 
     def get_config_hash(self) -> str:
@@ -207,7 +206,7 @@ GRID_REGISTRY = {
 # Config generation
 # =============================================================================
 
-def generate_experiment_configs(grid: Dict) -> Iterator[ExperimentConfig]:
+def generate_experiment_configs(grid: dict) -> Iterator[ExperimentConfig]:
     """
     Generate experiment configurations from a parameter grid.
 
@@ -228,7 +227,7 @@ def generate_experiment_configs(grid: Dict) -> Iterator[ExperimentConfig]:
     param_values = [grid[k] for k in param_keys]
 
     for values in product(*param_values):
-        base_params = dict(zip(param_keys, values))
+        base_params = dict(zip(param_keys, values, strict=False))
 
         # Skip invalid combinations
         n_disc = base_params.get("n_discriminant", 2)
@@ -249,7 +248,7 @@ def generate_experiment_configs(grid: Dict) -> Iterator[ExperimentConfig]:
                 )
 
 
-def get_configs_for_grid(grid_name: str) -> List[ExperimentConfig]:
+def get_configs_for_grid(grid_name: str) -> list[ExperimentConfig]:
     """
     Get all experiment configs for a named grid.
 
@@ -291,7 +290,7 @@ def list_grid_info(grid_name: str) -> None:
 # Predefined experiment sets (numbered, for --set N)
 # =============================================================================
 
-def _make_set_grid(**overrides) -> Dict:
+def _make_set_grid(**overrides) -> dict:
     """Create a grid based on defaults with overrides."""
     base = {
         "generation_mode": ["scale"],

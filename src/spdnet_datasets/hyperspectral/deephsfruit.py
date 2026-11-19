@@ -54,7 +54,7 @@ import torch
 from ..core.config import dataset_path
 from ..core.fetch import Bunch
 from ..manager import DatasetManager
-from ..utils.sources import source_dir
+from ..utils.sources import existing_dir, source_dir
 from ._common import HSIDataset, group_kfold_split
 
 DOMAIN, NAME = "HYPERSPECTRAL", "DeepHS-Fruit"
@@ -164,7 +164,7 @@ class DeepHSFruitDataset(HSIDataset):
     classification_mode : {"fruit", "ripeness"}
     modality : {"VIS"}
         Only the VIS covariances exist.
-    n_splits, fold
+    n_splits, fold, cache_dir
         See :func:`fetch_deephsfruit`.
     split, subset
         See :class:`~spdnet_datasets.hyperspectral._common.HSIDataset`.
@@ -179,16 +179,17 @@ class DeepHSFruitDataset(HSIDataset):
 
     def __init__(self, data_dir=None, *, classification_mode="fruit", modality="VIS",
                  n_splits=5, fold=0, split="recommended", subset=None, verify="size",
-                 **kwargs):
+                 cache_dir=None, **kwargs):
         if modality != "VIS":
             raise ValueError(f"Only VIS modality is supported, got {modality}")
         warnings.warn(WARNING, UserWarning, stacklevel=2)
         self.modality = modality
         self.classification_mode = classification_mode
         root = dataset_path(DOMAIN, NAME, data_dir)
-        super().__init__(data_dir=str(root), **kwargs)
+        super().__init__(data_dir=str(existing_dir(root, cache_dir)), **kwargs)
         bunch = fetch_deephsfruit(root, verify, classification_mode=classification_mode,
-                                  n_splits=n_splits, fold=fold)
+                                  n_splits=n_splits, fold=fold, cache_dir=cache_dir)
+        self.data_dir = Path(bunch.root)
         self._setup(bunch, split, subset)
 
 

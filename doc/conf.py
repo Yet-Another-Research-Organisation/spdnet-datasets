@@ -31,6 +31,7 @@ extensions = [
     "sphinx_design",
     "sphinx_gallery.gen_gallery",
     "catalogue",  # _ext/catalogue.py: table of the registered datasets
+    "dataset_figures",  # _ext/dataset_figures.py: fixed or interactive dataset figures
 ]
 
 # Example gallery (../examples). Only the tutorials run at build time: they use
@@ -79,22 +80,52 @@ intersphinx_mapping = {
     "numpy": ("https://numpy.org/doc/stable/", None),
 }
 source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "datasets/_template.md", "tools"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "datasets/_template.md", "datasets/_cite", "tools"]
 
-html_theme = "furo"
+# ---------------------------------------------------------------------------
+# HTML: pydata-sphinx-theme, dark by default, one accent colour per section
+# (doc/_static/custom.css keys the accent off <body data-section>, set by
+# doc/_templates/layout.html from the first path segment of the page).
+# ---------------------------------------------------------------------------
+html_theme = "pydata_sphinx_theme"
 html_title = "spdnet-datasets"
 html_static_path = ["_static"]
+templates_path = ["_templates"]
 html_css_files = ["custom.css"]
-html_theme_options = {
-    "source_repository": "https://github.com/Yet-Another-Research-Organisation/spdnet-datasets",
-    "source_branch": "main",
-    "source_directory": "doc/",
-    "light_css_variables": {
-        "color-brand-primary": "#3a4a8c",
-        "color-brand-content": "#3a4a8c",
-    },
-    "dark_css_variables": {
-        "color-brand-primary": "#9fb0f0",
-        "color-brand-content": "#9fb0f0",
-    },
+html_js_files = []
+html_favicon = "_static/favicon.png"
+html_logo = "_static/logo.png"
+html_show_sourcelink = False
+html_context = {
+    "default_mode": "dark",
+    "github_user": "Yet-Another-Research-Organisation",
+    "github_repo": "spdnet-datasets",
+    "github_version": "main",
+    "doc_path": "doc",
 }
+html_theme_options = {
+    "logo": {"text": "spdnet-datasets", "alt_text": "spdnet-datasets"},
+    "navbar_align": "left",
+    "header_links_before_dropdown": 6,
+    "navbar_end": ["theme-switcher", "navbar-icon-links"],
+    "navbar_persistent": ["search-button"],
+    "icon_links": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/Yet-Another-Research-Organisation/spdnet-datasets",
+            "icon": "fa-brands fa-github",
+            "type": "fontawesome",
+        },
+    ],
+    "use_edit_page_button": True,
+    "secondary_sidebar_items": ["page-toc", "edit-this-page"],
+    "show_toc_level": 2,
+    "show_nav_level": 1,
+    "navigation_with_keys": False,
+    "footer_start": ["copyright"],
+    "footer_end": ["sphinx-version", "theme-version"],
+    "pygments_light_style": "tango",
+    "pygments_dark_style": "github-dark",
+}
+# no left sidebar on the landing page and the references page
+html_sidebars = {"index": [], "references": []}

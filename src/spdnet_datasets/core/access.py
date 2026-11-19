@@ -13,9 +13,11 @@ Three kinds of sources are handled by the ``fetch_<dataset>()`` functions:
 Credentials are never written in code, URLs or logs. They are looked up in
 this order:
 
-1. environment variables (``KAGGLE_USERNAME`` / ``KAGGLE_KEY``, ``HF_TOKEN``);
-2. the tool's own configuration file (``~/.kaggle/kaggle.json``, the
-   Hugging Face token cache ``~/.cache/huggingface/token``);
+1. environment variables (``KAGGLE_API_TOKEN``, or the legacy
+   ``KAGGLE_USERNAME`` / ``KAGGLE_KEY``; ``HF_TOKEN``);
+2. the tool's own file (``~/.kaggle/access_token``, or the legacy
+   ``~/.kaggle/kaggle.json``; the Hugging Face token cache
+   ``~/.cache/huggingface/token``);
 3. the system keyring, if the optional ``keyring`` package is installed
    (:func:`store_secret` saves a value there);
 4. an interactive prompt (hidden input), when a terminal is attached.
@@ -114,20 +116,46 @@ def get_secret(name: str, *, env=(), files=(), prompt=None, interactive=None, he
 
 # --- Kaggle -------------------------------------------------------------------------------
 
+def _kaggle_dir():
+    return Path(os.environ.get("KAGGLE_CONFIG_DIR", "~/.kaggle")).expanduser()
+
+
+def _check_private(path):
+    if path.stat().st_mode & (stat.S_IRWXG | stat.S_IRWXO):
+        warnings.warn(f"{path} is readable by other users; run: chmod 600 {path}",
+                      UserWarning, stacklevel=3)
+
+
+def kaggle_token():
+    """Return a Kaggle API access token (current format), or ``None``.
+
+    Looks at ``KAGGLE_API_TOKEN``, then ``$KAGGLE_CONFIG_DIR/access_token`` or
+    ``~/.kaggle/access_token`` (warns if other users can read it), then the
+    keyring entry ``kaggle_token``. The token is created on
+    https://www.kaggle.com/settings/api ("Generate New Token").
+    """
+    if os.environ.get("KAGGLE_API_TOKEN"):
+        return os.environ["KAGGLE_API_TOKEN"].strip()
+    f = _kaggle_dir() / "access_token"
+    if f.is_file() and f.read_text().strip():
+        _check_private(f)
+        return f.read_text().strip()
+    return _keyring_get("kaggle_token")
+
+
 def kaggle_credentials(interactive=None):
-    """Return ``(username, key)`` for the Kaggle API.
+    """Return ``(username, key)`` of the legacy Kaggle API key format.
 
     Looks at ``KAGGLE_USERNAME`` / ``KAGGLE_KEY``, then ``$KAGGLE_CONFIG_DIR/kaggle.json``
     or ``~/.kaggle/kaggle.json`` (warns if other users can read it), then the
     keyring entry ``kaggle`` (JSON ``{"username", "key"}``), then a prompt.
+    Prefer the access token of :func:`kaggle_token`.
     """
     if os.environ.get("KAGGLE_USERNAME") and os.environ.get("KAGGLE_KEY"):
         return os.environ["KAGGLE_USERNAME"], os.environ["KAGGLE_KEY"]
-    cfg = Path(os.environ.get("KAGGLE_CONFIG_DIR", "~/.kaggle")).expanduser() / "kaggle.json"
+    cfg = _kaggle_dir() / "kaggle.json"
     if cfg.is_file():
-        if cfg.stat().st_mode & (stat.S_IRWXG | stat.S_IRWXO):
-            warnings.warn(f"{cfg} is readable by other users; run: chmod 600 {cfg}",
-                          UserWarning, stacklevel=2)
+        _check_private(cfg)
         data = json.loads(cfg.read_text())
         return data["username"], data["key"]
     stored = _keyring_get("kaggle")
@@ -139,10 +167,38 @@ def kaggle_credentials(interactive=None):
         key = getpass.getpass("Kaggle API key (hidden): ").strip()
         if user and key:
             return user, key
-    raise MissingCredentialsError(
-        "Kaggle credentials not found. Create an API token on kaggle.com (Settings > API), "
-        "then either save kaggle.json in ~/.kaggle/ (chmod 600) or set KAGGLE_USERNAME and "
-        "KAGGLE_KEY. You must also accept the dataset or competition rules on its page.")
+    raise MissingCredentialsError(_KAGGLE_HELP)
+
+
+_KAGGLE_HELP = (
+    "Kaggle credentials not found. Generate an access token on "
+    "https://www.kaggle.com/settings/api ('Generate New Token') and store it in "
+    "~/.kaggle/access_token (chmod 600), or set KAGGLE_API_TOKEN. The legacy "
+    "kaggle.json (or KAGGLE_USERNAME / KAGGLE_KEY) is also accepted. You must also "
+    "accept the dataset or competition rules on its page.")
+
+
+def kaggle_auth_header(interactive=None) -> str:
+    """``Authorization`` header value for the Kaggle API.
+
+    ``Bearer <access token>`` (:func:`kaggle_token`), else ``Basic`` with the
+    legacy username and key (:func:`kaggle_credentials`), else a hidden prompt
+    for an access token.
+    """
+    token = kaggle_token()
+    if token:
+        return f"Bearer {token}"
+    try:
+        user, key = kaggle_credentials(interactive=False)
+    except MissingCredentialsError:
+        user = key = None
+    if user and key:
+        return "Basic " + base64.b64encode(f"{user}:{key}".encode()).decode()
+    if _interactive(interactive):
+        token = getpass.getpass("Kaggle API access token (hidden): ").strip()
+        if token:
+            return f"Bearer {token}"
+    raise MissingCredentialsError(_KAGGLE_HELP)
 
 
 def kaggle_download(ref: str, dest_dir, *, competition=False, checksum=None, algo="sha256",
@@ -152,15 +208,13 @@ def kaggle_download(ref: str, dest_dir, *, competition=False, checksum=None, alg
     The rules of the dataset or competition must have been accepted on
     kaggle.com with the same account.
     """
-    user, key = kaggle_credentials(interactive)
+    auth = kaggle_auth_header(interactive)
     if competition:
         url = f"https://www.kaggle.com/api/v1/competitions/data/download-all/{ref}"
     else:
         url = f"https://www.kaggle.com/api/v1/datasets/download/{ref}"
-    token = base64.b64encode(f"{user}:{key}".encode()).decode()
     dest = Path(dest_dir) / (ref.replace("/", "__") + ".zip")
-    return download(url, dest, checksum=checksum, algo=algo,
-                    headers={"Authorization": f"Basic {token}"})
+    return download(url, dest, checksum=checksum, algo=algo, headers={"Authorization": auth})
 
 
 # --- Hugging Face -------------------------------------------------------------------------
@@ -182,14 +236,17 @@ def hf_token(interactive=None, required=True):
 
 
 def hf_download(repo_id: str, filename: str, dest_dir, *, revision="main", repo_type="dataset",
-                gated=False, checksum=None, algo="sha256", interactive=None) -> Path:
-    """Download one file of a Hugging Face repository (with a token if ``gated``)."""
+                gated=False, checksum=None, algo="sha256", interactive=None, size=None) -> Path:
+    """Download one file of a Hugging Face repository (with a token if ``gated``).
+
+    ``size``: expected size in bytes, see :func:`spdnet_datasets.core.fetch.download`.
+    """
     prefix = "datasets/" if repo_type == "dataset" else ""
     url = f"https://huggingface.co/{prefix}{repo_id}/resolve/{revision}/{filename}"
     token = hf_token(interactive, required=gated)
     headers = {"Authorization": f"Bearer {token}"} if token else None
     return download(url, Path(dest_dir) / filename, checksum=checksum, algo=algo,
-                    headers=headers)
+                    headers=headers, size=size)
 
 
 # --- Manual downloads -----------------------------------------------------------------------

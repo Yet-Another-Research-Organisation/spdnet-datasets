@@ -2,12 +2,13 @@
 
 ``make_figures.py`` needs a covariance output. The SAR datasets of the mission
 that only give raw chips or channel means (``OUTPUTS = ("raw", "mean")``) are
-drawn here with the same palette, layout and static-HTML convention::
+drawn here with the same palette, layout and output convention::
 
     python doc/tools/make_figures_raw.py mstar --split official
     python doc/tools/make_figures_raw.py atrnet_star --split official --fifth protocol_overlap
 
-Figures written to ``doc/_static/figures/<page>/``, with ``summary.json``:
+Figures written to ``doc/_static/figures/<page>/`` (fixed PNG or interactive JSON,
+see ``figures_io.py``), with ``summary.json``:
 
 - ``raw_samples``: one chip per class for four classes (first channel, log10
   scale or as returned with ``--raw-scale linear``, 1-99 % clipping, at most
@@ -29,7 +30,9 @@ Extras (``--extra``) read loader caches or metadata for one page:
 - ``parcel_pixels``: ``raw_samples`` for datasets whose raw output is an
   irregular set of pixels ``(n, p)`` (overwrites the one of ``make_figures.py``,
   which draws every pixel);
-- ``cpazmal_dates``: the HH / HV acquisition dates retained for each orbit.
+- ``cpazmal_dates``: the HH / HV acquisition dates retained for each orbit;
+- ``image_mean``: ``raw_samples`` as the channel-mean image, for loaders whose
+  raw output is a set of pixels (``--kwargs`` selects the image layout).
 """
 
 import argparse
@@ -37,16 +40,15 @@ import json
 from pathlib import Path
 
 import numpy as np
+from figures_io import write_figure
 from make_figures import GRID, OUT, SEQUENTIAL, SERIES, _layout  # noqa: F401
 
 PART_COLORS = {"train": SERIES[0], "val": SERIES[1], "test": SERIES[2]}
 
 
 def _write(out, figs):
-    out.mkdir(parents=True, exist_ok=True)
     for kind, f in figs.items():
-        (out / f"{kind}.html").write_text(
-            f.to_html(include_plotlyjs="cdn", full_html=True, config={"responsive": True}))
+        write_figure(f, out, kind)
 
 
 def _labels(ds):
@@ -158,10 +160,17 @@ def build_raw(name, kwargs, split, page, max_samples=400, seed=0, fifth="amplitu
     fig.add_bar(x=list(parts), y=[len(v) for v in parts.values()],
                 marker_color=[PART_COLORS.get(s, SERIES[3]) for s in parts], showlegend=False,
                 row=1, col=1)
-    _, sizes = np.unique(np.asarray(ds.groups), return_counts=True)
-    fig.add_histogram(x=sizes, marker_color=SERIES[1], nbinsx=40, showlegend=False, row=1, col=2)
-    fig.update_xaxes(title_text="samples in the group", row=1, col=2)
-    _layout(fig, f"Split sizes and group sizes ({len(sizes)} groups, never across parts)")
+    if getattr(ds, "groups", None) is not None:
+        _, sizes = np.unique(np.asarray(ds.groups), return_counts=True)
+        fig.add_histogram(x=sizes, marker_color=SERIES[1], nbinsx=40, showlegend=False,
+                          row=1, col=2)
+        fig.update_xaxes(title_text="samples in the group", row=1, col=2)
+        _layout(fig, f"Split sizes and group sizes ({len(sizes)} groups, never across parts)")
+    else:  # no group (e.g. MSTAR: the parts are fixed by the depression angle)
+        sizes = np.zeros(0)
+        fig.add_annotation(text="no groups: the parts are given by the source", showarrow=False,
+                           xref="x2 domain", yref="y2 domain", x=0.5, y=0.5)
+        _layout(fig, "Split sizes (no groups)")
     figs["split_schema"] = fig
 
     extra = {}
@@ -208,7 +217,7 @@ def build_raw(name, kwargs, split, page, max_samples=400, seed=0, fifth="amplitu
     out = OUT / page
     _write(out, figs)
     summary = {"name": name, "kwargs": kwargs, "split": split, "n_samples": int(len(ds)),
-               "n_groups": int(len(sizes)), "raw_shape": list(raws[0].shape), "mean_dim": p,
+               "n_groups": int(len(sizes)) if len(sizes) else None, "raw_shape": list(raws[0].shape), "mean_dim": p,
                "classes": names, "counts": counts, **extra}
     (out / "summary.json").write_text(json.dumps(summary, indent=1))
     return summary
@@ -332,6 +341,41 @@ def parcel_pixels(name, kwargs, page, max_pixels=300, seed=0):
     return {"n_pixels": n_px}
 
 
+def image_mean(name, kwargs, page, channel_axis=-1, seed=0):
+    """``raw_samples`` as the channel-mean image of four samples of distinct classes.
+
+    For loaders whose default raw output is a set of pixels: pass the
+    constructor arguments that give the image (HyperLeaf ``mode="image"`` with
+    every band, Pol-InSAR-Island ``raw_layout="grid"``).
+    """
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+
+    from spdnet_datasets import DatasetManager
+
+    ds = DatasetManager.DATASETS[name](**kwargs)
+    y = _labels(ds)
+    rng = np.random.default_rng(seed)
+    shown = [int(rng.choice(np.flatnonzero(y == c))) for c in np.unique(y)[:4]]
+    imgs = []
+    for i in shown:
+        x, _ = ds[i]
+        img = np.asarray(x[-1] if isinstance(x, tuple) else x, dtype=np.float32)
+        imgs.append(np.round(img.mean(axis=channel_axis), 3))
+    wide = imgs[0].shape[1] > 3 * imgs[0].shape[0]  # elongated images (leaves): 2 x 2 grid
+    rows, cols = (2, 2) if wide else (1, len(imgs))
+    fig = make_subplots(rows=rows, cols=cols, subplot_titles=[ds.classes[y[i]] for i in shown],
+                        vertical_spacing=0.12)
+    for j, z in enumerate(imgs):
+        r, c = (j // 2 + 1, j % 2 + 1) if wide else (1, j + 1)
+        fig.add_trace(go.Heatmap(z=z, colorscale=SEQUENTIAL, showscale=False,
+                                 hovertemplate="value %{z:.3g}<extra></extra>"), r, c)
+        fig.update_yaxes(autorange="reversed", scaleanchor=f"x{j + 1 if j else ''}", row=r, col=c)
+    _layout(fig, "Channel-mean image of four samples")
+    _write(OUT / page, {"raw_samples": fig})
+    return {"shown": shown, "shape": list(img.shape)}
+
+
 def cpazmal_dates(page, kwargs):
     """The ``n_dates`` acquisition dates (HH and HV) retained for each orbit."""
     import pandas as pd
@@ -369,7 +413,9 @@ if __name__ == "__main__":
                     help="sample blocks of this many consecutive items (chunked stores)")
     ap.add_argument("--raw-scale", default="log10", choices=["log10", "linear"],
                     help="display of raw_samples (linear for already log-scaled raw outputs)")
-    ap.add_argument("--extra", choices=["pastis_dates", "split_map", "cpazmal_dates", "parcel_pixels"])
+    ap.add_argument("--extra", choices=["pastis_dates", "split_map", "cpazmal_dates", "parcel_pixels",
+                                        "image_mean"])
+    ap.add_argument("--channel-axis", type=int, default=-1, help="image_mean: channel axis")
     ap.add_argument("--xy", default="easting,northing", help="split_map: meta columns")
     ap.add_argument("--scale", type=float, default=1.0, help="split_map: coordinate factor")
     ap.add_argument("--unit", default="", help="split_map: axis unit")
@@ -385,6 +431,8 @@ if __name__ == "__main__":
         res = split_map(a.name, kw, a.split, page, a.xy.split(","), a.scale, a.unit)
     elif a.extra == "parcel_pixels":
         res = parcel_pixels(a.name, kw, page)
+    elif a.extra == "image_mean":
+        res = image_mean(a.name, kw, page, a.channel_axis)
     elif a.extra == "cpazmal_dates":
         res = cpazmal_dates(page or "cpazmal", kw)
     else:

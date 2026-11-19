@@ -19,6 +19,9 @@
   - `spdnet_datasets.radar_microdoppler.mvdoppler` (`fetch_mvdoppler`, `MVDopplerDataset`, registry name `mvdoppler`)
 ```
 
+```{dataset-preview} mvdoppler
+```
+
 ## Description and source
 
 MVDoppler records 13 subjects walking in front of two millimetre-wave (mmWave)
@@ -62,8 +65,7 @@ uncorrelated (correlation 0.09) with different Doppler peaks. The figure shows
 the preprocessed (frame × 64) data of four snapshots: bins 0–31 are view x,
 32–63 view y.
 
-```{raw} html
-<iframe src="../_static/figures/mvdoppler/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} mvdoppler/raw_samples
 ```
 
 Skipped and counted (`dataset._bunch.info`): 2 files without the HDF5
@@ -75,9 +77,10 @@ signature (`phone_call_02515`, `texting_12478`) and 24 `.h5` files absent from
 normal 14 570, phone_call 13 151, pockets 13 266, texting 13 847 snapshots.
 The histogram shows `fold0`.
 
-```{raw} html
-<iframe src="../_static/figures/mvdoppler/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/mvdoppler/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} mvdoppler/class_hist
+```
+
+```{dataset-figure} mvdoppler/class_means
 ```
 
 ## Covariance construction
@@ -98,9 +101,10 @@ With `normalize=True` (default), the covariances are multiplied by the scalar
 s fitted on the training part of the chosen split (geometric mean of the
 eigenvalues = 1), the means and raw data by √s.
 
-```{raw} html
-<iframe src="../_static/figures/mvdoppler/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/mvdoppler/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} mvdoppler/cov_samples
+```
+
+```{dataset-figure} mvdoppler/eigen_spectrum
 ```
 
 ## Splits
@@ -119,8 +123,7 @@ train = the rest. Groups are subjects.
 | `fold2` | 38 237 | 3 910 | 12 687 |
 | `fold3` | 34 129 | 3 702 | 17 003 |
 
-```{raw} html
-<iframe src="../_static/figures/mvdoppler/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} mvdoppler/split_schema
 ```
 
 ## Leakage risks and measures
@@ -160,3 +163,12 @@ Changing the estimator recomputes the preprocessing stage (about 1 min,
   separate.
 - `scaling_factor` is replaced by `normalize=True`.
 - `subset=None` is the default: the instance holds every snapshot.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/mvdoppler.md
+```
+````

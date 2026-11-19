@@ -17,6 +17,9 @@
   - {mod}`spdnet_datasets.sar.cpazmal` (`fetch_cpazmal`, `CPAZMaLDataset`)
 ```
 
+```{dataset-preview} cpazmal
+```
+
 ## Description and source
 
 CPAZMaL (Cryosphere PAZ SAR data for MAchine Learning) is a set of time
@@ -80,8 +83,7 @@ The raw output is the (n, 40) matrix of these pixels. Its rows are pixels and
 its columns the 20 HH amplitudes followed by the 20 HV amplitudes. The figure
 shows four parcels, with at most 300 pixels each.
 
-```{raw} html
-<iframe src="../_static/figures/cpazmal/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} cpazmal/raw_samples
 ```
 
 ## Classes
@@ -106,9 +108,10 @@ The loader excludes four sites:
 This leaves 66 parcels in DSC and 67 in ASC. `dataset.excluded` lists the
 excluded sites with the reason.
 
-```{raw} html
-<iframe src="../_static/figures/cpazmal/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/cpazmal/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} cpazmal/class_hist
+```
+
+```{dataset-figure} cpazmal/class_means
 ```
 
 ## Covariance construction
@@ -135,8 +138,7 @@ dates are spread evenly over the common dates, identical for every parcel, and
 stored in `dataset.dates`. The default `orbit` is `"DSC"`. HV stops in October
 2020 (ASC) and January 2021 (DSC), so the covariance covers about one year.
 
-```{raw} html
-<iframe src="../_static/figures/cpazmal/dates.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} cpazmal/dates
 ```
 
 **Observations.** The observations are the valid pixels, and a sample needs
@@ -150,9 +152,10 @@ means and raw pixels are multiplied by √s.
 The median condition number of the SCM (sample covariance matrix) covariances is about 90 (DSC) and 150
 (ASC) per parcel, and about 250 with 16 × 16 blocks.
 
-```{raw} html
-<iframe src="../_static/figures/cpazmal/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/cpazmal/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} cpazmal/cov_samples
+```
+
+```{dataset-figure} cpazmal/eigen_spectrum
 ```
 
 ## Splits
@@ -171,8 +174,7 @@ validation part. `recommended` is fold 0:
 With one covariance per parcel, a test fold has one or two parcels per class,
 so scores vary strongly between folds. Report the mean over the five folds.
 
-```{raw} html
-<iframe src="../_static/figures/cpazmal/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} cpazmal/split_schema
 ```
 
 ## Leakage risks and measures
@@ -204,3 +206,12 @@ cov, y = ds[0]                       # (40, 40)
 ds.dates                             # the 20 retained dates
 blocks = CPAZMaLDataset(block=16, min_pixels=120, return_raw=True)
 ```
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/cpazmal.md
+```
+````

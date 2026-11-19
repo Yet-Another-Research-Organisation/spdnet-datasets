@@ -17,13 +17,13 @@ pixels (one band in two). Full description: :doc:`/datasets/chikusei`.
 # --------------------
 # ``n = 225`` pixels for ``p = 64`` bands is close to the ``n >= 2p`` floor:
 # Ledoit-Wolf shrinkage, or ``window=23``, gives better-conditioned matrices
-# (:doc:`/guide/covariance`).
+# (:doc:`/datasets/covariance`).
 
 from spdnet_datasets import create_dataloaders
 from spdnet_datasets.core.splits import assert_no_leakage
 from spdnet_datasets.hyperspectral.chikusei import ChikuseiDataset
 
-# sphinx_gallery_thumbnail_path = "_static/thumbnails/chikusei.png"
+# sphinx_gallery_thumbnail_path = "_static/previews/chikusei/thumb.png"
 ds = ChikuseiDataset(estimator="ledoit_wolf")
 cov, y = ds[0]
 print(len(ds), "windows,", len(ds.classes), "classes; cov", tuple(cov.shape))
@@ -33,20 +33,18 @@ print(len(ds), "windows,", len(ds.classes), "classes; cov", tuple(cov.shape))
 # -----------------------
 # The band-mean image of four windows, then the class counts per split.
 #
-# .. raw:: html
+# .. dataset-figure:: chikusei/raw_samples
 #
-#    <iframe src="../../_static/figures/chikusei/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
-#    <iframe src="../../_static/figures/chikusei/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
+# .. dataset-figure:: chikusei/class_hist
 
 # %%
 # Covariance matrices
 # -------------------
 # A few covariances (shown as correlations) and the spread of their eigenvalues.
 #
-# .. raw:: html
+# .. dataset-figure:: chikusei/cov_samples
 #
-#    <iframe src="../../_static/figures/chikusei/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-#    <iframe src="../../_static/figures/chikusei/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+# .. dataset-figure:: chikusei/eigen_spectrum
 
 # %%
 # Splitting the data
@@ -63,6 +61,4 @@ print({k: len(v) for k, v in parts.items()})
 train, val, test = create_dataloaders(ds, split="spatial", batch_size=64, num_workers=0)
 
 # %%
-# .. raw:: html
-#
-#    <iframe src="../../_static/figures/chikusei/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+# .. dataset-figure:: chikusei/split_schema

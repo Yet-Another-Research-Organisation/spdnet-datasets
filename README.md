@@ -1,8 +1,16 @@
 # spdnet-datasets
 
+[![Tests](https://github.com/Yet-Another-Research-Organisation/spdnet-datasets/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/Yet-Another-Research-Organisation/spdnet-datasets/actions/workflows/tests.yml)
+[![Documentation](https://github.com/Yet-Another-Research-Organisation/spdnet-datasets/actions/workflows/docs.yml/badge.svg?branch=main)](https://yet-another-research-organisation.github.io/spdnet-datasets/)
+[![Lint](https://github.com/Yet-Another-Research-Organisation/spdnet-datasets/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/Yet-Another-Research-Organisation/spdnet-datasets/actions/workflows/lint.yml)
+[![codecov](https://codecov.io/gh/Yet-Another-Research-Organisation/spdnet-datasets/graph/badge.svg?branch=main)](https://codecov.io/gh/Yet-Another-Research-Organisation/spdnet-datasets)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 Dataset loaders, covariance estimators and synthetic data generators for SPDNet research.
 
-Documentation: build it with `pip install -e ".[docs]" && make -C doc html` (published on GitHub Pages at each release).
+Documentation: <https://yet-another-research-organisation.github.io/spdnet-datasets/> (built from `doc/` and deployed by GitHub Actions on every push to `main`; local build: `pip install -e ".[docs]" -r doc/requirements.txt && make -C doc html`).
 
 ## Overview
 
@@ -89,6 +97,25 @@ If you use this package in your research, please cite:
 ## Contributing
 
 Contributions are welcome! Please feel free to submit pull requests.
+
+Every pull request runs three GitHub Actions workflows:
+
+| Workflow | What it checks |
+|---|---|
+| `tests.yml` | unit tests without any dataset, Python 3.11 and 3.12, coverage sent to Codecov |
+| `lint.yml` | `ruff check` (rules in `pyproject.toml`) |
+| `docs.yml` | strict Sphinx build (warnings are errors); deployed to GitHub Pages from `main` |
+
+The same checks locally:
+
+```bash
+pip install -e ".[test,dev]"
+ruff check src tests examples doc/tools
+SPDNET_DATA_ROOT=/nonexistent pytest -m "not slow and not network and not real_data" --cov=spdnet_datasets
+```
+
+Tests marked `real_data`, `network` or `slow` need the datasets or Internet
+access and are run on the lab server.
 
 ## Support
 

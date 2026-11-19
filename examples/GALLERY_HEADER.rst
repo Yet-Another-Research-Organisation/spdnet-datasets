@@ -11,7 +11,7 @@ the bottom of each page, and for the whole gallery at the bottom of this page).
   tiny fake data, so they work anywhere, without any dataset.
 - **Dataset examples** load one real dataset per family. They read
   ``$SPDNET_DATA_ROOT`` and are therefore *not* executed when the documentation
-  is built; their figures are the interactive figures of the dataset pages.
+  is built; their figures are those of the dataset pages.
 
 There are no Binder or Colab links: the datasets are not public, and the
 tutorials only need ``pip install spdnet-datasets``.

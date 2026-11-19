@@ -4,7 +4,7 @@ The covariance contract: n >= 2p, four estimators, SPD checks
 
 Every sample of a dataset is a ``(p, p)`` covariance estimated from ``n``
 observations of ``p`` channels. :mod:`spdnet_datasets.core.estimators` enforces
-two rules (see :doc:`/guide/principles` and :doc:`/guide/covariance`):
+two rules (see :doc:`/guide/principles` and :doc:`/datasets/covariance`):
 
 - at least ``n >= 2p`` observations per covariance;
 - the result is symmetric positive definite (SPD) with a condition number

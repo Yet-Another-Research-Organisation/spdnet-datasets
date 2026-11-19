@@ -1,0 +1,1 @@
+- S. Puustinen, J. Hyttinen, A.-P. Elomaa and H. Vrzáková, "Hyperspectral placenta dataset: Hyperspectral image acquisition, annotations, and processing of biological tissues in microsurgical training", *Data in Brief* 50, 2023, 109526. doi:[10.1016/j.dib.2023.109526](https://doi.org/10.1016/j.dib.2023.109526)

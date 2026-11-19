@@ -1,7 +1,7 @@
 # Real datasets
 
 One class per dataset, registered under the name shown in the
-{doc}`../guide/datasets` catalogue.
+{doc}`../datasets/catalogue` catalogue.
 
 ## `chikusei`
 

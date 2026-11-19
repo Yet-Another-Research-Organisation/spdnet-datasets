@@ -1,0 +1,1 @@
+- K. J. Piczak, "ESC: Dataset for Environmental Sound Classification", *Proceedings of the 23rd ACM International Conference on Multimedia*, 2015, pp. 1015–1018. doi:[10.1145/2733373.2806390](https://doi.org/10.1145/2733373.2806390)

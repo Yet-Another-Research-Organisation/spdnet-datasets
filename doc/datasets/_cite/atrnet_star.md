@@ -1,0 +1,1 @@
+- Y. Liu *et al.*, "ATRNet-STAR: A Large Dataset and Benchmark Towards Remote Sensing Object Recognition in the Wild", arXiv:2501.13354, 2025. doi:[10.48550/arXiv.2501.13354](https://doi.org/10.48550/arXiv.2501.13354)

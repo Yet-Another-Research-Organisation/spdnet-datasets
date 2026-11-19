@@ -4,14 +4,14 @@ Provides common functionality and interface for data loading and splitting.
 """
 
 import warnings
-
-import torch
-from torch.utils.data import Dataset, DataLoader, random_split, Subset
-from pathlib import Path
-from typing import Optional, List, Tuple, Dict
-import numpy as np
 from abc import ABC, abstractmethod
+from collections.abc import Callable
+from pathlib import Path
+
+import numpy as np
+import torch
 from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader, Dataset, Subset, random_split
 
 from .core.outputs import ALL_OUTPUTS, pack_outputs, validate_output_request
 
@@ -31,10 +31,10 @@ class BaseDataset(Dataset, ABC):
     def __init__(
         self,
         data_dir: str,
-        classes: Optional[List[str]] = None,
-        max_samples_per_class: Optional[int] = None,
-        max_classes: Optional[int] = None,
-        transform: Optional[callable] = None,
+        classes: list[str] | None = None,
+        max_samples_per_class: int | None = None,
+        max_classes: int | None = None,
+        transform: Callable | None = None,
         seed: int = 42,
         verbose: bool = True,
         return_mean: bool = False,
@@ -42,8 +42,8 @@ class BaseDataset(Dataset, ABC):
         estimator: str = "scm",
         task: str = "fine",
         drop_classes: tuple = (),
-        merge_classes: Optional[dict] = None,
-        balance: Optional[str] = None,
+        merge_classes: dict | None = None,
+        balance: str | None = None,
         normalize: bool = True,
         **kwargs  # Accept any additional parameters
     ):
@@ -111,7 +111,7 @@ class BaseDataset(Dataset, ABC):
         pass
 
     @abstractmethod
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, int]:
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
         """Get a single sample."""
         pass
 
@@ -119,7 +119,7 @@ class BaseDataset(Dataset, ABC):
         """Return dataset length."""
         return len(self.samples)
 
-    def _limit_classes(self, all_classes: List[str]) -> List[str]:
+    def _limit_classes(self, all_classes: list[str]) -> list[str]:
         """Limit classes: use explicit list if provided, else apply max_classes."""
         if self._requested_classes:
             missing = [c for c in self._requested_classes if c not in all_classes]
@@ -136,7 +136,7 @@ class BaseDataset(Dataset, ABC):
             return sorted(selected)
         return all_classes
 
-    def _limit_samples_per_class(self, samples_by_class: Dict[str, List]) -> List:
+    def _limit_samples_per_class(self, samples_by_class: dict[str, list]) -> list:
         """Limit samples per class if max_samples_per_class is set."""
         limited_samples = []
         for class_name, class_samples in samples_by_class.items():
@@ -173,8 +173,8 @@ def create_dataloaders(
     seed: int = 42,
     stratified: bool = False,
     verbose: bool = True,
-    split: Optional[str] = None,
-) -> Tuple[DataLoader, DataLoader, DataLoader]:
+    split: str | None = None,
+) -> tuple[DataLoader, DataLoader, DataLoader]:
     """
     Split dataset and create train/val/test dataloaders.
 
@@ -249,9 +249,9 @@ def create_dataloaders(
         all_indices = np.arange(len(dataset))
 
         if verbose:
-            print(f"\nStratified split - Original class distribution:")
+            print("\nStratified split - Original class distribution:")
             unique, counts = np.unique(all_labels, return_counts=True)
-            for cls, count in zip(unique, counts):
+            for cls, count in zip(unique, counts, strict=False):
                 print(f"  Class {cls}: {count} samples ({100*count/len(all_labels):.1f}%)")
 
         # Step 1: Split off test set first

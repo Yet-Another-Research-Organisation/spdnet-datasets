@@ -19,6 +19,9 @@
   - `spdnet_datasets.hyperspectral.kaggle_wheat` (`fetch_kaggle_wheat`, `KaggleWheatDataset`, registry name `kaggle_wheat`)
 ```
 
+```{dataset-preview} kaggle_wheat
+```
+
 ## Description and source
 
 These are the data of task 1 of the ICPR 2026 competition "Beyond Visible
@@ -42,8 +45,8 @@ blue) patch of 64 × 64. Only the HS patches are used here.
 
 Kaggle competition
 [`beyond-visible-spectrum-ai-for-agriculture-2026`](https://www.kaggle.com/competitions/beyond-visible-spectrum-ai-for-agriculture-2026/data).
-It needs Kaggle credentials (`KAGGLE_USERNAME` / `KAGGLE_KEY` or
-`~/.kaggle/kaggle.json`, see [Fetching](../guide/fetch.md)) and the competition
+It needs a Kaggle access token (`~/.kaggle/access_token` or `KAGGLE_API_TOKEN`,
+see [Fetching](../guide/fetch.md)) and the competition
 rules accepted with the same account. Without a local copy,
 `fetch_kaggle_wheat()` downloads the competition archive into
 `<cache>/Wheat_Disease_ICPR26/downloads/` (no checksum published) and reads the
@@ -61,8 +64,7 @@ position, is dropped. 23 train patches (Health 9, Other 14) and 11 validation
 patches are entirely zero. The raw output is the 32 × 32 × 107 patch; the
 figure shows its band-mean image.
 
-```{raw} html
-<iframe src="../_static/figures/kaggle_wheat/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} kaggle_wheat/raw_samples
 ```
 
 ## Classes
@@ -71,9 +73,10 @@ After the exclusions, the counts are Rust 200, Health 191 and Other 184. The
 figure gives the counts per part of the stratified split, then the mean
 spectrum per class.
 
-```{raw} html
-<iframe src="../_static/figures/kaggle_wheat/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/kaggle_wheat/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} kaggle_wheat/class_hist
+```
+
+```{dataset-figure} kaggle_wheat/class_means
 ```
 
 ## Covariance construction
@@ -97,9 +100,10 @@ The unlabelled validation set (300 patches: 11 zero and 1 short, so 288
 covariances) is available through `fetch_kaggle_wheat(part="val")`. Its labels
 are `None` and it has no split; the dataset class does not expose it.
 
-```{raw} html
-<iframe src="../_static/figures/kaggle_wheat/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/kaggle_wheat/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} kaggle_wheat/cov_samples
+```
+
+```{dataset-figure} kaggle_wheat/eigen_spectrum
 ```
 
 ## Splits
@@ -114,8 +118,7 @@ No plot, flight or position information is available, so the split cannot
 be grouped. In the figure, the "samples per group" panel is trivial (one patch
 per group).
 
-```{raw} html
-<iframe src="../_static/figures/kaggle_wheat/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} kaggle_wheat/split_schema
 ```
 
 ## Leakage risks and measures
@@ -151,3 +154,12 @@ val_kaggle = fetch_kaggle_wheat(part="val")             # unlabelled competition
   default.
 - Use `estimator=`. `cov_method=...` is silently absorbed by `**kwargs` and
   gives the SCM.
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/kaggle_wheat.md
+```
+````

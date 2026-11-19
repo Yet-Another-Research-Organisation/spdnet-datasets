@@ -24,7 +24,7 @@ Full description: :doc:`/datasets/esc50`.
 from spdnet_datasets import create_dataloaders
 from spdnet_datasets.audio.esc50 import ESC50Dataset
 
-# sphinx_gallery_thumbnail_path = "_static/thumbnails/esc50.png"
+# sphinx_gallery_thumbnail_path = "_static/previews/esc50/thumb.png"
 ds = ESC50Dataset(split="official", fold=1, return_mean=True)
 print(len(ds), "clips,", ds.num_classes, "classes")
 (cov, mean), y = ds[0]
@@ -36,10 +36,9 @@ print("cov", tuple(cov.shape), "mean", tuple(mean.shape), "class", ds.classes[y]
 # The 20 MFCC of the non-silent frames of a few clips (coefficient x frame),
 # then the class counts per split.
 #
-# .. raw:: html
+# .. dataset-figure:: esc50/raw_samples
 #
-#    <iframe src="../../_static/figures/esc50/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
-#    <iframe src="../../_static/figures/esc50/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
+# .. dataset-figure:: esc50/class_hist
 
 # %%
 # Covariance matrices
@@ -47,10 +46,9 @@ print("cov", tuple(cov.shape), "mean", tuple(mean.shape), "class", ds.classes[y]
 # A few covariances (shown as correlations) and the spread of their
 # eigenvalues (median and 10-90 % band of the log10 eigenvalues).
 #
-# .. raw:: html
+# .. dataset-figure:: esc50/cov_samples
 #
-#    <iframe src="../../_static/figures/esc50/cov_samples.html" class="plotly-figure" loading="lazy"></iframe>
-#    <iframe src="../../_static/figures/esc50/eigen_spectrum.html" class="plotly-figure" loading="lazy"></iframe>
+# .. dataset-figure:: esc50/eigen_spectrum
 
 # %%
 # Splitting the data
@@ -69,6 +67,4 @@ print({k: len(v) for k, v in parts.items()}, "-", len(shared), "recordings in tr
 train, val, test = create_dataloaders(ds, split="official", batch_size=32, num_workers=0)
 
 # %%
-# .. raw:: html
-#
-#    <iframe src="../../_static/figures/esc50/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+# .. dataset-figure:: esc50/split_schema

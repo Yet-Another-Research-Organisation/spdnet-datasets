@@ -17,6 +17,9 @@
   - {mod}`spdnet_datasets.sar.s1slc_cvdl` (`fetch_s1slc_cvdl`, `S1SLCCVDLDataset`)
 ```
 
+```{dataset-preview} s1slc_cvdl
+```
+
 ## Description and source
 
 S1SLC_CVDL contains 100 × 100 pixel patches of Sentinel-1 (S1) SLC (single
@@ -78,9 +81,10 @@ whole chunks, as the figures here do with `--contiguous 100`.
 The figures show amplitudes (`features="amplitude"`), after the per-city RMS
 normalisation.
 
-```{raw} html
-<iframe src="../_static/figures/s1slc_cvdl/raw_samples.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/s1slc_cvdl/amplitude_hist.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} s1slc_cvdl/raw_samples
+```
+
+```{dataset-figure} s1slc_cvdl/amplitude_hist
 ```
 
 ## Classes
@@ -91,9 +95,10 @@ industrial and water, but the order is not verified. The classes are therefore
 named `"1"` to `"7"`. They are strongly imbalanced, from 108 981 patches for
 class 2 to 1 680 for class 4, and their proportions change from city to city.
 
-```{raw} html
-<iframe src="../_static/figures/s1slc_cvdl/class_hist.html" class="plotly-figure" loading="lazy"></iframe>
-<iframe src="../_static/figures/s1slc_cvdl/class_means.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} s1slc_cvdl/class_hist
+```
+
+```{dataset-figure} s1slc_cvdl/class_means
 ```
 
 ## Covariance construction
@@ -116,8 +121,7 @@ The dataset gives no patch positions, so no spatial split within a city is
 possible. A random split would put neighbouring and overlapping patches on
 both sides.
 
-```{raw} html
-<iframe src="../_static/figures/s1slc_cvdl/split_schema.html" class="plotly-figure" loading="lazy"></iframe>
+```{dataset-figure} s1slc_cvdl/split_schema
 ```
 
 ## Leakage risks and measures
@@ -144,3 +148,12 @@ from spdnet_datasets.sar.s1slc_cvdl import S1SLCCVDLDataset
 ds = S1SLCCVDLDataset(split="loco_Houston", features="complex", return_raw=True)
 x, y = ds[0]                         # (100, 100, 4) float32: Re HH, Im HH, Re HV, Im HV
 ```
+
+## How to cite
+
+````{admonition} If you use this dataset in a publication, cite
+:class: tip
+
+```{include} _cite/s1slc_cvdl.md
+```
+````

@@ -7,17 +7,17 @@ Provides three generation strategies:
 3. WishartGenerator: Wishart / Inverse-Wishart with random SPD scale matrices.
 """
 
+import sys
+from pathlib import Path
+from typing import Literal
+
 import numpy as np
 import torch
-from scipy.stats import wishart, invwishart, ortho_group
-from typing import Tuple, Optional, Dict, Literal
-from pathlib import Path
-import sys
+from scipy.stats import invwishart, ortho_group, wishart
 
 # Import random_SPD from the spdnet submodule
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "spdnet" / "src"))
 from yetanotherspdnet.random.spd import random_SPD
-
 
 # =============================================================================
 # Eigenvalue generation
@@ -91,8 +91,8 @@ def generate_eigenvalues(
 def shuffle_data(
     data: np.ndarray,
     labels: np.ndarray,
-    seed: Optional[int] = None,
-) -> Tuple[np.ndarray, np.ndarray]:
+    seed: int | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
     """Shuffle data and labels together, preserving correspondence."""
     rng = np.random.default_rng(seed)
     perm = rng.permutation(len(data))
@@ -115,7 +115,7 @@ class ScaleMatrixGeneratorDiagonal:
         self,
         matrix_size: int = 16,
         n_classes: int = 3,
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ):
         self.matrix_size = matrix_size
         self.n_classes = n_classes
@@ -130,7 +130,7 @@ class ScaleMatrixGeneratorDiagonal:
         n_discriminant: int = 2,
         discriminant_position: Literal["large", "small", "mixed"] = "large",
         class_separation_ratio: float = 0.01,
-    ) -> Tuple[np.ndarray, np.ndarray, Dict]:
+    ) -> tuple[np.ndarray, np.ndarray, dict]:
         """
         Generate a dataset of diagonal-based SPD matrices.
 
@@ -199,7 +199,7 @@ class ScaleMatrixGeneratorBlock:
         self,
         matrix_size: int = 16,
         n_classes: int = 3,
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ):
         self.matrix_size = matrix_size
         self.block_size = matrix_size // 2
@@ -221,7 +221,7 @@ class ScaleMatrixGeneratorBlock:
         n_discriminant: int = 2,
         discriminant_position: Literal["large", "small", "mixed"] = "large",
         class_separation_ratio: float = 0.01,
-    ) -> Tuple[np.ndarray, np.ndarray, Dict]:
+    ) -> tuple[np.ndarray, np.ndarray, dict]:
         """
         Generate a dataset of block-structured SPD matrices.
 
@@ -364,7 +364,7 @@ class WishartGenerator:
         df: int,
         discriminant_position: str,
         perturbation_strength: float = 0.25,
-    ) -> Tuple[np.ndarray, np.ndarray, Dict]:
+    ) -> tuple[np.ndarray, np.ndarray, dict]:
         """
         Generate Wishart or Inverse-Wishart distributed data.
 

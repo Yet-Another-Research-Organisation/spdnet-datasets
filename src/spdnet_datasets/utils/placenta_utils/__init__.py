@@ -1,7 +1,7 @@
 """Placenta utilities package."""
 
-from .spectral_tiffs import read_stiff, read_mtiff
-from .annotations import parse, create_masks, flatten_masks, overlay_rgb_mask
+from .annotations import create_masks, flatten_masks, overlay_rgb_mask, parse
+from .spectral_tiffs import read_mtiff, read_stiff
 
 __all__ = [
     'read_stiff',

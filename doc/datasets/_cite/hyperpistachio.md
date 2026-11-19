@@ -1,0 +1,1 @@
+- A. Sheikh-Akbari and H. Mehrabinejad, "HyperPistachio: A Hyperspectral Image Dataset of Aflatoxin B1 Contaminated Pistachio Nuts", Zenodo, 2026. doi:[10.5281/zenodo.20027441](https://doi.org/10.5281/zenodo.20027441)

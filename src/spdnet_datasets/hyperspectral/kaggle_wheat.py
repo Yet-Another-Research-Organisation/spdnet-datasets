@@ -26,8 +26,8 @@ Download
 Kaggle competition ``beyond-visible-spectrum-ai-for-agriculture-2026``
 (https://www.kaggle.com/competitions/beyond-visible-spectrum-ai-for-agriculture-2026;
 organisers: https://han-research.gitlab.io/Agvision/). Needs Kaggle credentials
-(``KAGGLE_USERNAME`` / ``KAGGLE_KEY`` or ``~/.kaggle/kaggle.json``, see
-:mod:`spdnet_datasets.core.access`) and the competition rules accepted on its page
+(an access token in ``~/.kaggle/access_token`` or ``KAGGLE_API_TOKEN``; the legacy
+``kaggle.json`` also works, see :mod:`spdnet_datasets.core.access`) and the competition rules accepted on its page
 with the same account; licence: the competition rules. Without a local copy,
 ``fetch_kaggle_wheat`` downloads the competition archive through the Kaggle API
 into ``<cache_dir>/Wheat_Disease_ICPR26/downloads/`` (no checksum published) and
@@ -47,7 +47,7 @@ from ..core.config import dataset_path
 from ..core.estimators import check_sample_size
 from ..core.fetch import Bunch, run_pipeline
 from ..manager import DatasetManager
-from ..utils.sources import source_dir
+from ..utils.sources import existing_dir, source_dir
 from ._common import (
     HSIDataset,
     covariance_stage,
@@ -166,10 +166,11 @@ class KaggleWheatDataset(HSIDataset):
                  split="recommended", subset=None, cache_dir=None, keep=None, force=False,
                  verify="size", **kwargs):
         root = dataset_path(DOMAIN, NAME, data_dir)
-        super().__init__(data_dir=str(root), **kwargs)
+        super().__init__(data_dir=str(existing_dir(root, cache_dir)), **kwargs)
         bunch = fetch_kaggle_wheat(root, cache_dir, keep, self.estimator, force, verify,
                                    skip_first=skip_first, skip_last=skip_last,
                                    n_splits=n_splits, fold=fold)
+        self.data_dir = Path(bunch.root)
         self._setup(bunch, split, subset)
 
     def _load_raw(self, k):
