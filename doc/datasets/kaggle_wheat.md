@@ -155,6 +155,48 @@ val_kaggle = fetch_kaggle_wheat(part="val")             # unlabelled competition
 - Use `estimator=`. `cov_method=...` is silently absorbed by `**kwargs` and
   gives the SCM.
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each patch into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} kaggle_wheat
+```
+
+The loader drops the 8 first and 10 last bands (107 bands), whereas R23 used
+the first 125: `spectral_w48` and `spectral_w64` (windows of 48 or 64 bands at step 8) give 8
+and 6 tokens instead of 10 and 8.
+
+```{dataset-figure} kaggle_wheat/series_spectral
+```
+
+```{dataset-figure} kaggle_wheat/series_spatial
+```
+
+```{dataset-figure} kaggle_wheat/series_spatio_spectral
+```
+
+```{dataset-figure} kaggle_wheat/series_spectral_w48
+```
+
+```{dataset-figure} kaggle_wheat/series_spectral_w64
+```
+
+Not measured: no copy of the data can feed these modes.
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("kaggle_wheat")
+series = CovarianceSeries("kaggle_wheat", "spatial", window=(16, 16), step=(16, 16), n_channels=32)  # 4 quadrants, 32 bands
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

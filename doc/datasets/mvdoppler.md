@@ -164,6 +164,47 @@ Changing the estimator recomputes the preprocessing stage (about 1 min,
 - `scaling_factor` is replaced by `normalize=True`.
 - `subset=None` is the default: the instance holds every snapshot.
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each snapshot into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} mvdoppler
+```
+
+The loader stacks the two radar views (2 × 32 bins, 64 channels). Pooling into
+16 channels averages 4 bins of one view, and the spectral sub-bands (16 channels, step 16)
+never mix the views. `temporal_w64` (R23) keeps the 64 channels: same `p` as the R23 cache
+`mvdoppler_w64`, whose 64 variables were the central bins of view x only; `n_t = 64 = p`,
+so Ledoit-Wolf and `allow_small_n=True` by default.
+
+```{dataset-figure} mvdoppler/series_temporal
+```
+
+```{dataset-figure} mvdoppler/series_spectral
+```
+
+```{dataset-figure} mvdoppler/series_spectro_temporal
+```
+
+```{dataset-figure} mvdoppler/series_temporal_w64
+```
+
+Not measured: no copy of the data can feed these modes.
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("mvdoppler")
+series = CovarianceSeries("mvdoppler", "temporal", window=128, step=64)  # 4 windows of 128 frames
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

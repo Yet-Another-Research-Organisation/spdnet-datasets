@@ -180,6 +180,43 @@ with warnings.catch_warnings():
 - `split="train"` raises an error: use `subset="train"`. `subset=None` is the
   default.
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each fruit cube into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} deephsfruit
+```
+
+Built by name, the loader is in `classification_mode="ripeness"` (the R2
+cache: 3 states). The fruit is read from the ENVI sources (`DeepHSFruitDataset.structured_raw`,
+224 bands, Otsu mask on the 760-880 nm mean as `real.series.deephs_series`), cropped to its
+bounding box; quadrants are halves of the box.
+
+```{dataset-figure} deephsfruit/series_spectral
+```
+
+```{dataset-figure} deephsfruit/series_spatial
+```
+
+```{dataset-figure} deephsfruit/series_spatio_spectral
+```
+
+Not measured: no copy of the data can feed these modes.
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("deephsfruit")
+series = CovarianceSeries("deephsfruit", "spectral", band_window=32, band_step=16)  # windows of 32 bands
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

@@ -160,6 +160,50 @@ lw = Rices90Dataset(estimator="ledoit_wolf")
 - Use `estimator=`. `cov_method=...` is silently absorbed by `**kwargs` and
   gives the SCM.
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each grain into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} rices90
+```
+
+The grain is read again in its bounding box (`Rices90Dataset.structured_raw`,
+same segmentation as the loader, 64 binned bands, 0 outside the grain); the quadrants are
+halves of the box. With the 64 bands, a quadrant has about 100 pixels for `2p = 128`, so
+the `spatial` mode pools them into 16 (`CovarianceSeries("rices90", "spatial",
+n_channels=None)` raises `ValueError` unless `allow_small_n=True`).
+
+```{warning}
+For 73 of the 90 varieties both bundles come from the same session: the variety is
+confounded with the session, and only the `cross_session` split (17 varieties) tests
+across sessions.
+```
+
+```{dataset-figure} rices90/series_spectral
+```
+
+```{dataset-figure} rices90/series_spatial
+```
+
+```{dataset-figure} rices90/series_spatio_spectral
+```
+
+Not measured: no copy of the data can feed these modes.
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("rices90")
+series = CovarianceSeries("rices90", "spectral", band_window=8, band_step=8)  # 8 windows of 8 bands
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

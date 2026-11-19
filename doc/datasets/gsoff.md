@@ -182,6 +182,42 @@ Through the manager: `{"name": "gsoff", "split": "recommended", ...}`.
   `cov_method="ledoit_wolf"` is silently absorbed by `**kwargs` and gives the
   SCM.
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each window into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} gsoff
+```
+
+The bands are those of the loader (one band in `band_step = 2`: 63 bands); pass
+`loader_kwargs={"band_step": 1}` for all 125. Background pixels (all zero) are dropped from
+the observations of every token.
+
+```{dataset-figure} gsoff/series_spectral
+```
+
+```{dataset-figure} gsoff/series_spatial
+```
+
+```{dataset-figure} gsoff/series_spatio_spectral
+```
+
+Not measured: no copy of the data can feed these modes.
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("gsoff")
+series = CovarianceSeries("gsoff", "spectral", band_window=21, band_step=21)  # 3 windows of 21 bands
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

@@ -161,6 +161,43 @@ crop = BirdSetXCMDataset(subset=None, crop_s=5.0)   # 5 s excerpts, as the atlas
 - The former covariance series (`series_audio.birdset_series`, branch
   `timeseries`) used the 5 s crop; the default is now the whole recording.
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each recording into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} birdset_xcm
+```
+
+The spectral modes need the 64 log-mel bands (`features="logmel"`); their
+statistics below are measured on 3 000 recordings spread over the copy (`limit=3000`), since
+the log-mel preprocessing of the whole copy takes hours. Recordings have different lengths:
+use `collate_series`.
+
+```{dataset-figure} birdset_xcm/series_temporal
+```
+
+```{dataset-figure} birdset_xcm/series_spectral
+```
+
+```{dataset-figure} birdset_xcm/series_spectro_temporal
+```
+
+Not measured: no copy of the data can feed these modes.
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("birdset_xcm")
+series = CovarianceSeries("birdset_xcm", "temporal", window=124, step=62)  # 2 s windows
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

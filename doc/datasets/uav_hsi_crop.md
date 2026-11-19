@@ -172,6 +172,47 @@ transfer = UAVDataset(scenes=("MJK_N", "MJK_S"), split="scene_transfer")
 - Use `estimator=`. `cov_method=...` is silently absorbed by `**kwargs` and
   gives the SCM.
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each window into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} uav
+```
+
+`spectral_w48` and `spectral_w64` are the R23 large-p series (`uav_w48`, `uav_w64`:
+windows of 48 bands at step 8, of 64 at step 6, Ledoit-Wolf, `cover=False`).
+
+```{dataset-figure} uav_hsi_crop/series_spectral
+```
+
+```{dataset-figure} uav_hsi_crop/series_spatial
+```
+
+```{dataset-figure} uav_hsi_crop/series_spatio_spectral
+```
+
+```{dataset-figure} uav_hsi_crop/series_spectral_w48
+```
+
+```{dataset-figure} uav_hsi_crop/series_spectral_w64
+```
+
+Not measured: no copy of the data can feed these modes.
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("uav")
+series = CovarianceSeries("uav", "spatial", window=(10, 10), step=(5, 5))  # 4 windows of 10 x 10 pixels
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

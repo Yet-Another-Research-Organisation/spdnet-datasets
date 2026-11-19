@@ -244,6 +244,56 @@ ds.meta[["s2_dates", "gap_s1a", "gap_s1d"]].head()
 ds_raw = PastisRDataset(scenario="E", return_raw=True)
 ```
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each parcel into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} pastis_r
+```
+
+The parcels are those of scenario A of the loader (at least 30 pixels).
+`s2_dates` reproduces `real.series.pastis_series`: the S2 acquisition of the tile nearest each
+date of a 24-date calendar grid common to every patch (`PastisRDataset.s2_dates`).
+`s2_months` merges pairs of grid dates (about one month, 12 tokens). `s1s2_fusion` reproduces
+`real.series_pastis_fusion`: 12 equal periods, per-pixel medians of the 10 S2 bands and of
+(VV, VH) of both S1 orbits (`p = 14`), each variable standardised on the training parcels
+(the former builder used the statistics of fold 1); a period without an acquisition of one
+sensor is a masked token. The statistics below are measured on at most 300 parcels per
+class (`max_samples_per_class=300`).
+
+```{dataset-figure} pastis_r/series_s2_dates
+```
+
+```{dataset-figure} pastis_r/series_s2_months
+```
+
+```{dataset-figure} pastis_r/series_s1s2_fusion
+```
+
+Measured on the real data (BERTHA, 2026-11-19, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `s2_dates` | 5 400 | 24 / 24 | 10 | 164 (30) | 16.4 | 100.00 % | 6.4e+01 / 3.2e+02 / 2.0e+03 |
+| `s2_months` | 5 400 | 12 / 12 | 10 | 328 (60) | 32.8 | 100.00 % | 1.8e+02 / 1.6e+03 / 5.6e+04 |
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("pastis_r")
+series = CovarianceSeries("pastis_r", "s1s2_fusion", loader_kwargs={"max_samples_per_class": 300})  # fusion on a subsample
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

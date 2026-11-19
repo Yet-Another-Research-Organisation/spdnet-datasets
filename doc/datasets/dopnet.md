@@ -168,6 +168,45 @@ lopo = DopNetDataset(split="recommended", fold=2)       # test = person C
   gestures instead of 3 076).
 - `scaling_factor` is replaced by `normalize=True`.
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each gesture into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} dopnet
+```
+
+The `temporal` mode reproduces `real.series.dopnet_series`: the `.mat` files are
+read again (`DopNetDataset.doppler_bands`) to take the log power of the 128 central Doppler
+bins in 16 bands, with windows of 48 frames at step 24; gestures have different lengths,
+padded by `collate_series`. The samples are those of the loader (gestures of at least 96
+frames, duplicates removed, training and test files). The two other modes cut the 48
+energy-band channels of the loader.
+
+```{dataset-figure} dopnet/series_temporal
+```
+
+```{dataset-figure} dopnet/series_spectral
+```
+
+```{dataset-figure} dopnet/series_spectro_temporal
+```
+
+Not measured: no copy of the data can feed these modes.
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("dopnet")
+series = CovarianceSeries("dopnet", "temporal", window=64, step=32)  # windows of 64 frames
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

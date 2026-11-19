@@ -189,6 +189,36 @@ t6 = PolInSARIslandDataset(representation="t6")                 # 24×24, scm on
 off = PolInSARIslandDataset(cells="official", split="official")  # optimistic, warns
 ```
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each cell into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} pol_insar_island
+```
+
+The `representation="logpower"` cells of the loader (`32 × 32` pixels, 12
+log-powers), every pixel of the cell, as `real.series_sar.polinsar_logpower_series`: 4 × 4
+patches of 8 × 8 pixels, each log-power standardised on the training cells, Ledoit-Wolf.
+
+```{dataset-figure} pol_insar_island/series_spatial
+```
+
+Not measured: no copy of the data can feed these modes.
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("pol_insar_island")
+series = CovarianceSeries("pol_insar_island", "spatial", window=(16, 16), step=(8, 8))  # 9 patches of 16 x 16 pixels
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

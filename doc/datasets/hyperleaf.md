@@ -167,6 +167,55 @@ img = HyperLeafDataset(mode="image", bands=[81, 51, 21])
 - Use `estimator=`. `cov_method=...` is silently absorbed by `**kwargs` and
   gives the SCM.
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each leaf image into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} hyperleaf
+```
+
+The default mode is the user's design: 6 spatial windows of 48 × 58 pixels
+along the leaf times 4 windows of 48 bands (24 tokens, `p = 48`). The 4 band windows are spread
+evenly, which leaves 4 bands unused between two windows; `band_window=51` covers the 204 bands
+exactly. The source is the whole image (`HyperLeafDataset.structured_raw`) and only the leaf
+pixels are observations: a spatial window holds far fewer than 2 784 of them, and a token with
+fewer than `2p` leaf pixels is masked. The `spatial` mode keeps the 204 bands (`2p = 408`).
+`spectral_w48`, `spectral_w64` and `spectral_w96` are the R23 large-p series (step 16).
+
+```{dataset-figure} hyperleaf/series_spatio_spectral
+```
+
+```{dataset-figure} hyperleaf/series_spatial
+```
+
+```{dataset-figure} hyperleaf/series_spectral
+```
+
+```{dataset-figure} hyperleaf/series_spectral_w48
+```
+
+```{dataset-figure} hyperleaf/series_spectral_w64
+```
+
+```{dataset-figure} hyperleaf/series_spectral_w96
+```
+
+Not measured: no copy of the data can feed these modes.
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("hyperleaf")
+series = CovarianceSeries("hyperleaf", "spatio_spectral", band_window=51, n_windows=(1, 8))  # 8 x 4 windows of 51 bands
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

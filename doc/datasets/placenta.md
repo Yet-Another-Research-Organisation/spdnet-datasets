@@ -161,6 +161,41 @@ dye = PlacentaDataset(split="dye_transfer")
 - Use `estimator=`. `cov_method=...` is silently absorbed by `**kwargs` and
   gives the SCM.
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each window into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} placenta
+```
+
+Windows of 8 bands (37 bands in all); the spatial mode keeps every band
+(`p = 37`, `n_t = 144 ≈ 3.9p`).
+
+```{dataset-figure} placenta/series_spectral
+```
+
+```{dataset-figure} placenta/series_spatial
+```
+
+```{dataset-figure} placenta/series_spatio_spectral
+```
+
+Not measured: no copy of the data can feed these modes.
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("placenta")
+series = CovarianceSeries("placenta", "spectral", band_window=12, band_step=6)  # windows of 12 bands
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

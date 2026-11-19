@@ -147,6 +147,55 @@ test = GTZANDataset(split="stratified", subset="test", fold=1)
 - `scaling_factor` is replaced by `normalize=True`.
 - Duplicates are now removed (985 excerpts instead of 999).
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each clip into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} gtzan
+```
+
+The spectral modes and `temporal_mel64` need the 64 log-mel bands (loader built with
+`features="logmel"`), with which the loader keeps 885 of the 985 MFCC clips. `temporal_mel64`
+(R23) has `n_t = 258 ≥ 2p`: no derogation.
+
+```{dataset-figure} gtzan/series_temporal
+```
+
+```{dataset-figure} gtzan/series_spectral
+```
+
+```{dataset-figure} gtzan/series_spectro_temporal
+```
+
+```{dataset-figure} gtzan/series_temporal_mel64
+```
+
+Measured on the real data (BERTHA, 2026-11-19, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `temporal` | 985 | 20 / 20 | 20 | 258 (258) | 12.9 | 99.92 % | 1.3e+02 / 5.2e+02 / 5.9e+03 |
+| `spectral` | 885 | 7 / 7 | 16 | 2 582 (2 397) | 161.4 | 100.00 % | 5.0e+01 / 2.2e+02 / 1.4e+03 |
+| `spectro_temporal` | 885 | 16 / 16 | 16 | 1 032 (958) | 64.5 | 99.27 % | 5.0e+01 / 2.3e+02 / 2.0e+03 |
+| `temporal_mel64` | 885 | 20 / 20 | 64 | 258 (258) | 4.0 | 100.00 % | 2.8e+02 / 1.2e+03 / 4.0e+03 |
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("gtzan")
+series = CovarianceSeries("gtzan", "temporal", window=129, step=129)  # 1.5 s windows, no overlap
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

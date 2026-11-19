@@ -198,6 +198,42 @@ xe = CI4RDataset(mode="xethru", return_raw=True)       # Ledoit-Wolf 32x32 by de
 - `subset=None` is the default: the instance holds every sample and
   `dataset.splits` indexes it.
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each spectrogram into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} ci4r
+```
+
+The parameters of the former `real.series.ci4r_series`: the central half of the
+Doppler axis (loader `band=0.5`, 64 bins) averaged into 16 bands, 13 windows of 200 columns at
+step 100 (`cover=False`: the last 75 columns are not used, as before), Ledoit-Wolf.
+
+```{dataset-figure} ci4r/series_temporal
+```
+
+```{dataset-figure} ci4r/series_spectral
+```
+
+```{dataset-figure} ci4r/series_spectro_temporal
+```
+
+Not measured: no copy of the data can feed these modes.
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("ci4r")
+series = CovarianceSeries("ci4r", "temporal", window=300, step=150, n_channels=32)  # longer windows, 32 bands
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

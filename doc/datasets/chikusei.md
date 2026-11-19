@@ -187,6 +187,41 @@ test = ChikuseiDataset(subset="test", window=23, estimator="ledoit_wolf")
 - Use `estimator=`. `cov_method=...` is silently absorbed by `**kwargs` and
   gives the SCM.
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each window into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} chikusei
+```
+
+The windows are those of the loader (version 2: 15 × 15 windows of the
+official spatial split with its buffer), with one band in two (64 bands).
+
+```{dataset-figure} chikusei/series_spectral
+```
+
+```{dataset-figure} chikusei/series_spatial
+```
+
+```{dataset-figure} chikusei/series_spatio_spectral
+```
+
+Not measured: no copy of the data can feed these modes.
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("chikusei")
+series = CovarianceSeries("chikusei", "spectral", band_window=32, band_step=16)  # windows of 32 bands
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

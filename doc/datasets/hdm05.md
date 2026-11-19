@@ -162,6 +162,52 @@ all31 = HDM05Dataset(subset=None, features="c31", max_classes=20)
 - Sequences with T < 186 are no longer kept with `c93`; use `c31` to keep all
   2 086 sequences.
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each motion into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} hdm05
+```
+
+The modes are registered, but no copy can feed them: the local export and the
+ETH archive hold the 93 × 93 covariances only, without the joint trajectories, and
+`HDM05Dataset.structured_raw` raises a `ValueError` saying so. They need a reader of the raw
+MPI motion capture files (C3D / ASF-AMC).
+
+```{dataset-figure} hdm05/series_joint
+```
+
+```{dataset-figure} hdm05/series_frame
+```
+
+```{dataset-figure} hdm05/series_window
+```
+
+Measured on the real data (BERTHA, 2026-11-19, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `joint` | ValueError("HDM05 covariance series need the raw MPI motion capture files (C3D / ASF-AMC, https://resources.mpi-inf.mpg. | | | | | | |
+| `frame` | ValueError("HDM05 covariance series need the raw MPI motion capture files (C3D / ASF-AMC, https://resources.mpi-inf.mpg. | | | | | | |
+| `window` | ValueError("HDM05 covariance series need the raw MPI motion capture files (C3D / ASF-AMC, https://resources.mpi-inf.mpg. | | | | | | |
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("hdm05")
+series = CovarianceSeries("hdm05", "frame", n_windows=8)  # raises ValueError: no trajectory in the copies
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite
