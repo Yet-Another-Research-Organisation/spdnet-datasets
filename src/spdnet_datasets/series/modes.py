@@ -67,6 +67,13 @@ class SeriesMode:
         (large-p tokens with ``n_t < 2p``, Ledoit-Wolf).
     source : callable(ds, i) -> array
         Structured sample ``i`` of the wrapped loader (unscaled).
+    prepare : callable(x) -> x, optional
+        Per-sample transform applied before the standardisation and the tokenizer
+        (skeleton centred on its root joint, rotated into the body frame...).
+    standardize : {None, "last", "element"}
+        Divide by standard deviations fitted on the training samples of the split (after
+        removing the means): ``"last"`` one per variable of the last axis, ``"element"`` one
+        per element of the trailing axes (per joint and coordinate).
     drop_invalid : bool
         Drop the observations that are all zero or not finite (image background) before
         estimating each token.
@@ -85,12 +92,17 @@ class SeriesMode:
     allow_small_n: bool = False
     loader_defaults: dict = field(default_factory=dict)
     source: Callable = structured_raw
+    prepare: Callable | None = None
+    standardize: str | None = None
     drop_invalid: bool = False
     min_n_over_p: float = 2.0
 
     def __post_init__(self):
         if self.family not in FAMILIES:
             raise ValueError(f"family must be one of {FAMILIES}, got {self.family!r}")
+        if self.standardize not in (None, "last", "element"):
+            raise ValueError(f"standardize must be None, 'last' or 'element', got "
+                             f"{self.standardize!r}")
 
     def resolve(self, **params):
         """Default parameters updated with ``params`` (unknown names raise ``ValueError``)."""
@@ -104,6 +116,8 @@ class SeriesMode:
         """``(S, p, n_t)`` for a sample of ``shape`` (default ``example_shape``), every observation
         valid; ``n_t`` is the smallest token."""
         x = np.zeros(shape or self.example_shape, dtype=np.float32)
+        if self.prepare is not None:
+            x = self.prepare(x)
         obs, _ = self.tokenize(x, **self.resolve(**params))
         return len(obs), obs[0].shape[1], min(len(o) for o in obs)
 
@@ -295,6 +309,258 @@ SERIES_MODES["hyperleaf"] = _large_p_spectral({
         "window of 16 bands (step 8); observations = the leaf pixels", _HYPERLEAF,
         drop_invalid=True),
 }, {48: 16, 64: 16, 96: 16})
+
+
+# ---------------------------------------------------------------------------
+# Skeletons (NTU RGB+D 120; HDM05 has no raw trajectories): sample = (T, 25, 3) camera
+# coordinates of body 0. Parameters of real/series_ntu.py and real/series_large_p.py.
+
+from ..real.series_large_p import NTU_JOINTS_15  # noqa: E402
+from ..real.series_ntu import (  # noqa: E402
+    NTU_JOINTS_16,
+    NTU_LONG_ACTIONS,
+    NTU_PARTS,
+    body_frame,
+)
+
+NTU_PARTS_15 = {"trunk": (0, 1, 20, 2, 3), "left arm": (4, 5, 6, 7, 21),
+                "right arm": (8, 9, 10, 11, 23), "left leg": (0, 12, 13, 14, 15),
+                "right leg": (0, 16, 17, 18, 19)}
+"""Five body parts of five joints (p = 15 each; the root joint is shared by the trunk and the
+legs, the thumbs are left out), camera coordinates: tokens of the ``part_temporal`` mode."""
+
+
+def _root_centred(x):
+    """(T, 25, 3) -> (T, 24, 3): root joint subtracted, then dropped (``ntu_skeletons``)."""
+    return (x - x[:, :1])[:, 1:]
+
+
+def _root_centred_25(x):
+    return x - x[:, :1]
+
+
+def _body_frame_16(x):
+    return body_frame(x - x[:, :1])[:, list(NTU_JOINTS_16)]
+
+
+def _centred_16(x):
+    return (x - x[:, :1])[:, list(NTU_JOINTS_16)]
+
+
+def _joints(x, *, joints=None):
+    """One token per joint: its trajectory over every frame, p = 3."""
+    J = x.shape[1]
+    groups = [(3 * j, 3 * j + 1, 3 * j + 2) for j in (joints or range(J))]
+    return tok.parts(x.reshape(len(x), -1), groups)
+
+
+def _frames(x, *, n_windows=12):
+    """``n_windows`` equal consecutive windows; observations = every joint of every frame."""
+    edges = np.linspace(0, len(x), n_windows + 1).round().astype(int)
+    obs = [x[a:b].reshape(-1, x.shape[-1]) for a, b in zip(edges[:-1], edges[1:], strict=True)]
+    return obs, [[(a, b), (0, x.shape[1]), (0, 3)]
+                 for a, b in zip(edges[:-1], edges[1:], strict=True)]
+
+
+def _width_windows(T, width, n_windows, minimum=4):
+    w = max(int(round(T * width)), minimum)
+    return tok.axis_windows(T, w, n_windows=n_windows)
+
+
+def _parts_in_windows(x, *, parts, width=1 / 3, n_windows=6):
+    """Window-major: every body part of the first window, then of the second..."""
+    obs, pos = [], []
+    for a, b in _width_windows(len(x), width, n_windows):
+        w = x[a:b]
+        for joints in parts.values():
+            obs.append(w[:, list(joints)].reshape(b - a, -1))
+            pos.append([(a, b), tuple(joints), (0, 3)])
+    return obs, pos
+
+
+def _joint_covariance(x, *, width=1 / 3, n_windows=6):
+    """Covariance between joints over a window: the 3 axes are 3 observations of the
+    J-dimensional variable, window mean removed per joint and axis (n = 3 x frames)."""
+    obs, pos = [], []
+    for a, b in _width_windows(len(x), width, n_windows):
+        v = x[a:b] - x[a:b].mean(0)
+        obs.append(v.transpose(0, 2, 1).reshape(-1, x.shape[1]))
+        pos.append([(a, b), (0, x.shape[1]), (0, 3)])
+    return obs, pos
+
+
+def _axis_covariance(x, *, width=1 / 3, n_windows=4):
+    """Per window and per body axis (lateral, vertical, sagittal): covariance between joints."""
+    obs, pos = [], []
+    w = int(len(x) * width)
+    for a, b in tok.axis_windows(len(x), max(w, 1), n_windows=n_windows):
+        for axis in range(3):
+            obs.append(x[a:b, :, axis])
+            pos.append([(a, b), (0, x.shape[1]), (axis, axis + 1)])
+    return obs, pos
+
+
+def _windows_all_joints(x, *, joints=None, n_windows=8):
+    """R23 ``ntu_window_series``: windows of a quarter of the sequence, evenly spread, over
+    the 3 x J coordinates (camera axes, not centred)."""
+    x = x if joints is None else x[:, list(joints)]
+    return tok.temporal(x.reshape(len(x), -1), max(len(x) // 4, 3), n_windows=n_windows)
+
+
+def _skeleton_modes(shape, *, ntu=True):
+    modes = {
+        "joint": SeriesMode(
+            "joint", _joints, ("T", "J", "C"), {"joints": None},
+            "one token per joint (root-centred, root dropped): its 3 coordinates over every "
+            "frame", shape, prepare=_root_centred),
+        "frame": SeriesMode(
+            "frame", _frames, ("T", "J", "C"), {"n_windows": 12},
+            "12 equal consecutive windows; observations = every joint of every frame, p = 3",
+            shape, family="temporal", prepare=_root_centred),
+        "window": SeriesMode(
+            "window", _windows_all_joints, ("T", "J", "C"),
+            {"joints": None, "n_windows": 8},
+            f"R23 large p: 8 windows of a quarter of the sequence, the {3 * shape[1]} camera "
+            "coordinates (n_t < 2p, Ledoit-Wolf)", shape, family="temporal",
+            estimator="ledoit_wolf", allow_small_n=True),
+    }
+    if not ntu:
+        return modes
+    modes.update({
+        "part": SeriesMode(
+            "part", _parts_in_windows, ("T", "J", "C"),
+            {"parts": NTU_PARTS, "width": 1 / 3, "n_windows": 6},
+            "6 windows of a third of the sequence x 5 body parts of 4 joints (p = 12), "
+            "root-centred and standardised coordinates, window-major", shape,
+            family="temporal", estimator="ledoit_wolf", prepare=_root_centred_25,
+            standardize="element"),
+        "jointcov": SeriesMode(
+            "jointcov", _joint_covariance, ("T", "J", "C"),
+            {"width": 1 / 3, "n_windows": 6},
+            "6 windows of a third of the sequence; covariance between 16 joints, the 3 axes as "
+            "observations (n = 3 x frames)", shape, family="temporal",
+            estimator="ledoit_wolf", prepare=_centred_16, standardize="element"),
+        "axis": SeriesMode(
+            "axis", _axis_covariance, ("T", "J", "C"),
+            {"width": 1 / 3, "n_windows": 4},
+            "4 windows x 3 body axes (lateral, vertical, sagittal): covariance between 16 "
+            "joints in the body frame, window-major", shape, family="temporal",
+            estimator="ledoit_wolf", prepare=_body_frame_16, standardize="element"),
+        "part_temporal": SeriesMode(
+            "part_temporal", _parts_in_windows, ("T", "J", "C"),
+            {"parts": NTU_PARTS_15, "width": 0.4, "n_windows": 4},
+            "4 windows (50 % overlap) x 5 body parts of 5 joints (p = 15), camera "
+            "coordinates, window-major; a token with n_t < 2p is masked", shape,
+            family="temporal"),
+        "window_p45": SeriesMode(
+            "window_p45", _windows_all_joints, ("T", "J", "C"),
+            {"joints": NTU_JOINTS_15, "n_windows": 8},
+            "R23 large p: 8 windows of a quarter of the sequence, 15 joints (p = 45, n_t < 2p, "
+            "Ledoit-Wolf)", shape, family="temporal", estimator="ledoit_wolf",
+            allow_small_n=True),
+    })
+    window = modes.pop("window")
+    modes["window_p75"] = replace(window, name="window_p75")
+    modes["window_p45"] = modes.pop("window_p45")
+    return modes
+
+
+# Sequences of real/series_ntu.py: actions A001-A010, at most 300 per class (median 76
+# frames); the axis mode keeps the 11 long actions (median 123 frames), as ntu_axis_series.
+_NTU_SELECTION = {"classes": [f"A{a:03d}" for a in range(1, 11)], "max_samples_per_class": 300}
+_NTU_LONG = {"classes": [f"A{a:03d}" for a in NTU_LONG_ACTIONS], "max_samples_per_class": None}
+SERIES_MODES["ntu120"] = {
+    name: replace(mode, loader_defaults=_NTU_LONG if name == "axis" else _NTU_SELECTION,
+                  example_shape=(123, 25, 3) if name == "axis" else mode.example_shape)
+    for name, mode in _skeleton_modes((76, 25, 3)).items()}
+# HDM05: same generic modes on (T, 31, 3); the copies hold no trajectories (structured_raw raises)
+SERIES_MODES["hdm05"] = _skeleton_modes((251, 31, 3), ntu=False)
+
+# ---------------------------------------------------------------------------
+# PASTIS-R parcels: (dates or periods, pixels, variables)
+
+
+def _pastis_s2(ds, i):
+    return ds.s2_dates(i, 24)
+
+
+def _pastis_fusion(ds, i):
+    return ds.s1s2_periods(i, 12)
+
+
+SERIES_MODES["pastis_r"] = {
+    "s2_dates": SeriesMode(
+        "s2_dates", _temporal, ("T", "N", "B"),
+        {"window": 1, "step": 1, "n_windows": None, "n_channels": None, "cover": False},
+        "one token per date of a 24-date calendar grid (nearest S2 acquisition of the tile): "
+        "covariance of the 10 bands over the parcel pixels", (24, 66, 10), family="temporal",
+        estimator="ledoit_wolf", source=_pastis_s2),
+    "s2_months": SeriesMode(
+        "s2_months", _temporal, ("T", "N", "B"),
+        {"window": 2, "step": 2, "n_windows": None, "n_channels": None, "cover": False},
+        "12 periods of two consecutive grid dates (about a month): 10 bands over the pixels x "
+        "2 dates", (24, 66, 10), family="temporal", estimator="ledoit_wolf",
+        source=_pastis_s2),
+    "s1s2_fusion": SeriesMode(
+        "s1s2_fusion", _temporal, ("T", "N", "B"),
+        {"window": 1, "step": 1, "n_windows": None, "n_channels": None, "cover": False},
+        "12 equal periods, per-pixel median of the 10 S2 bands and (VV, VH) of S1A and S1D "
+        "(p = 14), standardised on the training parcels", (12, 66, 14), family="temporal",
+        estimator="ledoit_wolf", source=_pastis_fusion, standardize="last"),
+}
+
+# ---------------------------------------------------------------------------
+# Objects (rice grains, fruits): bounding box (h, w, B), 0 outside the object
+
+SERIES_MODES["rices90"] = {
+    "spectral": SeriesMode(
+        "spectral", _spectral, ("H", "W", "B"),
+        {"band_window": 16, "band_step": 8, "n_windows": None, "cover": True},
+        "window of 16 binned bands (step 8); observations = the grain pixels", (21, 17, 64),
+        drop_invalid=True),
+    "spatial": SeriesMode(
+        "spatial", _spatial, ("H", "W", "B"),
+        {"window": (0.5, 0.5), "step": (0.5, 0.5), "n_windows": None, "n_channels": 16},
+        "4 quadrants of the grain box, the 64 bands pooled into 16 (p = 64 gives about 100 "
+        "pixels for 2p = 128)", (21, 17, 64), drop_invalid=True),
+    "spatio_spectral": SeriesMode(
+        "spatio_spectral", _spatio_spectral, ("H", "W", "B"),
+        {"window": (0.5, 0.5), "step": (0.5, 0.5), "n_windows": None, "band_window": 16,
+         "band_step": 16, "band_n_windows": None},
+        "4 quadrants of the grain box x windows of 16 bands, spatial-major", (21, 17, 64),
+        drop_invalid=True),
+}
+SERIES_MODES["deephsfruit"] = {
+    "spectral": SeriesMode(
+        "spectral", _spectral, ("H", "W", "B"),
+        {"band_window": 16, "band_step": 8, "n_windows": None, "cover": True},
+        "window of 16 bands (step 8, T = 27); observations = the fruit pixels",
+        (180, 140, 224), drop_invalid=True,
+        loader_defaults={"classification_mode": "ripeness"}),
+    "spatial": SeriesMode(
+        "spatial", _spatial, ("H", "W", "B"),
+        {"window": (0.5, 0.5), "step": (0.5, 0.5), "n_windows": None, "n_channels": 16},
+        "4 quadrants of the fruit box, the 224 bands pooled into 16", (180, 140, 224),
+        drop_invalid=True, loader_defaults={"classification_mode": "ripeness"}),
+    "spatio_spectral": SeriesMode(
+        "spatio_spectral", _spatio_spectral, ("H", "W", "B"),
+        {"window": (0.5, 0.5), "step": (0.5, 0.5), "n_windows": None, "band_window": 32,
+         "band_step": 32, "band_n_windows": None},
+        "4 quadrants of the fruit box x windows of 32 bands, spatial-major", (180, 140, 224),
+        drop_invalid=True, loader_defaults={"classification_mode": "ripeness"}),
+}
+
+# ---------------------------------------------------------------------------
+# Pol-InSAR-Island (real.series_sar.polinsar_logpower_series): 4 x 4 patches of 8 x 8 m of
+# a 32 x 32 cell, the 12 log-powers (6 per band, L and S), standardised, Ledoit-Wolf
+
+SERIES_MODES["pol_insar_island"] = {
+    "spatial": SeriesMode(
+        "spatial", _spatial, ("H", "W", "F"),
+        {"window": (8, 8), "step": (8, 8), "n_windows": None, "n_channels": None},
+        "4 x 4 patches of 8 x 8 pixels, row-major; variables = the 12 log-powers (L and S)",
+        (32, 32, 12), estimator="ledoit_wolf", standardize="last"),
+}
 
 
 def get_mode(dataset, mode=None):

@@ -192,5 +192,23 @@ class DeepHSFruitDataset(HSIDataset):
         self.data_dir = Path(bunch.root)
         self._setup(bunch, split, subset)
 
+    def structured_raw(self, i):
+        """VIS cube of sample ``i`` cropped to the fruit, ``(h, w, 224)`` float32, 0 outside the
+        fruit (Otsu threshold on the 760-880 nm mean, as ``real.series.deephs_series``), read
+        from the ENVI sources (``spectral`` package). Source of
+        :class:`~spdnet_datasets.series.CovarianceSeries`."""
+        from spectral.io import envi
+
+        from ..real.series import otsu_threshold
+
+        header = Path(self.bunch.root) / self.meta_all["header_file"].iloc[int(self._index[i])]
+        cube = np.asarray(envi.open(str(header), str(header.with_suffix(".bin"))).load(),
+                          dtype=np.float32)
+        nir = cube[..., 150:200].mean(-1)
+        mask = nir > otsu_threshold(nir)
+        rows, cols = np.nonzero(mask)
+        box = (slice(rows.min(), rows.max() + 1), slice(cols.min(), cols.max() + 1))
+        return cube[box] * mask[box][..., None]
+
 
 __all__ = ["DeepHSFruitDataset", "fetch_deephsfruit"]

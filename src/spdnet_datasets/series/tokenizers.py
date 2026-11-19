@@ -13,7 +13,8 @@ Windows along one axis follow :func:`spdnet_datasets.real.series.window_starts`:
 regular starts leave it uncovered, or ``n_windows`` windows spread evenly. With ``n_windows`` and
 no ``window``, the window is ``2 n / (n_windows + 1)``: ``n_windows`` windows that overlap by
 50 % and cover the whole axis. An axis shorter than ``window`` gives a single window over the
-whole axis.
+whole axis. A float ``window`` or ``step`` at most 1 is a fraction of the axis length (``0.5``:
+halves, for objects of varying size such as grains or fruits).
 
 The variables of a token are the last axis of the input (frequency bins, MFCC, bands), possibly
 restricted to a band window (:func:`spectral`); every other axis becomes observations.
@@ -37,6 +38,10 @@ def axis_windows(n, window=None, step=None, n_windows=None, cover=True):
         if n_windows is None:
             raise ValueError("give window or n_windows")
         window = max(1, int(2 * n / (n_windows + 1)))
+    if isinstance(window, float) and window <= 1:  # fraction of the axis
+        window = int(np.ceil(window * n))
+    if isinstance(step, float) and step <= 1:
+        step = int(np.ceil(step * n))
     window = int(window)
     if window < 1:
         raise ValueError(f"window must be >= 1, got {window}")

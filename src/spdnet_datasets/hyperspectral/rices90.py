@@ -97,6 +97,13 @@ def otsu_threshold(values, bins=256):
 
 def segment_grains(cube, dark):
     """(lines, samples, B) cube -> list of (n_pixels, B) relative reflectances of the grains."""
+    return [pixels for pixels, _ in grain_boxes(cube, dark)]
+
+
+def grain_boxes(cube, dark):
+    """Grains of a cube as ``(pixels (n, B), box (h, w, B))``: the relative reflectances of the
+    grain, and its bounding box with the pixels outside the grain set to 0 (same grains and
+    order as :func:`segment_grains`)."""
     from scipy import ndimage
 
     cube = np.asarray(cube, dtype=np.float32) - dark[None]
@@ -111,8 +118,12 @@ def segment_grains(cube, dark):
     areas = ndimage.sum(mask, labels, range(1, n + 1))
     median = np.median(areas[areas > 30]) if (areas > 30).any() else 0
     objects = ndimage.find_objects(labels)
-    return [cube[objects[i]][labels[objects[i]] == i + 1]
-            for i in range(n) if 0.4 * median <= areas[i] <= 2.0 * median]
+    out = []
+    for i in range(n):
+        if 0.4 * median <= areas[i] <= 2.0 * median:
+            inside = labels[objects[i]] == i + 1
+            out.append((cube[objects[i]][inside], cube[objects[i]] * inside[..., None]))
+    return out
 
 
 def fetch_rices90(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
@@ -233,6 +244,23 @@ class Rices90Dataset(HSIDataset):
                               band_bin=band_bin, val_fraction=val_fraction)
         self.data_dir = Path(bunch.root)
         self._setup(bunch, split, subset)
+
+    def structured_raw(self, i):
+        """Grain of sample ``i`` in its bounding box, ``(h, w, p)`` float32 binned reflectances,
+        0 outside the grain (unscaled). The cube of the grain is read and segmented again (one
+        cube kept in memory: read the grains in order). Source of
+        :class:`~spdnet_datasets.series.CovarianceSeries`."""
+        row = self.meta_all.iloc[int(self._index[i])]
+        root = Path(self.bunch.root)
+        key = (row["session"], row["cube"])
+        if getattr(self, "_grains", (None,))[0] != key:
+            dark = np.asarray(read_envi(root / row["session"] / "black.hdr"), np.float32).mean(0)
+            boxes = [box for _, box in grain_boxes(read_envi(root / row["session"]
+                                                              / f"{row['cube']}.hdr"), dark)]
+            self._grains = (key, boxes)
+        box = self._grains[1][int(row["grain"])]
+        p = int(self.bunch.info["p"])
+        return box.reshape(*box.shape[:2], p, -1).mean(-1).astype(np.float32)
 
     def _load_raw(self, k):
         """Binned pixels of the grain, (n_pixels, p)."""

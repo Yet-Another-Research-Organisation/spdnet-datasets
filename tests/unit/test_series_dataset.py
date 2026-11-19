@@ -183,3 +183,29 @@ def test_build_from_name(fake, monkeypatch):
                         lambda name, mode, kw: FakeLoader(**(kw or {})))
     s = fake("fake_series", loader_kwargs={"data_dir": "x"})
     assert s.name == "fake_series" and s.loader.data_dir == "x"
+
+
+def test_standardisation_fitted_on_train_and_prepare(fake, monkeypatch, tmp_path):
+    from dataclasses import replace
+
+    base = _spectrogram_modes((T, P), window=20, step=10, n_channels=None)["temporal"]
+    mode = replace(base, standardize="last", prepare=lambda x: 2 * x)
+    monkeypatch.setitem(SERIES_MODES, "fake_series", {"temporal": mode})
+    s = fake(normalize=False)
+    b = fake(FakeLoader(test_shift=5.0), normalize=False, cache_dir=tmp_path / "b")
+    train = np.concatenate([2 * FakeLoader().structured_raw(i) for i in range(4)])
+    mu, sd = train.mean(0), train.std(0)
+    np.testing.assert_allclose(s._standardization[0], mu, atol=1e-10)
+    np.testing.assert_allclose(s._standardization[1], sd, rtol=1e-6)
+    np.testing.assert_allclose(b._standardization[1], sd, rtol=1e-6)  # test data not used
+    x = (2 * FakeLoader().structured_raw(9) - mu) / sd
+    (tokens, _), _ = s[9]
+    np.testing.assert_allclose(tokens[0].numpy(), np.cov(x[:20].T, bias=True), rtol=1e-5)
+
+
+def test_fractional_windows_follow_the_object_size():
+    from spdnet_datasets.series import tokenizers as tok
+
+    assert tok.axis_windows(21, 0.5, 0.5) == [(0, 11), (10, 21)]
+    obs, _ = tok.spatial(np.zeros((20, 16, 3)), (0.5, 0.5), (0.5, 0.5))
+    assert len(obs) == 4 and obs[0].shape == (80, 3)

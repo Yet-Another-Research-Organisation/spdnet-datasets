@@ -333,6 +333,17 @@ class NTURGBD120Dataset(SequenceCovarianceDataset):
     def _make_splits(self, meta, labels, groups):
         return ntu120_splits(meta, labels, groups, seed=0)
 
+    def structured_raw(self, i):
+        """Skeleton of sample ``i``, ``(T, 25, 3)`` float64: camera coordinates (m) of body 0,
+        frames where the body is lost dropped (the frames of the covariance), read again from
+        the copy. Source of :class:`~spdnet_datasets.series.CovarianceSeries`."""
+        if not hasattr(self, "_paths"):
+            index = ntu_index(self.data_dir)
+            self._paths = dict(zip(index["id"], index["path"], strict=True))
+        record = _load(Path(self.data_dir, self._paths[self.meta["id"].iloc[i]]))
+        x = np.asarray(record["skel_body0"], dtype=np.float64)
+        return x[np.any(x != 0, axis=(1, 2))]
+
 
 __all__ = ["COARSE_MAP", "NTURGBD120Dataset", "TRAIN_SUBJECTS", "fetch_ntu120",
            "ingest_ntu120", "ntu120_splits", "ntu_index", "read_skeleton",

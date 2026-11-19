@@ -321,6 +321,18 @@ class HDM05Dataset(SequenceCovarianceDataset):
         return fetch_hdm05(self.data_dir, features=self.features, fold=self.fold,
                            source=self.source, **self.fetch_kwargs)
 
+    def structured_raw(self, i):
+        """Not available: the local and ETH copies hold covariances only.
+
+        The covariance series need the joint trajectories, i.e. the raw C3D / ASF-AMC files of
+        the MPI database (https://resources.mpi-inf.mpg.de/HDM05/), which no loader reads yet.
+        """
+        raise ValueError(
+            "HDM05 covariance series need the raw MPI motion capture files (C3D / ASF-AMC, "
+            "https://resources.mpi-inf.mpg.de/HDM05/): the local export and the ETH archive "
+            f"(source={self.source!r}) only hold the 93 x 93 covariances, without the "
+            "trajectories.")
+
     def _make_splits(self, meta, labels, groups):
         return hdm05_splits(meta, labels, groups, fold=self.fold, seed=0)
 

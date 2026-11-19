@@ -500,6 +500,18 @@ class PolInSARIslandDataset(BaseDataset):
                   f"{len(keep)} cells, p={self.covariances.shape[-1]}, "
                   f"{len(np.unique(self.groups))} blocks")
 
+    def structured_raw(self, i):
+        """Cell ``i`` as a grid ``(32, 32, p)`` of log-powers, every pixel (labelled or not),
+        unscaled (``representation="logpower"``). Source of
+        :class:`~spdnet_datasets.series.CovarianceSeries`."""
+        if self._fetch["representation"] != "logpower" or self._processed is None:
+            raise ValueError("structured_raw needs representation='logpower' and the "
+                             "preprocessed cells (keep != 'keep_covariance')")
+        if not hasattr(self, "_raw"):
+            self._raw = np.load(Path(self._processed) / "raw.npy", mmap_mode="r")
+            self._masks = np.load(Path(self._processed) / "masks.npy", mmap_mode="r")
+        return np.asarray(self._raw[int(self.meta["proc_index"].iat[i])])
+
     def __getitem__(self, idx):
         cov = torch.from_numpy(apply_scale(self.covariances[idx], self.scale))
         # mean and raw x sqrt(s); "t6" means are T6 entries (second order): x s

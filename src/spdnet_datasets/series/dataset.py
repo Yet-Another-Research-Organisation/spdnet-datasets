@@ -169,14 +169,45 @@ class CovarianceSeries(Dataset):
         self.return_mean = return_mean
         self.normalize = normalize
         self.verbose = verbose
+        splits = getattr(self.loader, "splits", {}) or {}
+        self.split = split if split is not None else getattr(self.loader, "split", None)
+        if (normalize or subset is not None or self.mode.standardize) and self.split not in splits:
+            raise ValueError(f"Unknown split {self.split!r}; available: {sorted(splits)}")
+        self._standardization = None
+        if self.mode.standardize:
+            self._standardization = self._fit_standardization(splits[self.split]["train"])
         self._check_sizes()
         self._load(cache_dir, force)
-        self._setup_split(split, subset)
+        self._setup_split(subset)
 
     # -- tokens -------------------------------------------------------------
-    def structured(self, i):
-        """Structured sample ``i`` of the loader (unscaled), axes ``mode.axes``."""
-        return np.asarray(self.mode.source(self.loader, int(i)))
+    def structured(self, i, standardize=True):
+        """Structured sample ``i`` of the loader (unscaled), axes ``mode.axes``, after the
+        mode's ``prepare`` and (``standardize``) its standardisation."""
+        x = np.asarray(self.mode.source(self.loader, int(i)))
+        if self.mode.prepare is not None:
+            x = self.mode.prepare(x)
+        if standardize and self._standardization is not None:
+            mu, sd = self._standardization
+            x = (x - mu) / sd
+        return x
+
+    def _fit_standardization(self, train, max_samples=1000):
+        """Means and standard deviations of the training samples (at most ``max_samples``,
+        evenly spread), per variable (``"last"``) or per trailing element (``"element"``)."""
+        train = np.unique(np.asarray(train, dtype=int))
+        train = train[np.unique(np.linspace(0, len(train) - 1, max_samples).round().astype(int))]
+        s = q = n = 0.0
+        for i in train:
+            x = self.structured(i, standardize=False).astype(np.float64)
+            x = x.reshape(-1, x.shape[-1]) if self.mode.standardize == "last" else x
+            ok = np.isfinite(x)
+            s = s + np.where(ok, x, 0).sum(0)
+            q = q + np.where(ok, x * x, 0).sum(0)
+            n = n + ok.sum(0)
+        mu = s / np.maximum(n, 1)
+        sd = np.sqrt(np.maximum(q / np.maximum(n, 1) - mu ** 2, 0)) + 1e-12
+        return mu, sd
 
     def tokenize(self, i):
         """``(observations, positions)`` of loader sample ``i`` (see
@@ -186,16 +217,24 @@ class CovarianceSeries(Dataset):
             obs = [_valid(o) for o in obs]
         return obs, pos
 
-    def _check_sizes(self):
-        """``ValueError`` when the nominal tokens of the first sample have ``n_t < 2p``."""
-        obs, _ = self.mode.tokenize(self.structured(0), **self.params)
-        p, n_t = obs[0].shape[1], min(len(o) for o in obs)
+    def _check_sizes(self, n_samples=9):
+        """``ValueError`` when the nominal tokens are too small: the smallest token of each of
+        ``n_samples`` samples evenly spread, observations not filtered; their median is compared
+        with ``2p`` (a short sample alone does not raise: its small tokens are masked)."""
+        rows = np.unique(np.linspace(0, len(self.loader) - 1, n_samples).round().astype(int))
+        sizes = []
+        for i in rows:
+            obs, _ = self.mode.tokenize(self.structured(i, standardize=False), **self.params)
+            p = obs[0].shape[1]
+            sizes.append(min(len(o) for o in obs))
+        n_t = int(np.median(sizes))
         if n_t < self.mode.min_n_over_p * p and not self.allow_small_n:
             raise ValueError(
                 f"{self.name}/{self.mode.name} with {self.params}: tokens of {n_t} observations "
-                f"for p = {p}, fewer than {self.mode.min_n_over_p:g}p = "
-                f"{int(np.ceil(self.mode.min_n_over_p * p))}. Enlarge the windows, reduce p "
-                "(n_channels, band_window) or pass allow_small_n=True (Ledoit-Wolf).")
+                f"(median over {len(rows)} samples) for p = {p}, fewer than "
+                f"{self.mode.min_n_over_p:g}p = {int(np.ceil(self.mode.min_n_over_p * p))}. "
+                "Enlarge the windows, reduce p (n_channels, band_window) or pass "
+                "allow_small_n=True (Ledoit-Wolf).")
 
     def _min_n(self, p):
         """Fewest observations of an unmasked token."""
@@ -237,6 +276,9 @@ class CovarianceSeries(Dataset):
     def _load(self, cache_dir, force):
         key = {"mode": self.mode.name, "params": self.params, "estimator": self.estimator,
                "allow_small_n": self.allow_small_n, "source": _source_key(self.loader)}
+        if self._standardization is not None:  # fitted on the training part of the split
+            key["standardization"] = params_hash({"mu": self._standardization[0].tolist(),
+                                                  "sd": self._standardization[1].tolist()})
 
         def process(_, out_dir):
             (Path(out_dir) / "key.json").write_text(json.dumps(key, default=str, indent=1))
@@ -253,12 +295,9 @@ class CovarianceSeries(Dataset):
         self.lengths = np.load(d / "lengths.npy")
 
     # -- split and normalisation -------------------------------------------
-    def _setup_split(self, split, subset):
+    def _setup_split(self, subset):
         ds = self.loader
         splits = getattr(ds, "splits", {}) or {}
-        self.split = split if split is not None else getattr(ds, "split", None)
-        if (self.normalize or subset is not None) and self.split not in splits:
-            raise ValueError(f"Unknown split {self.split!r}; available: {sorted(splits)}")
         self.scale = 1.0
         if self.normalize:
             train = np.unique(np.asarray(splits[self.split]["train"], dtype=int))

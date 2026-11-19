@@ -867,6 +867,67 @@ class PastisRDataset(BaseDataset):
             print(f"PASTIS-R scenario {self.scenario}: {len(self)} parcels, "
                   f"{len(self.classes)} classes, p = {self.covariances.shape[-1]}")
 
+    # -- covariance series (spdnet_datasets.series) ------------------------------------
+    def _files_dir(self):
+        _, files = _resolve(self._data_arg)
+        return files if (files / "metadata.geojson").exists() else download_pastis_r(
+            self.cache_dir)
+
+    def _calendar(self):
+        """Acquisition days per patch and sensor, and the span common to every patch."""
+        if not hasattr(self, "_days"):
+            props = _read_metadata(self._files_dir())
+            self._days = {int(p["ID_PATCH"]): {s: _acquisitions(p[f"dates-{s}"])
+                                               for s in ("S2", "S1A", "S1D")} for p in props}
+        return self._days
+
+    def _patch_series(self, kind, patch, n):
+        """``(T, c, 128, 128)`` float64 series of one patch, the last patch read kept."""
+        key = (kind, patch, n)
+        if getattr(self, "_series_patch", (None,))[0] == key:
+            return self._series_patch[1]
+        files, days = self._files_dir(), self._calendar()
+        if kind == "s2":  # acquisition nearest each date of a calendar grid common to all patches
+            start = max(d["S2"].min() for d in days.values())
+            end = min(d["S2"].max() for d in days.values())
+            nearest = np.abs(days[patch]["S2"][:, None]
+                             - np.linspace(start, end, n)[None]).argmin(0)
+            cube = np.load(files / "DATA_S2" / f"S2_{patch}.npy")[nearest].astype(np.float64)
+        else:  # per-pixel median of each period, S2 10 bands + S1A / S1D (VV, VH)
+            start = max(d[s].min() for d in days.values() for s in d)
+            end = min(d[s].max() for d in days.values() for s in d)
+            edges = np.linspace(start, end + 1, n + 1)
+            stacks = []
+            for sensor, channels in (("S2", slice(0, 10)), ("S1A", slice(0, 2)),
+                                     ("S1D", slice(0, 2))):
+                data = np.load(files / f"DATA_{sensor}" / f"{sensor}_{patch}.npy")[:, channels]
+                period = np.searchsorted(edges, days[patch][sensor], side="right") - 1
+                stacks.append(np.stack([
+                    np.median(data[period == t].astype(np.float64), 0) if (period == t).any()
+                    else np.full(data.shape[1:], np.nan) for t in range(n)]))
+            cube = np.concatenate(stacks, 1)
+        self._series_patch = (key, cube)
+        return cube
+
+    def s2_dates(self, i, n_dates=24):
+        """Parcel ``i`` as ``(n_dates, n, 10)``: its pixels at the S2 acquisition of its tile
+        nearest each date of a calendar grid common to every patch (raw units). Source of the
+        ``s2_dates`` covariance series (former ``real.series.pastis_series``)."""
+        row = self.meta.iloc[i]
+        ids = np.load(self._files_dir() / "ANNOTATIONS" / f"ParcelIDs_{int(row['patch'])}.npy")
+        cube = self._patch_series("s2", int(row["patch"]), n_dates)
+        return cube[:, :, ids == int(row["parcel"])].transpose(0, 2, 1)
+
+    def s1s2_periods(self, i, n_periods=12):
+        """Parcel ``i`` as ``(n_periods, n, 14)``: per pixel, median over each of ``n_periods``
+        equal periods of the 10 S2 bands and of (VV, VH) in dB of S1A and S1D; a period without
+        an acquisition of one sensor is NaN (masked token). Source of the ``s1s2_fusion``
+        series (former ``real.series_pastis_fusion``)."""
+        row = self.meta.iloc[i]
+        ids = np.load(self._files_dir() / "ANNOTATIONS" / f"ParcelIDs_{int(row['patch'])}.npy")
+        cube = self._patch_series("s1s2", int(row["patch"]), n_periods)
+        return cube[:, :, ids == int(row["parcel"])].transpose(0, 2, 1)
+
     def raw_pixels(self, i):
         """Standardised pixels (n, p) float32 of sample ``i``."""
         r = self._pixel_rows[i]
