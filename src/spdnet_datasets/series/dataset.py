@@ -64,13 +64,19 @@ def _check_loader(ds, mode):
                              f"{settings[key]!r}")
 
 
+def _labels(ds):
+    """Labels of the loader samples (``labels``, or ``targets`` for the SAR loaders)."""
+    labels = getattr(ds, "labels", None)
+    return np.asarray(labels if labels is not None else ds.targets)
+
+
 def _source_key(ds):
     """Identity of the wrapped samples: loader class, cached stage and exposed rows."""
     bunch = getattr(ds, "bunch", None) or getattr(ds, "_bunch", None) or {}
     stage = (bunch.get("covariance_path") or bunch.get("processed_path")
              or getattr(ds, "_processed", None))
     index = np.asarray(getattr(ds, "_index", np.arange(len(ds))))
-    labels = np.asarray(ds.labels)
+    labels = _labels(ds)
     return {"loader": type(ds).__name__, "data_dir": str(getattr(ds, "data_dir", "")),
             "stage": str(stage), "index": params_hash({"i": index.tolist()}),
             "labels": params_hash({"y": labels.tolist()}), "n": len(ds)}
@@ -318,7 +324,7 @@ class CovarianceSeries(Dataset):
         self.subset = subset
         self._index = index
         self.splits = splits
-        self.labels = np.asarray(ds.labels)[index]
+        self.labels = _labels(ds)[index]
         groups = getattr(ds, "groups", None)
         self.groups = None if groups is None else np.asarray(groups)[index]
         self.classes = list(getattr(ds, "classes", []))
