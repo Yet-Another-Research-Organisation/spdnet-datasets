@@ -392,6 +392,16 @@ class SequenceCovarianceDataset(BaseDataset):
         r = self._rows[j]
         return np.asarray(self._features[self._offsets[r]:self._offsets[r + 1]])
 
+    def structured_raw(self, i):
+        """Preprocessed sequence of sample ``i``, ``(T, p)`` unscaled (axes frames x features).
+
+        Source of :class:`~spdnet_datasets.series.CovarianceSeries`; needs the processed stage.
+        """
+        if self._processed is None or self._rows is None:
+            raise ValueError("structured_raw needs the preprocessed sequences: fetch with "
+                             "keep='keep_processed' or 'keep_full'")
+        return self._raw(self._index[i])
+
     def __getitem__(self, i):
         j = self._index[i]
         cov = torch.from_numpy(self._covs[j] * self.scale)

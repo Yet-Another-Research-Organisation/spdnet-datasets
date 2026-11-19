@@ -414,6 +414,17 @@ class HSIDataset(BaseDataset):
         windows = np.load(Path(proc) / "windows.npy", mmap_mode="r")
         return windows[int(self.meta_all["proc_index"].iloc[k])]
 
+    def structured_raw(self, i):
+        """Window of sample ``i``, ``(H, W, B)`` unscaled, with the loader's bands.
+
+        Source of :class:`~spdnet_datasets.series.CovarianceSeries`.
+        """
+        x = np.asarray(self._load_raw(int(self._index[i])))
+        if x.ndim != 3:
+            raise ValueError(f"{type(self).__name__}: the raw sample {x.shape} has no spatial "
+                             "layout; override structured_raw")
+        return x
+
     def __getitem__(self, i):
         k = int(self._index[i])
         cov = torch.from_numpy(np.asarray(self.bunch.covariances[k], dtype=np.float64)

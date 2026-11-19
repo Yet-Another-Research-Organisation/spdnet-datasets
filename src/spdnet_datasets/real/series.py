@@ -135,6 +135,28 @@ def resolve_fit_mask(fit_mask, n: int, *args) -> np.ndarray:
     return fit_mask
 
 
+def window_starts(
+    n: int,
+    window: int,
+    step: int | None = None,
+    n_windows: int | None = None,
+    cover: bool = False,
+) -> list[int]:
+    """
+    Starts of the windows ``[s, s + window)`` over ``n`` positions: every ``step`` (``range(0, n - window + 1,
+    step)``), or ``n_windows`` starts spread evenly over ``[0, n - window]``. ``cover`` (``step`` only): add a
+    last window ending at ``n`` when the regular starts leave the end uncovered. Empty when ``n < window``.
+    """
+    if n < window:
+        return []
+    if n_windows is not None:
+        return np.linspace(0, n - window, n_windows).round().astype(int).tolist()
+    starts = list(range(0, n - window + 1, step))
+    if cover and starts[-1] + window < n:
+        starts.append(n - window)
+    return starts
+
+
 def sliding_covariances(
     observations: np.ndarray,
     window: int,
@@ -154,10 +176,7 @@ def sliding_covariances(
     n, p = observations.shape
     if n < window:
         raise ValueError(f"{n} observations for windows of {window}: no complete window")
-    if n_windows is not None:
-        starts = np.linspace(0, n - window, n_windows).round().astype(int)
-    else:
-        starts = range(0, n - window + 1, step)
+    starts = window_starts(n, window, step, n_windows)
     covariances = np.stack([covariance(observations[s:s + window], estimator, load, spd=spd) for s in starts])
     if return_mean:
         return covariances, np.stack([observations[s:s + window].mean(0) for s in starts])
@@ -454,7 +473,7 @@ def spectral_windows(
 ):
     """pixels (n, bands) -> (T, b, b) covariances of the spectral windows, diagonally loaded by 1e-6 tr(C) / b
     (:func:`covariance`); ``return_mean``: also the (T, b) window means."""
-    starts = range(0, pixels.shape[1] - band_window + 1, band_step)
+    starts = window_starts(pixels.shape[1], band_window, band_step)
     covariances = np.stack([covariance(pixels[:, b:b + band_window], estimator, spd=spd) for b in starts])
     if return_mean:
         return covariances, np.stack([pixels[:, b:b + band_window].mean(0) for b in starts])

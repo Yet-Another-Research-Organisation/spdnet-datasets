@@ -235,6 +235,17 @@ class HyperLeafDataset(HSIDataset):
         leaf = read_leaf(self.bunch.root / "images" / f"{image_id}.tiff", self.bunch.bands)
         return valid_pixels(leaf.reshape(-1, len(self.bunch.bands)))
 
+    def structured_raw(self, i):
+        """Whole image of sample ``i``, ``(48, 352, B)`` float32 unscaled, background = 0.
+
+        ``B`` = the loader's bands (``band_step``; all 204 by default). ``raw`` gives the leaf
+        pixels only, without their layout; this hook keeps it for
+        :class:`~spdnet_datasets.series.CovarianceSeries`.
+        """
+        image_id = self.meta_all["ImageId"].iloc[int(self._index[i])]
+        return read_leaf(self.bunch.root / "images" / f"{int(image_id):05d}.tiff",
+                         self.bunch.get("bands"))
+
     def __getitem__(self, i):
         if self.mode == "cov":
             return super().__getitem__(i)

@@ -225,6 +225,19 @@ class RadarCovarianceDataset(BaseDataset):
                   f"p={b.covariances.shape[-1]}, split={self.split!r}, scale={self.scale:.3e}")
             print("  " + ", ".join(f"{c}: {n}" for c, n in zip(self.classes, counts, strict=True)))
 
+    def structured_raw(self, i):
+        """Preprocessed spectrogram of sample ``i``, ``(T, p)`` unscaled (axes time x bins).
+
+        Source of :class:`~spdnet_datasets.series.CovarianceSeries`; needs the processed stage.
+        """
+        if self._raw is None:
+            self._raw, self._offsets = load_raw(self._bunch.processed_path)
+            if self._raw is None:
+                raise ValueError("structured_raw needs the processed stage: fetch with "
+                                 "keep='keep_processed' or 'keep_full'")
+        r = int(self._bunch.meta["raw_index"].iat[int(self._index[i])])
+        return np.asarray(self._raw[self._offsets[r]:self._offsets[r + 1]])
+
     def __getitem__(self, i):
         j = int(self._index[i])
         b = self._bunch
