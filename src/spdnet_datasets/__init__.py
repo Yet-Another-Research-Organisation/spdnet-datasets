@@ -23,6 +23,9 @@ from .hyperspectral import (
     UAVDataset,
 )
 from .manager import DatasetManager
+
+# MOABB adapter: registers "moabb" (moabb itself is imported only when data are loaded)
+from .moabb import MOABBCovariances, MOABBDataset
 from .radar_microdoppler import CI4RDataset, DopNetDataset, MVDopplerDataset
 
 # Deprecated loader kept for its precomputed cov/ layout (superseded by NTURGBD120Dataset)
@@ -70,6 +73,10 @@ __all__ = [
     'GTZANDataset',
     'BirdSetXCMDataset',
     'NTURGBD120Dataset',
+
+    # EEG (MOABB adapter)
+    'MOABBCovariances',
+    'MOABBDataset',
 
     # SITS
     'PastisRDataset',

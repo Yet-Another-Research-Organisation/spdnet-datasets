@@ -53,7 +53,11 @@ export MNE_DATA=/path/to/mne_data
 - in `MOABBCovariances`, such trials are excluded and counted
   (`dataset.n_excluded`); labels and metadata stay aligned, and an error is
   raised only if no trial is left. Typical causes are a common average
-  reference (rank `n_channels - 1`) or a flat channel.
+  reference (rank `n_channels - 1`) or a flat channel;
+- every kept trial has the same channels, in the same order
+  (`dataset.channels`). Subjects whose channel list differs from the most
+  common one in the dataset, or differs between their own sessions, are
+  excluded with a warning and listed in `dataset.excluded_subjects`.
 
 `Covariances` is not `pyriemann.estimation.Covariances`. Both map
 `(n_trials, n_channels, n_times)` to `(n_trials, n_channels, n_channels)`, but
@@ -101,8 +105,10 @@ train, val, test = create_dataloaders(ds, batch_size=32, num_workers=0,
 x, y = next(iter(train))   # x: (32, 22, 22) float64 SPD matrices, y: (32,) labels
 ```
 
-`MOABBCovariances` calls `paradigm.get_data(dataset=..., subjects=...)` once.
-It stores the result in a cache, then estimates one covariance per epoch.
+`MOABBCovariances` calls `paradigm.get_data(dataset=..., subjects=[s],
+return_epochs=True)` once per subject, keeps the subjects with the same
+channels, and stores the epochs in a cache. It then estimates one covariance
+per epoch.
 
 ### Output contract
 
@@ -136,10 +142,13 @@ depends on the `return_*` flags:
 | `cross_session_<k>` | leave one session out, per subject (subjects with a single session are skipped) | `CrossSessionEvaluation` |
 | `cross_subject_<k>` | leave one subject out (≥ 2 subjects) | `CrossSubjectEvaluation` |
 | `recommended` | first fold of the strictest available protocol | |
+| `stratified` | trials split into train / val / test, stratified by class (only with `holdout=(val_size, test_size)`) | |
 
-Every split is `{"train", "val", "test"}`, and `val` is empty. MOABB
-protocols have no validation set: carve one out of `train` yourself, for
-example with `core.splits.group_split`.
+Every split is `{"train", "val", "test"}`. In the MOABB protocols `val` is
+empty, since MOABB has no validation set: carve one out of `train` yourself,
+for example with `core.splits.group_split`. The `stratified` split is
+within-subject: every subject has trials in the three parts. It is the one to
+use with `spdnet-train`, whose early stopping monitors the validation set.
 
 ### Normalization
 
@@ -154,6 +163,38 @@ covariance.
 Pass the same split name to `MOABBCovariances(split=...)` and to
 `create_dataloaders(split=...)`. With two different names, the scale is fitted
 on trials that may be in the test set of the other split.
+
+### From a configuration file
+
+`MOABBDataset` builds the same dataset from class names. It is registered as
+`moabb`, so `DatasetManager` and the Hydra configs of `spdnet-training` can
+select it:
+
+```yaml
+# configs/dataset/bnci2014_001.yaml
+name: moabb
+dataset: BNCI2014_001          # class of moabb.datasets
+paradigm: MotorImagery         # class of moabb.paradigms
+paradigm_params: {n_classes: 4, events: [left_hand, right_hand, feet, tongue],
+                  fmin: 8.0, fmax: 32.0, resample: 128}
+dataset_params: {}             # e.g. {sessions: [1, 2]}
+exclude_subjects: []
+input_dim: 22                  # checked against the number of channels
+split_strategy: stratified
+holdout: [0.1, 0.15]           # (val_size, test_size) of the stratified split
+seed: 42
+batch_size: 32
+num_workers: 0
+```
+
+```bash
+spdnet-train --config-dir configs dataset=bnci2014_001 model.hidden_layers_size=[16]
+```
+
+The BiMap sizes must not exceed the number of channels (22 here). The
+`scripts/eeg/` folder of spdnet-training holds such configs for several
+motor-imagery datasets, with one experiment preset per dataset.
+
 
 ### Cache and `keep`
 

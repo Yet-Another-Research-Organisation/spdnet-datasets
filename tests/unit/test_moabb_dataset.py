@@ -20,22 +20,39 @@ class FakeDataset:
     """Minimal stand-in for a MOABB dataset."""
 
     code = "Fake-2026"
+    unit_factor = 1.0
 
     def __init__(self, n_subjects=3, n_sessions=2, n_per_class=6, n_times=N_T):
         self.subject_list = list(range(1, n_subjects + 1))
         self.n_sessions, self.n_per_class, self.n_times = n_sessions, n_per_class, n_times
 
 
+def as_epochs(X, ch_names=None):
+    """MNE epochs of the arrays ``X`` (n_trials, n_channels, n_times)."""
+    import mne
+
+    ch_names = ch_names or [f"C{i}" for i in range(X.shape[1])]
+    info = mne.create_info(ch_names, 100.0, "eeg")
+    return mne.EpochsArray(X, info, verbose="error")
+
+
 class FakeParadigm:
-    """Returns ``(X, y, metadata)`` like ``moabb.paradigms.*.get_data``."""
+    """Returns ``(epochs, y, metadata)`` like ``moabb.paradigms.*.get_data``.
+
+    Subclasses change the arrays in ``_data``.
+    """
 
     def __init__(self, fmin=8, fmax=32):
         self.fmin, self.fmax = fmin, fmax
         self.events = ["left_hand", "right_hand"]
         self._calls = 0
 
-    def get_data(self, dataset, subjects=None):
+    def get_data(self, dataset, subjects=None, return_epochs=False):
         self._calls += 1
+        X, y, metadata = self._data(dataset, subjects)
+        return (as_epochs(X) if return_epochs else X), y, metadata
+
+    def _data(self, dataset, subjects):
         rng = np.random.default_rng(0)
         X, y, rows = [], [], []
         for s in subjects:
@@ -115,9 +132,9 @@ def test_cache_is_replayed_without_get_data(cache):
     paradigm = FakeParadigm()
     _make(cache, paradigm=paradigm)
     _make(cache, paradigm=paradigm)
-    assert paradigm._calls == 1
+    assert paradigm._calls == 3  # one call per subject, then the cache
     _make(cache, paradigm=paradigm, force=True)
-    assert paradigm._calls == 2
+    assert paradigm._calls == 6
     _make(cache, paradigm=FakeParadigm(fmax=30))  # other paradigm settings: new entry
     assert len(list((cache / "moabb_Fake-2026" / "covariance").iterdir())) == 2
 
@@ -141,7 +158,7 @@ def test_cache_key_covers_dataset_and_paradigm_options(cache):
     paradigm = FakeParadigm()
     paradigm.filters = [_Filter(30)]
     _make(cache, paradigm=paradigm)
-    assert paradigm._calls == 1  # other configuration: recomputed
+    assert paradigm._calls == 3  # other configuration: recomputed (3 subjects)
     assert len(list((cache / "moabb_Fake-2026" / "processed").iterdir())) == 5
 
 
@@ -149,25 +166,27 @@ def test_estimator_change_reuses_the_epochs(cache):
     paradigm = FakeParadigm()
     scm = _make(cache, paradigm=paradigm)
     lw = _make(cache, paradigm=paradigm, estimator="ledoit_wolf")
-    assert paradigm._calls == 1
+    assert paradigm._calls == 3
     assert scm.paths.processed_dir == lw.paths.processed_dir
     assert scm.paths.covariance_dir != lw.paths.covariance_dir
 
 
 class ConstantTrialParadigm(FakeParadigm):
-    """Trial 5 is constant: its covariance is singular (not SPD)."""
+    """Trial 5 (of subject 1) is constant: its covariance is singular (not SPD)."""
 
-    def get_data(self, dataset, subjects=None):
-        X, y, metadata = super().get_data(dataset, subjects)
-        X[5] = 1.0
-        metadata["trial"] = np.arange(len(y))
+    def _data(self, dataset, subjects):
+        X, y, metadata = super()._data(dataset, subjects)
+        if subjects[0] == 1:
+            X[5] = 1.0
+        # global trial number (subjects are loaded one by one)
+        metadata["trial"] = np.arange(len(y)) + (subjects[0] - 1) * len(y)
         return X, y, metadata
 
 
 def test_failing_trials_are_excluded_and_counted(cache):
     paradigm = ConstantTrialParadigm()
     ds = _make(cache, paradigm=paradigm, return_raw=True)
-    X, y, metadata = paradigm.get_data(FakeDataset(), [1, 2, 3])
+    X, y, metadata = paradigm._data(FakeDataset(), [1, 2, 3])
     assert ds.n_excluded == 1 and len(ds) == len(y) - 1
     assert 5 not in ds.trial_index and ds.metadata["trial"].tolist() == ds.trial_index.tolist()
     assert [ds.classes[k] for k in ds.labels] == y[ds.trial_index].tolist()
@@ -269,8 +288,8 @@ def test_cache_key_fingerprints_object_configuration():
 class _SessionsParadigm(FakeParadigm):
     """Subject 1 has two sessions, subject 2 only one."""
 
-    def get_data(self, dataset, subjects=None):
-        X, y, meta = super().get_data(dataset, subjects)
+    def _data(self, dataset, subjects):
+        X, y, meta = super()._data(dataset, subjects)
         keep = ~((meta["subject"] == 2) & (meta["session"] == "1train")).to_numpy()
         return X[keep], y[keep], meta[keep].reset_index(drop=True)
 
@@ -288,9 +307,10 @@ def test_infeasible_within_session_does_not_block_other_protocols(cache):
 
 
 class _NaNParadigm(FakeParadigm):
-    def get_data(self, dataset, subjects=None):
-        X, y, meta = super().get_data(dataset, subjects)
-        X[0, 0, 5] = np.nan
+    def _data(self, dataset, subjects):
+        X, y, meta = super()._data(dataset, subjects)
+        if subjects[0] == 1:
+            X[0, 0, 5] = np.nan
         return X, y, meta
 
 
