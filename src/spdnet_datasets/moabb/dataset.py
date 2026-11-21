@@ -303,6 +303,39 @@ class MOABBCovariances(BaseDataset):
     def __len__(self) -> int:
         return len(self.labels)
 
+    def _cached_epochs(self):
+        if self.paths.processed_dir is None:
+            raise ValueError("The cached epochs were deleted (keep='keep_covariance'); rebuild "
+                             "with force=True and another keep.")
+        if getattr(self, "_epochs_all", None) is None:
+            self._epochs_all = np.load(self.paths.processed_dir / "epochs.npy", mmap_mode="r")
+        return self._epochs_all
+
+    @property
+    def sfreq(self) -> float:
+        """Sampling rate of the epochs (Hz): the paradigm's ``resample`` when set, otherwise
+        ``(n_times - 1) / duration`` of the epoch window (MNE keeps both ends; e.g. 1 001
+        samples over the 4 s of BNCI2014_001: 250 Hz)."""
+        if getattr(self.paradigm, "resample", None):
+            return float(self.paradigm.resample)
+        start, stop = self.dataset.interval
+        tmin = self.paradigm.tmin or 0.0
+        tmax = self.paradigm.tmax if self.paradigm.tmax is not None else stop - start
+        return round((self._cached_epochs().shape[2] - 1) / (tmax - tmin), 6)
+
+    @property
+    def passband(self):
+        """``(fmin, fmax)`` of the paradigm's filters (Hz), ``None`` if unknown."""
+        filters = getattr(self.paradigm, "filters", None)
+        if not filters:
+            return None
+        return (float(min(f[0] for f in filters)), float(max(f[1] for f in filters)))
+
+    def structured_raw(self, idx):
+        """Epoch ``idx`` as ``(n_times, n_channels)`` float64, unscaled (as filtered by the
+        paradigm). Source of :class:`~spdnet_datasets.series.CovarianceSeries`."""
+        return np.asarray(self._cached_epochs()[self.trial_index[idx]], dtype=np.float64).T
+
     def __getitem__(self, idx):
         # covariance scaled by s, mean and raw by sqrt(s): the three stay consistent
         root = float(np.sqrt(self.scale))

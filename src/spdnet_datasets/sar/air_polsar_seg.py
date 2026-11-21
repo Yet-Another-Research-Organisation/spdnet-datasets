@@ -63,7 +63,12 @@ from ..core.config import dataset_path
 from ..core.fetch import Bunch, download, run_pipeline
 from ..manager import DatasetManager
 from ..utils.sources import existing_dir, source_dir
-from ._common import check_split_groups, finalize_labels, group_kfold_splits
+from ._common import (
+    check_split_groups,
+    finalize_labels,
+    group_kfold_splits,
+    texture_features,
+)
 
 DOMAIN, NAME = "SAR", "AIR-PolSAR-Seg"
 PAGE = "https://github.com/AICyberTeam/AIR-PolSAR-Seg"
@@ -332,6 +337,13 @@ class AIRPolSARSegDataset(BaseDataset):
         if self.verbose:
             print(f"AIR-PolSAR-Seg: {len(keep)} cells, {b.positions['component'].nunique()} mosaic "
                   f"components, {len(b.overlaps)} overlapping patch pairs")
+
+    def structured_raw(self, idx):
+        """Cell ``idx`` as ``(cell, cell, 6)`` real variables: ``log10(1 + A)`` of HH, HV, VH,
+        VV (the raw output), then ``|d/dx|`` and ``|d/dy|`` of their mean. Source of
+        :class:`~spdnet_datasets.series.CovarianceSeries`."""
+        return texture_features(np.log10(1.0 + np.asarray(self._cells[self._keep[idx]],
+                                                          dtype=np.float64)))
 
     def __getitem__(self, idx):
         raw = np.log10(1.0 + np.asarray(self._cells[self._keep[idx]], dtype=np.float32))

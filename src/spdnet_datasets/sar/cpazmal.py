@@ -106,6 +106,41 @@ def select_dates(common, n_dates):
     return [common[i] for i in idx]
 
 
+def common_dates(h, sites, orbit):
+    """Dates common to HH and HV of ``orbit`` over the ``sites`` of the HDF5 file ``h``."""
+    common = None
+    for s in sites:
+        g = h["data"][s][orbit]
+        c = set(g["HH"]["timestamps"][:].astype(str)) & set(g["HV"]["timestamps"][:].astype(str))
+        common = c if common is None else common & c
+    return sorted(common or [])
+
+
+def pair_dates(a, b):
+    """Pair each date of ``a`` with a distinct date of ``b`` (``len(b) >= len(a)``), in time
+    order, minimising the total gap in days. Dates are ``YYYYMMDD`` strings; returns the
+    paired dates of ``b``."""
+    a, b = sorted(a), sorted(b)
+    day = pd.to_datetime(pd.Series(a + b), format="%Y%m%d").to_numpy()
+    da, db = day[:len(a)], day[len(a):]
+    n, m = len(a), len(b)
+    if m < n:
+        raise ValueError(f"cannot pair {n} dates with {m}")
+    gap = np.abs((da[:, None] - db[None, :]) / np.timedelta64(1, "D"))
+    cost = np.full((n + 1, m + 1), np.inf)
+    cost[0] = 0.0
+    for i in range(1, n + 1):
+        for j in range(i, m + 1):
+            cost[i, j] = min(cost[i, j - 1], cost[i - 1, j - 1] + gap[i - 1, j - 1])
+    out, j = [], m
+    for i in range(n, 0, -1):  # backtrack: date j of b paired with date i of a, or skipped
+        while cost[i, j] == cost[i, j - 1] and j > i:
+            j -= 1
+        out.append(b[j - 1])
+        j -= 1
+    return out[::-1]
+
+
 def _site_stack(group, orbit, dates, scale, max_mask_value):
     """``(H, W, 2T)`` features (HH dates then HV dates) and the valid-pixel mask."""
     feats, valid = [], None
@@ -140,12 +175,7 @@ def _process(path, out_dir, *, orbit, n_dates, scale, max_mask_value, min_pixels
                 excluded[s] = f"no HH+HV in {orbit}"
             else:
                 usable.append(s)
-        common = None
-        for s in usable:
-            g = h["data"][s][orbit]
-            c = set(g["HH"]["timestamps"][:].astype(str)) & set(g["HV"]["timestamps"][:].astype(str))
-            common = c if common is None else common & c
-        dates = select_dates(common or [], n_dates)
+        dates = select_dates(common_dates(h, usable, orbit), n_dates)
 
         pixels, rows = [], []
         for s in usable:
@@ -283,7 +313,9 @@ def fetch_cpazmal(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
     return Bunch(covariances=np.load(cdir / "covariances.npy"), means=np.load(cdir / "means.npy"),
                  labels=labels, groups=groups, meta=meta, dates=info["dates"],
                  excluded=info["excluded"], rejected=info["rejected"], splits=splits, processed_dir=res.processed_dir,
-                 covariance_dir=cdir)
+                 covariance_dir=cdir,
+                 source=local if raw_fn is None
+                 else cdir.parents[1] / "downloads" / HF_REVISION / FILENAME)
 
 
 @DatasetManager.register_dataset("cpazmal")
@@ -339,6 +371,7 @@ class CPAZMaLDataset(BaseDataset):
         elif self.normalize:
             warnings.warn("No split available: covariances are not normalised", UserWarning, stacklevel=2)
         self._processed = b.processed_dir
+        self._source = b.source
         self.samples = list(range(len(keep)))
         if self.verbose:
             print(f"CPAZMaL ({self._fetch_kwargs['orbit']}, p={self.covariances.shape[-1]}): "
@@ -351,6 +384,85 @@ class CPAZMaLDataset(BaseDataset):
             self._offsets = np.load(Path(self._processed) / "offsets.npy")
         j = int(self.meta["proc_index"].iat[i])
         return np.array(self._pixels[self._offsets[j]:self._offsets[j + 1]], dtype=np.float32)
+
+    def _calendars(self, h):
+        """Every date common to HH and HV of each orbit, over the labelled sites that have
+        both polarisations in that orbit (the loader keeps ``n_dates`` of them)."""
+        if not hasattr(self, "_dates_all"):
+            self._dates_all = {}
+            for orbit in ("ASC", "DSC"):
+                sites = [s for s in h["data"] if str(h["data"][s].attrs["class"]) in CLASSES
+                         and orbit in h["data"][s] and {"HH", "HV"} <= set(h["data"][s][orbit])]
+                self._dates_all[orbit] = common_dates(h, sites, orbit)
+            asc, dsc = self._dates_all["ASC"], self._dates_all["DSC"]
+            self.date_pairs = (list(zip(asc, pair_dates(asc, dsc), strict=True))
+                               if len(asc) <= len(dsc)
+                               else list(zip(pair_dates(dsc, asc), dsc, strict=True)))
+        return self._dates_all
+
+    def _site_dates(self, h, site, orbit, dates):
+        """``(H, W, T, 2)`` HH and HV of ``site`` on ``dates``, NaN where invalid."""
+        g = h["data"][site]
+        if orbit not in g or not {"HH", "HV"} <= set(g[orbit]):
+            return None
+        o = self._fetch_kwargs
+        out = []
+        for pol in ("HH", "HV"):
+            ts = g[orbit][pol]["timestamps"][:].astype(str).tolist()
+            idx = [ts.index(d) for d in dates]
+            img = g[orbit][pol]["images"][:, :, idx].astype(np.float64)
+            mask = g[orbit][pol]["masks"][:, :, idx]
+            ok = (img > 0) & (mask != NODATA_MASK) & (mask <= o["max_mask_value"])
+            safe = np.where(ok, img, 1.0)
+            value = {"amplitude": np.sqrt(safe), "intensity": safe,
+                     "log10": np.log10(safe)}[o["scale"]]
+            out.append(np.where(ok, value, np.nan))
+        H, W = min(x.shape[0] for x in out), min(x.shape[1] for x in out)
+        return np.stack([x[:H, :W] for x in out], -1).astype(np.float32)
+
+    def date_stack(self, i, orbit=None):
+        """Sample ``i`` on every common date of its orbit: ``(T, pixels, 2)`` HH and HV.
+
+        Source of :class:`~spdnet_datasets.series.CovarianceSeries`. The pixels are those of
+        the sample's box (the ``block x block`` piece, row-major), NaN on a date where they are
+        invalid (outside the polygon, nodata, distortion code above ``max_mask_value``);
+        values in the loader's ``scale``, unscaled. ``orbit="both"``: the dates of the shorter
+        calendar (ascending, 21) paired with distinct dates of the other one
+        (:attr:`date_pairs`, :func:`pair_dates`), ``(21, pixels, 4)`` = HH and HV ascending,
+        then descending; the two geocoded grids are aligned to within 0.15 pixel, the box is
+        read at the same rows and columns of both.
+        """
+        import h5py
+
+        own = self._fetch_kwargs["orbit"]
+        if orbit not in (None, own, "both"):
+            raise ValueError(f"orbit must be None, {own!r} or 'both', got {orbit!r}")
+        if not hasattr(self, "_h5"):
+            self._h5 = h5py.File(self._source, "r")
+            self._stack = (None, None)
+        cal = self._calendars(self._h5)
+        row = self.meta.iloc[i]
+        site = row["site"]
+        if self._stack[0] != (site, orbit):  # samples are ordered by site: one site in memory
+            if orbit == "both":
+                asc, dsc = zip(*self.date_pairs, strict=True)
+                parts = [self._site_dates(self._h5, site, "ASC", list(asc)),
+                         self._site_dates(self._h5, site, "DSC", list(dsc))]
+                if parts[1] is None:  # PLA005 has no descending HV
+                    parts[1] = np.full_like(parts[0], np.nan)
+                H = min(p.shape[0] for p in parts)
+                W = min(p.shape[1] for p in parts)
+                stack = np.concatenate([p[:H, :W] for p in parts], -1)
+            else:
+                stack = self._site_dates(self._h5, site, own, cal[own])
+            self._stack = ((site, orbit), stack)
+        stack = self._stack[1]
+        r0, c0 = int(row["r0"]), int(row["c0"])
+        r1, c1 = int(row["r1"]), int(row["c1"])
+        box = np.full((r1 - r0, c1 - c0, *stack.shape[2:]), np.nan, np.float32)
+        part = stack[r0:r1, c0:c1]
+        box[:part.shape[0], :part.shape[1]] = part
+        return np.moveaxis(box.reshape(-1, *stack.shape[2:]), 1, 0)
 
     def __getitem__(self, idx):
         cov = torch.from_numpy(apply_scale(self.covariances[idx], self.scale))

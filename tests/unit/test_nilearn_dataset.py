@@ -474,3 +474,12 @@ def test_nki_phenotypic_first_row_is_kept(cache, nki):
     ds = _make(cache, dataset="nki", split=None)
     assert ds.metadata["subject"].tolist() == nki.ids
     assert ds.metadata["age"].tolist() == [30.0 + k for k in range(6)]
+
+
+def test_structured_raw_is_the_series(cache, abide):
+    ds = _make(cache, return_raw=True, normalize=False)
+    plain = _make(cache, normalize=False)
+    for i in (0, 3):
+        x = plain.structured_raw(i)
+        assert x.dtype == np.float64
+        np.testing.assert_allclose(x, ds[i][0][1].numpy(), rtol=1e-6)

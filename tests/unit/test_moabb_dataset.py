@@ -298,3 +298,20 @@ class _NaNParadigm(FakeParadigm):
 def test_non_finite_epochs_are_excluded(cache, estimator):
     ds = _make(cache, paradigm=_NaNParadigm(), estimator=estimator)
     assert ds.n_excluded == 1 and 0 not in set(ds.trial_index.tolist())
+
+
+def test_structured_raw_and_sampling_rate(cache):
+    par = FakeParadigm()
+    par.resample = 128
+    ds = _make(cache, paradigm=par)
+    assert ds.sfreq == 128.0
+    x = ds.structured_raw(3)
+    assert x.shape == (N_T, N_CH) and x.dtype == np.float64
+    np.testing.assert_array_equal(x, ds._cached_epochs()[ds.trial_index[3]].T)
+    # without resample: (n_times - 1) / duration of the epoch window
+    par = FakeParadigm()
+    par.resample, par.tmin, par.tmax, par.filters = None, 0.0, None, [[8, 32]]
+    data = FakeDataset()
+    data.interval = [0.0, 0.39]
+    ds = _make(cache, dataset=data, paradigm=par)
+    assert ds.sfreq == pytest.approx(100.0) and ds.passband == (8.0, 32.0)

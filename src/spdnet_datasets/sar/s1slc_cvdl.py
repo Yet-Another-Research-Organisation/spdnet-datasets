@@ -64,7 +64,7 @@ from ..core.config import dataset_path, get_cache_dir
 from ..core.fetch import Bunch, check_local
 from ..manager import DatasetManager
 from ..utils.sources import downloads_dir, existing_dir, extract_rar, find_root
-from ._common import finalize_labels
+from ._common import finalize_labels, log_amplitude, texture_features
 
 DOMAIN, NAME = "SAR", "S1SLC_CVDL"
 PAGE = ("https://ieee-dataport.org/open-access/s1slccvdl-complex-valued-annotated-single-"
@@ -284,6 +284,15 @@ class S1SLCCVDLDataset(BaseDataset):
         if self._chunk.get("key") != (city, k):  # one chunk = 100 patches, decompressed once
             self._chunk = {"key": (city, k), "data": np.asarray(arr[k * size:(k + 1) * size])}
         return self._chunk["data"][i - k * size].astype(np.float32) / np.float32(self.rms[city])
+
+    def structured_raw(self, idx):
+        """Patch ``idx`` as ``(100, 100, 4)`` real variables: log-amplitudes of HH and HV
+        (:func:`~spdnet_datasets.sar._common.log_amplitude`, after the city RMS of
+        ``normalize``), then ``|d/dx|`` and ``|d/dy|`` of their mean. Source of
+        :class:`~spdnet_datasets.series.CovarianceSeries`."""
+        x = self._patch(idx)
+        amp = np.stack([np.hypot(x[..., 0], x[..., 1]), np.hypot(x[..., 2], x[..., 3])], -1)
+        return texture_features(log_amplitude(amp))
 
     def __getitem__(self, idx):
         x = self._patch(idx)

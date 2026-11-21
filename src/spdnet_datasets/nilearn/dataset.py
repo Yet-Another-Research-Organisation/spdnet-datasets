@@ -636,6 +636,22 @@ class NilearnConnectomes(BaseDataset):
     def __len__(self) -> int:
         return len(self.labels)
 
+    def structured_raw(self, idx):
+        """Time series of sample ``idx`` as ``(T, p)`` float64 (z-scored per region when
+        ``standardize``), unscaled. Source of
+        :class:`~spdnet_datasets.series.CovarianceSeries` (not for ``haxby``, whose samples
+        are blocks of 9 volumes)."""
+        if self.dataset == "haxby":
+            raise ValueError("haxby samples are blocks of 9 volumes: no covariance series")
+        if self.series is None:
+            if self.paths.processed_dir is None:
+                raise ValueError("The cached time series were deleted (keep='keep_covariance');"
+                                 " rebuild with force=True and another keep.")
+            p = self.paths.processed_dir
+            self.series = self._split_series(np.load(p / "series.npy", mmap_mode="r"),
+                                             np.load(p / "lengths.npy"))
+        return np.asarray(self.series[self.subject_index[idx]], dtype=np.float64)
+
     def __getitem__(self, idx):
         # covariance scaled by s, mean and raw by sqrt(s): the three stay consistent
         root = float(np.sqrt(self.scale))

@@ -64,7 +64,7 @@ from ..core.estimators import channel_mean
 from ..core.fetch import Bunch
 from ..manager import DatasetManager
 from ..utils.sources import existing_dir, source_dir
-from ._common import finalize_labels
+from ._common import finalize_labels, tuzel_features
 
 DOMAIN, NAME = "SAR", "MSTAR_SOC"
 PAGE = "https://github.com/omae11/MSTAR-dataset/tree/d99007290d20ce52933c8bf0f8c3f461acd522ee"
@@ -200,6 +200,16 @@ class MSTARDataset(BaseDataset):
             x = (np.abs(z)[..., None] if self.source == "amplitude"
                  else np.stack([z.real, z.imag], -1)).astype(np.float32)
         return np.ascontiguousarray(center_crop(x, self.crop))
+
+    def structured_raw(self, idx):
+        """Chip ``idx`` (centre crop) as ``(crop, crop, 9)`` region-covariance features of Tuzel
+        et al. (:func:`~spdnet_datasets.sar._common.tuzel_features`). Needs
+        ``source="complex"`` (the phase). Source of
+        :class:`~spdnet_datasets.series.CovarianceSeries`."""
+        if self.source != "complex":
+            raise ValueError("structured_raw needs source='complex' (amplitude and phase)")
+        x = self._read(idx)
+        return tuzel_features(x[..., 0] + 1j * x[..., 1])
 
     def __getitem__(self, idx):
         raw = self._read(idx)

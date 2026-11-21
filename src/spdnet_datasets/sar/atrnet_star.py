@@ -100,7 +100,7 @@ from ..core.estimators import channel_mean
 from ..core.fetch import Bunch, verify_local
 from ..manager import DatasetManager
 from ..utils.sources import downloads_dir, existing_dir, extract_7z, find_root
-from ._common import finalize_labels
+from ._common import finalize_labels, log_amplitude, texture_features
 
 DOMAIN, NAME = "SAR", "ATRNet-STAR"
 HF_REPO = "waterdisappear/ATRNet-STAR"
@@ -401,6 +401,17 @@ class ATRNetSTARDataset(BaseDataset):
         if self.verbose:
             print(f"ATRNet-STAR {self.representation}/{self.protocol}: {len(self.meta)} chips, "
                   f"{len(self.classes)} classes, empty files excluded: {self.n_empty}")
+
+    def structured_raw(self, idx):
+        """Chip ``idx`` as ``(128, 128, 6)`` real variables: log-amplitudes of HH, HV, VH, VV
+        (:func:`~spdnet_datasets.sar._common.log_amplitude`), then ``|d/dx|`` and ``|d/dy|``
+        of their mean. Needs ``representation="Slant_Range"``. Source of
+        :class:`~spdnet_datasets.series.CovarianceSeries`."""
+        if self.representation != "Slant_Range":
+            raise ValueError("structured_raw needs representation='Slant_Range' (4 polarisations)")
+        amp = _read_chip(self.data_dir / self.meta.at[idx, "path"], self.representation,
+                         "amplitude")
+        return texture_features(log_amplitude(amp))
 
     def __getitem__(self, idx):
         raw = _read_chip(self.data_dir / self.meta.at[idx, "path"], self.representation,

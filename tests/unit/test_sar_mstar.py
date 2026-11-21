@@ -75,3 +75,14 @@ def test_no_groups_and_stratified_validation(mstar_dir):
     s = ds.splits["official"]
     # stratified draw in the 17 deg chips: 3 of the 6 training chips of each class
     assert ds.meta["label"][s["val"]].value_counts().to_dict() == dict.fromkeys(ds.classes, 3)
+
+
+def test_structured_raw_tuzel_features(mstar_dir):
+    ds = MSTARDataset(mstar_dir, crop=16, source="complex", return_raw=True, verbose=False)
+    x = ds.structured_raw(0)
+    raw = ds[0][0].numpy()
+    assert x.shape == (16, 16, 9)
+    np.testing.assert_allclose(x[..., 2], np.hypot(raw[..., 0], raw[..., 1]), rtol=1e-5)
+    np.testing.assert_allclose(x[..., 7] ** 2 + x[..., 8] ** 2, 1.0, rtol=1e-6)
+    with pytest.raises(ValueError, match="complex"):
+        MSTARDataset(mstar_dir, crop=16, return_raw=True, verbose=False).structured_raw(0)

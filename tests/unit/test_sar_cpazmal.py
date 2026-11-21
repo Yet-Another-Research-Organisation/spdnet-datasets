@@ -153,3 +153,24 @@ def test_fetch_replays_from_cache(cpaz_dir, tmp_path):
     with pytest.raises(ValueError, match="return_raw"):
         CPAZMaLDataset(cpaz_dir, cache_dir=tmp_path / "c", keep="keep_covariance",
                        return_raw=True, verbose=False)
+
+
+def test_date_stack_every_common_date_and_both_orbits(cpaz_dir, tmp_path):
+    """Source of the covariance series: every common date, NaN where a pixel is invalid; on
+    the loader's dates and valid pixels it equals the loader's raw output."""
+    ds = _make(cpaz_dir, tmp_path, n_dates=10, block=10, min_pixels=40)
+    for i in (0, len(ds) - 1):
+        r = ds.meta.iloc[i]
+        x = ds.date_stack(i)
+        assert x.shape == (22, (r["r1"] - r["r0"]) * (r["c1"] - r["c0"]), 2)
+        idx = [HV_DATES.index(d) for d in ds.dates]
+        sub = x[idx]
+        valid = ~np.isnan(sub).any(axis=(0, 2))
+        assert valid.sum() == r["n_pixels"]
+        flat = np.transpose(sub[:, valid], (1, 2, 0)).reshape(valid.sum(), -1)  # HH then HV
+        np.testing.assert_allclose(flat, ds._raw(i), rtol=1e-6)
+    both = ds.date_stack(0, orbit="both")
+    assert both.shape == (22, ds.date_stack(0).shape[1], 4)
+    assert ds.date_pairs == list(zip(HV_DATES, HV_DATES, strict=True))
+    with pytest.raises(ValueError, match="orbit"):
+        ds.date_stack(0, orbit="ASC")

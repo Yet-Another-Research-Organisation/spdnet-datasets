@@ -80,6 +80,13 @@ class SeriesMode:
         estimating each token.
     min_n_over_p : float
         Smallest ``n_t / p`` accepted without ``allow_small_n``.
+    min_tokens : int
+        Fewest tokens of a typical sample: below, ``CovarianceSeries`` raises ``ValueError``
+        (an EEG epoch or an fMRI scan too short for its windows).
+    from_loader : tuple of str
+        Tokenizer parameters read from the wrapped loader (attribute of the same name, e.g.
+        the sampling rate ``sfreq``) unless passed explicitly; their ``defaults`` are typical
+        values, used by the documentation only.
     """
 
     name: str
@@ -97,6 +104,8 @@ class SeriesMode:
     standardize: str | None = None
     drop_invalid: bool = False
     min_n_over_p: float = 2.0
+    min_tokens: int = 1
+    from_loader: tuple = ()
 
     def __post_init__(self):
         if self.family not in FAMILIES:
@@ -300,9 +309,10 @@ SERIES_MODES["hyperleaf"] = _large_p_spectral({
     "spatio_spectral": SeriesMode(
         "spatio_spectral", _spatio_spectral, ("H", "W", "B"),
         {"window": (48, 58), "step": None, "n_windows": (1, 6), "band_window": 48,
-         "band_step": None, "band_n_windows": 4},
-        "6 windows of 48 x 58 pixels along the leaf x 4 windows of 48 bands, spatial-major; "
-        "observations = the leaf pixels", _HYPERLEAF, drop_invalid=True),
+         "band_step": None, "band_n_windows": 5},
+        "6 windows of 48 x 58 pixels along the leaf x 5 windows of 48 bands (starts 0, 39, "
+        "78, 117, 156: the 204 bands covered), spatial-major; observations = the leaf pixels",
+        _HYPERLEAF, drop_invalid=True),
     "spatial": SeriesMode(
         "spatial", _spatial, ("H", "W", "B"),
         {"window": (48, 58), "step": None, "n_windows": (1, 6), "n_channels": None},
@@ -372,10 +382,15 @@ def _width_windows(T, width, n_windows, minimum=4):
     return tok.axis_windows(T, w, n_windows=n_windows)
 
 
-def _parts_in_windows(x, *, parts, width=1 / 3, n_windows=6):
-    """Window-major: every body part of the first window, then of the second..."""
+def _parts_in_windows(x, *, parts, width=1 / 3, n_windows=6, min_window=None):
+    """Window-major: every body part of the first window, then of the second... A window
+    lasts ``width`` of the sequence but at least ``min_window`` frames (default ``2p`` of the
+    largest part, so that a short sequence gives overlapping windows rather than masked
+    tokens; ``min_window=4`` gives the former windows)."""
+    if min_window is None:
+        min_window = 2 * 3 * max(len(j) for j in parts.values())
     obs, pos = [], []
-    for a, b in _width_windows(len(x), width, n_windows):
+    for a, b in _width_windows(len(x), width, n_windows, min(min_window, len(x))):
         w = x[a:b]
         for joints in parts.values():
             obs.append(w[:, list(joints)].reshape(b - a, -1))
@@ -436,9 +451,9 @@ def _skeleton_modes(shape, *, ntu=True):
     modes.update({
         "part": SeriesMode(
             "part", _parts_in_windows, ("T", "J", "C"),
-            {"parts": NTU_PARTS, "width": 1 / 3, "n_windows": 6},
-            "6 windows of a third of the sequence x 5 body parts of 4 joints (p = 12), "
-            "root-centred and standardised coordinates, window-major", shape,
+            {"parts": NTU_PARTS, "width": 1 / 3, "n_windows": 6, "min_window": None},
+            "6 windows of a third of the sequence (at least 2p = 24 frames) x 5 body parts of "
+            "4 joints (p = 12), root-centred and standardised coordinates, window-major", shape,
             family="temporal", estimator="ledoit_wolf", prepare=_root_centred_25,
             standardize="element"),
         "jointcov": SeriesMode(
@@ -455,9 +470,10 @@ def _skeleton_modes(shape, *, ntu=True):
             estimator="ledoit_wolf", prepare=_body_frame_16, standardize="element"),
         "part_temporal": SeriesMode(
             "part_temporal", _parts_in_windows, ("T", "J", "C"),
-            {"parts": NTU_PARTS_15, "width": 0.4, "n_windows": 4},
-            "4 windows (50 % overlap) x 5 body parts of 5 joints (p = 15), camera "
-            "coordinates, window-major; a token with n_t < 2p is masked", shape,
+            {"parts": NTU_PARTS_15, "width": 0.4, "n_windows": 4, "min_window": None},
+            "4 windows of 40 % of the sequence (at least 2p = 30 frames) x 5 body parts of 5 "
+            "joints (p = 15), camera coordinates, window-major; a sequence shorter than 2p "
+            "frames gives masked tokens", shape,
             family="temporal"),
         "window_p45": SeriesMode(
             "window_p45", _windows_all_joints, ("T", "J", "C"),
@@ -567,6 +583,145 @@ SERIES_MODES["pol_insar_island"] = {
         {"window": (8, 8), "step": (8, 8), "n_windows": None, "n_channels": None},
         "4 x 4 patches of 8 x 8 pixels, row-major; variables = the 12 log-powers (L and S)",
         (32, 32, 12), estimator="ledoit_wolf", standardize="last"),
+}
+
+# ---------------------------------------------------------------------------
+# CPAZMaL: 12 x 12 pixel blocks of a parcel, every common dual-polarisation date
+# (CPAZMaLDataset.date_stack: (dates, block pixels, polarisations), invalid pixel-dates NaN)
+
+
+def _date_windows(x, *, window=12, step=6, cover=True):
+    """Windows of dates on ``x`` (T, N, V); variables = the V channels on the dates of the
+    window, channel-major (HH dates, then HV dates); observations = the N pixels."""
+    obs, pos = [], []
+    for a, b in tok.axis_windows(x.shape[0], window, step, cover=cover):
+        obs.append(np.transpose(x[a:b], (1, 2, 0)).reshape(x.shape[1], -1))
+        pos.append([(a, b), (0, x.shape[1]), (0, x.shape[2])])
+    return obs, pos
+
+
+def _cpazmal_dates(ds, i):
+    return ds.date_stack(i)
+
+
+def _cpazmal_both(ds, i):
+    return ds.date_stack(i, orbit="both")
+
+
+_CPAZMAL_BLOCKS = {"block": 12, "n_dates": 12, "min_pixels": 48}
+SERIES_MODES["cpazmal"] = {
+    "dates": SeriesMode(
+        "dates", _date_windows, ("T", "N", "P"), {"window": 12, "step": 6, "cover": True},
+        "windows of 12 dates (step 6) of the loader's orbit (30 descending dates: 4 windows); "
+        "variables = HH and HV amplitudes on the 12 dates (p = 24); observations = the pixels "
+        "of the 12 x 12 block valid on these dates", (30, 144, 2), family="temporal",
+        source=_cpazmal_dates, drop_invalid=True, loader_defaults=_CPAZMAL_BLOCKS),
+    "dates_both": SeriesMode(
+        "dates_both", _date_windows, ("T", "N", "P"), {"window": 6, "step": 3, "cover": True},
+        "both orbits: the 21 ascending dates, each paired with a distinct descending date "
+        "(2 to 13 days apart, median 2); windows of 6 pairs (step 3); variables = HH and HV of "
+        "both orbits on the 6 pairs (p = 24); observations = the block pixels valid in both "
+        "orbits",
+        (21, 144, 4), family="temporal", source=_cpazmal_both, drop_invalid=True,
+        loader_defaults=_CPAZMAL_BLOCKS),
+}
+
+# ---------------------------------------------------------------------------
+# SAR patches with real variables (structured_raw of the loaders: log-amplitudes of the
+# channels, then the absolute derivatives of their mean along rows and columns), and MSTAR
+# with the region-covariance features of Tuzel et al. (2006). No complex covariance.
+
+_SAR_TEXTURE = ("variables = the log-amplitudes of the {c}, then |d/dx| and |d/dy| of their "
+                "mean (p = {p}), each standardised on the training patches")
+
+
+def _sar_grid(n, size, shape, channels, loader_defaults):
+    return {"spatial": SeriesMode(
+        "spatial", _spatial, ("H", "W", "F"),
+        {"window": (size, size), "step": (size, size), "n_windows": None, "n_channels": None},
+        f"{n} x {n} windows of {size} x {size} pixels, row-major; "
+        + _SAR_TEXTURE.format(c=channels, p=shape[-1]), shape, standardize="last",
+        loader_defaults={"return_raw": True, **loader_defaults})}
+
+
+SERIES_MODES["s1slc_cvdl"] = _sar_grid(5, 20, (100, 100, 4), "2 polarisations (HH, HV)", {})
+SERIES_MODES["atrnet_star"] = _sar_grid(
+    4, 32, (128, 128, 6), "4 polarisations (HH, HV, VH, VV)",
+    {"representation": "Slant_Range", "slant_features": "amplitude"})
+SERIES_MODES["air_polsar_seg"] = _sar_grid(8, 64, (512, 512, 6),
+                                           "4 polarisations (HH, HV, VH, VV)", {"cell": 512})
+SERIES_MODES["mstar"] = {"spatial": SeriesMode(
+    "spatial", _spatial, ("H", "W", "F"),
+    {"window": (32, 32), "step": (32, 32), "n_windows": None, "n_channels": None},
+    "4 x 4 windows of 32 x 32 pixels of the 128 x 128 chip, row-major; variables of Tuzel "
+    "et al.: x, y, amplitude I, |dI/dx|, |dI/dy|, |d2I/dx2|, |d2I/dy2|, cos and sin of the "
+    "phase (p = 9), each standardised on the training chips", (128, 128, 9),
+    standardize="last", loader_defaults={"return_raw": True, "source": "complex"})}
+
+# ---------------------------------------------------------------------------
+# EEG epochs (MOABBCovariances.structured_raw: (T, C)) and fMRI scans
+# (NilearnConnectomes.structured_raw: (T, regions)); no loader name: pass an instance.
+
+FILTER_BANK = tuple((f, f + 4) for f in range(4, 40, 4))
+"""Nine 4 Hz bands from 4-8 to 36-40 Hz (filter-bank CSP)."""
+
+
+def _filter_bank(x, *, bands=FILTER_BANK, sfreq=250.0, order=4, passband=None):
+    """One token per band: the epoch ``x`` (T, C) filtered by a zero-phase Butterworth
+    band-pass; observations = every time sample, variables = the C channels. ``passband``: the
+    band the epochs were already filtered to (the MOABB paradigm's ``filters``); a band outside
+    it gives a nearly empty token, with a warning."""
+    import warnings
+
+    from scipy.signal import butter, sosfiltfilt
+
+    if passband is not None and (min(b[0] for b in bands) < passband[0]
+                                 or max(b[1] for b in bands) > passband[1]):
+        warnings.warn(f"filter bank {bands[0][0]}-{bands[-1][1]} Hz outside the paradigm's "
+                      f"pass band {passband[0]:g}-{passband[1]:g} Hz: build the paradigm with "
+                      "fmin <= 4 and fmax >= 40 (e.g. LeftRightImagery(fmin=1, fmax=45))",
+                      UserWarning, stacklevel=2)
+    obs, pos = [], []
+    for lo, hi in bands:
+        sos = butter(order, (lo, hi), btype="bandpass", fs=sfreq, output="sos")
+        obs.append(sosfiltfilt(sos, np.asarray(x, dtype=np.float64), axis=0))
+        pos.append([(0, len(x)), (0, x.shape[1])])
+    return obs, pos
+
+
+def _p_windows(x, *, window=None, step=None, window_over_p=4.0, min_windows=None):
+    """Windows over the first axis of ``x`` (T, p), 50 % overlap by default. Without
+    ``window``: ``window_over_p * p`` samples, shrunk (never below ``2p``) to the window that
+    gives ``min_windows`` windows when it gives fewer."""
+    T, p = x.shape
+    if window is None:
+        window = int(np.ceil(window_over_p * p))
+        if min_windows and tok.n_windows(T, window, step) < min_windows:
+            window = max(2 * p, int(np.ceil(2 * T / (min_windows + 1))))
+    return tok.temporal(x, window, step)
+
+
+SERIES_MODES["moabb"] = {
+    "filter_bank": SeriesMode(
+        "filter_bank", _filter_bank, ("T", "C"),
+        {"bands": FILTER_BANK, "sfreq": 250.0, "order": 4, "passband": None},
+        "9 bands of 4 Hz (4-8 to 36-40 Hz, Butterworth order 4, zero phase) over the whole "
+        "epoch; variables = the C channels (p = C), observations = every time sample",
+        (1001, 22), from_loader=("sfreq", "passband")),
+    "temporal": SeriesMode(
+        "temporal", _p_windows, ("T", "C"),
+        {"window": None, "step": None, "window_over_p": 4.0, "min_windows": 4},
+        "windows of 4C samples (50 % overlap), shrunk to give 4 windows when the epoch is "
+        "short, never below 2C; variables = the C channels", (1001, 22), family="temporal",
+        min_tokens=2),
+}
+SERIES_MODES["nilearn"] = {
+    "temporal": SeriesMode(
+        "temporal", _p_windows, ("T", "R"),
+        {"window": None, "step": None, "window_over_p": 2.0, "min_windows": None},
+        "dynamic connectivity: windows of 2p volumes (50 % overlap); variables = the p "
+        "regions; at least 3 windows", (168, 39), family="temporal", estimator="ledoit_wolf",
+        min_tokens=3),
 }
 
 

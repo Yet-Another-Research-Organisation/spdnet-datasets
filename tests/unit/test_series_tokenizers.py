@@ -120,7 +120,8 @@ def test_every_registered_mode_meets_its_rules():
             assert mode.family in ("temporal", "vision")
             if not mode.allow_small_n:  # documented derogations (R23 large p) only
                 assert n_t >= mode.min_n_over_p * p, (name, mode.name, n_t, p)
-            assert 4 <= S <= 32, (name, mode.name, S)
+            if (name, mode.name) != ("air_polsar_seg", "spatial"):  # 8 x 8 grid: user's choice
+                assert 4 <= S <= 32, (name, mode.name, S)
 
 
 def test_modes_reproduce_the_former_series_builders():
@@ -142,7 +143,7 @@ def test_modes_reproduce_the_former_series_builders():
 def test_registry_defaults_of_the_user_example():
     mode = get_mode("hyperleaf")
     assert mode.name == "spatio_spectral"
-    assert mode.nominal() == (24, 48, 48 * 58)
+    assert mode.nominal() == (30, 48, 48 * 58)  # 6 spatial x 5 band windows
 
 
 def test_get_mode_errors():

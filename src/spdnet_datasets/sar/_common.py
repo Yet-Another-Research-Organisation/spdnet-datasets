@@ -129,3 +129,40 @@ def group_kfold_splits(y, groups, *, n_splits=5, seed=0, prefix="sgkf"):
         splits[f"{prefix}{n_splits}_fold{k}"] = {
             "train": rest[tr], "val": rest[va], "test": test}
     return splits
+
+
+def _abs_derivatives(x, kernel):
+    """``|x * kernel|`` along columns (d/dx) and rows (d/dy), borders replicated."""
+    from scipy.ndimage import convolve1d
+
+    return (np.abs(convolve1d(x, kernel, axis=1, mode="nearest")),
+            np.abs(convolve1d(x, kernel, axis=0, mode="nearest")))
+
+
+def log_amplitude(amplitude):
+    """``log(A + 1e-3 mean(A))`` per channel of an ``(H, W, C)`` amplitude patch (the offset,
+    relative to the channel mean, keeps zero amplitudes finite)."""
+    a = np.asarray(amplitude, dtype=np.float64)
+    return np.log(a + 1e-3 * a.mean(axis=(0, 1), keepdims=True) + np.finfo(float).tiny)
+
+
+def texture_features(logs):
+    """``(H, W, C)`` log-amplitudes -> ``(H, W, C + 2)``: the C channels, then ``|d/dx|`` and
+    ``|d/dy|`` (central differences) of their mean. Real variables of the covariance-series
+    grids of the SAR patches (no complex covariance)."""
+    logs = np.asarray(logs, dtype=np.float64)
+    dx, dy = _abs_derivatives(logs.mean(-1), [1.0, 0.0, -1.0])
+    return np.concatenate([logs, dx[..., None], dy[..., None]], -1)
+
+
+def tuzel_features(z):
+    """Region-covariance features of Tuzel et al. (ECCV 2006) of a complex chip ``(H, W)``:
+    ``(H, W, 9)`` = x, y, I = |z|, |dI/dx|, |dI/dy|, |d2I/dx2|, |d2I/dy2| (filters
+    ``[-1, 0, 1]`` and ``[-1, 2, -1]``), cos and sin of the phase of ``z``."""
+    z = np.asarray(z)
+    amp = np.abs(z).astype(np.float64)
+    phase = np.angle(z)
+    y, x = np.mgrid[:amp.shape[0], :amp.shape[1]].astype(np.float64)
+    dx, dy = _abs_derivatives(amp, [1.0, 0.0, -1.0])
+    dxx, dyy = _abs_derivatives(amp, [-1.0, 2.0, -1.0])
+    return np.stack([x, y, amp, dx, dy, dxx, dyy, np.cos(phase), np.sin(phase)], -1)

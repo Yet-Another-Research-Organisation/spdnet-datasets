@@ -23,11 +23,20 @@ __all__ = ["CovarianceSeries", "collate_series"]
 
 SUBSETS = (None, "train", "val", "test")
 LOADER_ESTIMATOR_FIXED = {"hdm05", "deephsfruit"}  # given covariances: no estimator choice
+# adapters built from objects (a MOABB dataset and paradigm, a nilearn fetcher): instances only
+ADAPTERS = {"MOABBCovariances": "moabb", "NilearnConnectomes": "nilearn"}
+# loaders built by name store the samples their preprocessing drops for a global n < 2p (the
+# tokens have their own n_t): series_samples() then exposes them (silent or empty data stay out)
+RECOVER = {"esc50": {"min_frames": 1}, "gtzan": {"min_frames": 1},
+           "birdset_xcm": {"min_frames": 1}, "ntu120": {"min_frames": 1},
+           "dopnet": {"min_frames": 1}, "rices90": {"min_pixels": 1}}
 
 
 def _registry_name(ds):
     from ..manager import DatasetManager
 
+    if type(ds).__name__ in ADAPTERS:
+        return ADAPTERS[type(ds).__name__]
     for name, cls in DatasetManager.DATASETS.items():
         if type(ds) is cls and not name.endswith("_legacy"):
             return name
@@ -35,15 +44,19 @@ def _registry_name(ds):
 
 
 def _build_loader(name, mode, loader_kwargs):
-    from .. import audio, hyperspectral, radar_microdoppler  # noqa: F401  (registration)
+    from .. import audio, hyperspectral, radar_microdoppler, sar  # noqa: F401  (registration)
     from ..manager import DatasetManager
 
+    if name in ADAPTERS.values():
+        raise ValueError(f"{name!r} is an adapter: build it (e.g. MOABBCovariances(dataset, "
+                         "paradigm) or NilearnConnectomes('adhd')) and pass the instance")
     if name not in DatasetManager.DATASETS:
         raise ValueError(f"Unknown dataset {name!r}")
     # Ledoit-Wolf for the loader's own covariance: a sample must not be dropped because its
     # single p x p covariance is singular (the tokens are checked one by one); exclusions of
     # the preprocessing (silence, too few frames or pixels, empty files) are kept.
     base = {} if name in LOADER_ESTIMATOR_FIXED else {"estimator": "ledoit_wolf"}
+    base.update(RECOVER.get(name, {}))
     kwargs = {**base, **mode.loader_defaults, **(loader_kwargs or {})}
     if kwargs.get("subset") not in (None, "all"):
         raise ValueError("the wrapped loader must expose every sample: pass subset to "
@@ -58,11 +71,21 @@ def _check_loader(ds, mode, overridden=()):
         raise ValueError("the wrapped loader was built with subset="
                          f"{ds.subset!r}: build it with subset=None and pass subset to "
                          "CovarianceSeries")
-    settings = {**vars(ds), **getattr(ds, "feature_kwargs", {})}
+    settings = _settings(ds)
     for key, value in mode.loader_defaults.items():
         if key not in overridden and key in settings and settings[key] != value:
             raise ValueError(f"mode {mode.name!r} needs a loader with {key}={value!r}, got "
                              f"{settings[key]!r}")
+
+
+def _settings(ds):
+    """Loader settings: attributes, feature and fetch arguments."""
+    out = dict(vars(ds))
+    for key in ("feature_kwargs", "fetch_kwargs", "_fetch"):
+        extra = getattr(ds, key, None)
+        if isinstance(extra, dict):  # ``_fetch`` is a method of some loaders
+            out.update(extra)
+    return out
 
 
 def _labels(ds):
@@ -71,16 +94,20 @@ def _labels(ds):
     return np.asarray(labels if labels is not None else ds.targets)
 
 
-def _source_key(ds):
-    """Identity of the wrapped samples: loader class, cached stage and exposed rows."""
+def _source_key(ds, mode):
+    """Identity of the wrapped samples: loader class, cached stage, the loader settings of the
+    mode and the exposed rows."""
     bunch = getattr(ds, "bunch", None) or getattr(ds, "_bunch", None) or {}
+    paths = getattr(ds, "paths", None) or {}  # adapters (MOABB, nilearn)
     stage = (bunch.get("covariance_path") or bunch.get("processed_path")
-             or getattr(ds, "_processed", None))
+             or getattr(ds, "_processed", None) or paths.get("processed_dir"))
     index = np.asarray(getattr(ds, "_index", np.arange(len(ds))))
     labels = _labels(ds)
+    settings = _settings(ds)
     return {"loader": type(ds).__name__, "data_dir": str(getattr(ds, "data_dir", "")),
             "stage": str(stage), "index": params_hash({"i": index.tolist()}),
-            "labels": params_hash({"y": labels.tolist()}), "n": len(ds)}
+            "labels": params_hash({"y": labels.tolist()}), "n": len(ds),
+            "settings": {k: str(settings.get(k)) for k in sorted(mode.loader_defaults)}}
 
 
 def _estimate(obs, estimator, min_n):
@@ -144,6 +171,12 @@ class CovarianceSeries(Dataset):
     return_mean : bool
     normalize : bool
         Multiply the tokens by the geometric scale fitted on the unmasked training tokens.
+    recover : bool
+        When the loader has a ``series_samples()`` hook (audio, NTU, Dop-NET, Rices), wrap the
+        copy it returns: every sample of its preprocessing, including those whose own
+        ``p x p`` covariance needs ``2p`` observations they do not have (splits rebuilt by the
+        loader's rules, groups kept). Built by name, such loaders store their short samples
+        (``min_frames=1`` or ``min_pixels=1``); silent or empty samples stay excluded.
     cache_dir, force
         Series cache (default ``SPDNET_CACHE_DIR``), recompute.
     verbose : bool
@@ -159,7 +192,7 @@ class CovarianceSeries(Dataset):
 
     def __init__(self, dataset, mode=None, *, split=None, subset=None, loader_kwargs=None,
                  estimator=None, allow_small_n=None, return_mean=False, normalize=True,
-                 cache_dir=None, force=False, verbose=True, **params):
+                 recover=True, cache_dir=None, force=False, verbose=True, **params):
         if subset == "all":
             subset = None
         if subset not in SUBSETS:
@@ -175,7 +208,14 @@ class CovarianceSeries(Dataset):
             self.mode = get_mode(self.name, mode)
             self.loader = dataset
         _check_loader(self.loader, self.mode, set(loader_kwargs or ()))
+        self.n_loader = len(self.loader)  # samples with a p x p covariance in the loader
+        if recover and callable(getattr(self.loader, "series_samples", None)):
+            self.loader = self.loader.series_samples()
+        given = set(params)
         self.params = self.mode.resolve(**params)
+        for key in self.mode.from_loader:  # e.g. the sampling rate of the EEG epochs
+            if key not in given:
+                self.params[key] = getattr(self.loader, key)
         if allow_small_n is None:
             allow_small_n = self.mode.allow_small_n
         self.estimator = "ledoit_wolf" if allow_small_n else (estimator or self.mode.estimator)
@@ -185,6 +225,8 @@ class CovarianceSeries(Dataset):
         self.verbose = verbose
         splits = getattr(self.loader, "splits", {}) or {}
         self.split = split if split is not None else getattr(self.loader, "split", None)
+        if self.split is None and "recommended" in splits:
+            self.split = "recommended"
         if (normalize or subset is not None or self.mode.standardize) and self.split not in splits:
             raise ValueError(f"Unknown split {self.split!r}; available: {sorted(splits)}")
         self._standardization = None
@@ -236,11 +278,19 @@ class CovarianceSeries(Dataset):
         ``n_samples`` samples evenly spread, observations not filtered; their median is compared
         with ``2p`` (a short sample alone does not raise: its small tokens are masked)."""
         rows = np.unique(np.linspace(0, len(self.loader) - 1, n_samples).round().astype(int))
-        sizes = []
+        sizes, counts = [], []
         for i in rows:
             obs, _ = self.mode.tokenize(self.structured(i, standardize=False), **self.params)
             p = obs[0].shape[1]
             sizes.append(min(len(o) for o in obs))
+            counts.append(len(obs))
+        S = int(np.median(counts))
+        if S < self.mode.min_tokens:
+            raise ValueError(
+                f"{self.name}/{self.mode.name} with {self.params}: {S} tokens (median over "
+                f"{len(rows)} samples), fewer than {self.mode.min_tokens}: the samples are too "
+                "short for these windows. Shorten the windows (never below 2p) or use another "
+                "mode.")
         n_t = int(np.median(sizes))
         if n_t < self.mode.min_n_over_p * p and not self.allow_small_n:
             raise ValueError(
@@ -289,7 +339,8 @@ class CovarianceSeries(Dataset):
 
     def _load(self, cache_dir, force):
         key = {"mode": self.mode.name, "params": self.params, "estimator": self.estimator,
-               "allow_small_n": self.allow_small_n, "source": _source_key(self.loader)}
+               "allow_small_n": self.allow_small_n,
+               "source": _source_key(self.loader, self.mode)}
         if self._standardization is not None:  # fitted on the training part of the split
             key["standardization"] = params_hash({"mu": self._standardization[0].tolist(),
                                                   "sd": self._standardization[1].tolist()})
@@ -370,8 +421,11 @@ class CovarianceSeries(Dataset):
 
         Returns a dict with ``dataset``, ``mode``, ``family``, ``params``, ``S`` (largest number of
         tokens), ``S_median``, ``p``, ``n_t`` (median over the unmasked tokens), ``n_t_min``,
-        ``n_t_over_p``, ``spd_fraction`` (unmasked tokens) and ``kappa`` (5, 50 and 95 %
-        quantiles of the condition number of the unmasked tokens, on at most 2 000 samples).
+        ``n_t_over_p``, ``spd_fraction`` (unmasked tokens), ``kappa`` (5, 50 and 95 %
+        quantiles of the condition number of the unmasked tokens, on at most 2 000 samples) and
+        ``n_short`` (samples with fewer than the mode's ``min_tokens`` tokens: kept, padded by
+        :func:`collate_series`) and ``n_loader`` (samples of the wrapped loader, before
+        :meth:`series_samples` recovers the others).
         """
         p = self._tokens.shape[-1]
         valid = np.arange(self._mask.shape[1])[None] < self.lengths[:, None]
@@ -385,7 +439,9 @@ class CovarianceSeries(Dataset):
                 "S": int(self.lengths.max()), "S_median": float(np.median(self.lengths)),
                 "p": int(p), "n_t": n_t, "n_t_min": int(n_ok.min()) if len(n_ok) else 0,
                 "n_t_over_p": n_t / p, "spd_fraction": float(self._mask[valid].mean()),
-                "kappa": [float(q) for q in np.quantile(kappa, [0.05, 0.5, 0.95])]}
+                "kappa": [float(q) for q in np.quantile(kappa, [0.05, 0.5, 0.95])],
+                "n_short": int((self.lengths < self.mode.min_tokens).sum()),
+                "n_loader": int(self.n_loader)}
 
 
 def collate_series(batch):

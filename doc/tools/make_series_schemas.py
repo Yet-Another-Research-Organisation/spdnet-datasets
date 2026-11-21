@@ -40,12 +40,20 @@ AXIS_NAMES = {
     "skeleton": {"T": "frames", "J": "joints", "C": "x, y, z"},
     "sits": {"T": "dates / periods", "N": "parcel pixels", "B": "variables"},
     "sar": {"H": "rows", "W": "columns", "F": "log-powers"},
+    "sar_grid": {"H": "rows", "W": "columns", "F": "features"},
+    "sar_dates": {"T": "dates", "N": "block pixels", "P": "polarisations"},
+    "eeg": {"T": "time samples", "C": "channels", "f": "frequency, Hz"},
+    "fmri": {"T": "volumes", "R": "regions"},
 }
 FAMILY_OF = {"esc50": "audio", "gtzan": "audio", "birdset_xcm": "audio", "ci4r": "radar",
              "mvdoppler": "radar", "dopnet": "radar", "ntu120": "skeleton",
-             "hdm05": "skeleton", "pastis_r": "sits", "pol_insar_island": "sar"}
+             "hdm05": "skeleton", "pastis_r": "sits", "pol_insar_island": "sar",
+             "cpazmal": "sar_dates", "s1slc_cvdl": "sar_grid", "atrnet_star": "sar_grid",
+             "air_polsar_seg": "sar_grid", "mstar": "sar_grid", "moabb": "eeg",
+             "nilearn": "fmri"}
 # drawing axes of a 3-axis sample: (horizontal, vertical, depth)
-LAYOUT3 = {"hsi": (1, 0, 2), "sar": (1, 0, 2), "sits": (0, 1, 2), "skeleton": (0, 1, 2)}
+LAYOUT3 = {"hsi": (1, 0, 2), "sar": (1, 0, 2), "sar_grid": (1, 0, 2), "sits": (0, 1, 2),
+           "sar_dates": (0, 1, 2), "skeleton": (0, 1, 2)}
 
 
 def _rgb(c):
@@ -265,7 +273,15 @@ def draw(name, mode, path, theme):
     ax.text(0.3, 4.95, f"{name} · {mode.name}  ({order})", fontsize=10, color=t["ink"],
             fontweight="bold", va="top")
     ax.text(0.3, 4.55, mode.description, fontsize=8, color=t["muted"], va="top", wrap=True)
-    if kind == "skeleton":  # frames x joints; the 3 coordinates are always all used
+    if mode.name == "filter_bank":  # tokens = frequency bands of the whole epoch
+        from dataclasses import replace
+
+        bands = mode.defaults["bands"]
+        positions = [[(0, x.shape[0]), (int(lo), int(hi))] for lo, hi in bands]
+        top = max(b[1] for b in bands)
+        _draw_2d(ax, replace(mode, axes=("T", "f")), (x.shape[0], top), positions, colours,
+                 t, names, (1.2, 0.9, 6.0, 2.9))
+    elif kind == "skeleton":  # frames x joints; the 3 coordinates are always all used
         positions = [list(p[:2]) for p in positions]
         _draw_2d(ax, mode, x.shape[:2], positions, colours, t, names, (1.2, 0.9, 6.0, 2.9))
     elif x.ndim == 2:
