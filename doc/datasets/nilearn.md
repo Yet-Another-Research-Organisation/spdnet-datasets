@@ -373,6 +373,53 @@ end-to-end validation.
   nomenclature. *NeuroImage*, 53, 1–15.
 - spdlearn, [Classifying fMRI data with SPDNet](https://spdlearn.org/generated/auto_examples/applied_examples/plot_fmri.html).
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each fMRI scan into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} nilearn
+```
+
+Dynamic connectivity: windows of 2p volumes at 50 % overlap over the region time
+series of `NilearnConnectomes` (an instance: no loader name), estimated with Ledoit-Wolf. A
+dataset whose typical scan gives fewer than 3 windows raises `ValueError` (ABIDE with the
+`tt` atlas, p = 97, needs 388 volumes, and its scans have 78 to 316); shorter scans of a
+longer dataset are kept and counted (`describe()["n_short"]`: 6 of the 38 ADHD scans, which
+last 78 to 261 volumes, give 1 or 2 windows). `haxby` raises (its samples are blocks of 9 volumes).
+With the SCM, every NKI window is masked: the cleaned series of a 296-volume window have a
+numerical rank of 56 for p = 148.
+
+```{dataset-figure} nilearn/series_temporal
+```
+
+Measured on the real data (BERTHA, November 2026, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `temporal` (development (msdl)) | 155 | 4 / 4 | 39 | 78 (78) | 2.0 | 100.00 % | 2.1e+01 / 4.2e+01 / 9.9e+01 |
+| `temporal` (adhd (msdl)) | 38 | 6 / 4 | 39 | 78 (78) | 2.0 | 100.00 % | 1.6e+01 / 3.2e+01 / 5.3e+01 |
+| `temporal` (nki (destrieux)) | 99 | 6 / 6 | 148 | 296 (296) | 2.0 | 100.00 % | 1.5e+03 / 2.9e+03 / 8.5e+03 |
+
+The adapter is built from objects, so the series wraps an instance; every default
+can be overridden:
+
+```python
+from spdnet_datasets.nilearn import NilearnConnectomes
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+scans = NilearnConnectomes("development")  # MSDL atlas, p = 39, T = 168
+series = CovarianceSeries(scans)  # windows of 2p = 78 volumes: 4 tokens
+series = CovarianceSeries(scans, "temporal", window=84, step=28)  # 4 windows of 84
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this adapter in a publication, cite

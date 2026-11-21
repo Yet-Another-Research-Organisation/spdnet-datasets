@@ -168,6 +168,47 @@ x, y = ds[0]                         # (32, 32, 4) float32, log10(1 + A)
 ds.positions.head()                  # patch positions in the rebuilt mosaic
 ```
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each 512 x 512 cell into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} air_polsar_seg
+```
+
+The 8 × 8 grid of 64 × 64 windows needs 512 × 512 cells (loader `cell=512`)
+instead of the 32 × 32 cells of the loader's default. With the same rules (cell fully covered,
+90 % annotated, majority class at least 75 % of it), only 35 cells remain: the grid is the
+user's choice, but its statistics rest on few samples. Variables: `log10(1 + A)` of the four
+polarisations (the loader's raw output), then the absolute derivatives along columns and rows
+of their mean, standardised on the training cells. The 64 tokens exceed the S ≤ 32 rule of
+the other datasets.
+
+```{dataset-figure} air_polsar_seg/series_spatial
+```
+
+Measured on the real data (BERTHA, November 2026, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `spatial` | 35 | 64 / 64 | 6 | 4 096 (4 096) | 682.7 | 100.00 % | 6.4e+00 / 2.4e+01 / 6.9e+01 |
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("air_polsar_seg")
+series = CovarianceSeries("air_polsar_seg", "spatial", window=(128, 128), step=(128, 128))  # 4 x 4 windows of 128 x 128
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

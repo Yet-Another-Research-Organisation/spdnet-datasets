@@ -203,14 +203,14 @@ fewer than `2p` leaf pixels is masked. The `spatial` mode keeps the 204 bands (`
 ```{dataset-figure} hyperleaf/series_spectral_w96
 ```
 
-Measured on the real data (BERTHA, 2026-11-19, default parameters of each mode,
+Measured on the real data (BERTHA, November 2026, default parameters of each mode,
 `describe()`): number of samples, tokens per series, observations per token among the
 unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
 tokens.
 
 | Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
 |---|---|---|---|---|---|---|---|
-| `spatio_spectral` | 1 590 | 24 / 24 | 48 | 794 (96) | 16.5 | 61.87 % | 2.0e+03 / 1.4e+05 / 1.9e+06 |
+| `spatio_spectral` | 1 590 | 30 / 30 | 48 | 794 (96) | 16.5 | 61.83 % | 2.3e+03 / 1.6e+05 / 2.0e+06 |
 | `spatial` | 1 590 | 6 / 6 | 204 | 914 (409) | 4.5 | 46.54 % | 4.5e+05 / 3.7e+06 / 2.3e+07 |
 | `spectral` | 1 590 | 25 / 25 | 16 | 2 748 (1 070) | 171.7 | 100.00 % | 1.1e+03 / 4.3e+04 / 2.7e+05 |
 | `spectral_w48` | 1 590 | 10 / 10 | 48 | 2 748 (1 070) | 57.2 | 100.00 % | 2.3e+04 / 2.6e+05 / 1.3e+06 |

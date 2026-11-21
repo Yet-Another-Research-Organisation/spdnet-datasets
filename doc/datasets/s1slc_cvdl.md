@@ -149,6 +149,45 @@ ds = S1SLCCVDLDataset(split="loco_Houston", features="complex", return_raw=True)
 x, y = ds[0]                         # (100, 100, 4) float32: Re HH, Im HH, Re HV, Im HV
 ```
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each patch into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} s1slc_cvdl
+```
+
+Real variables only (no complex covariance): the log-amplitudes of HH and HV
+(`log(A + 10⁻³ Ā)`, after the city RMS of `normalize`), then the absolute derivatives along
+columns and rows of their mean (filter `[1, 0, -1]`); `S1SLCCVDLDataset.structured_raw`. Each
+variable is standardised on the training patches of the split. The statistics below are
+measured on 1 000 patches per class (`max_samples_per_class=1000`).
+
+```{dataset-figure} s1slc_cvdl/series_spatial
+```
+
+Measured on the real data (BERTHA, November 2026, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `spatial` | 7 000 | 25 / 25 | 4 | 400 (400) | 100.0 | 100.00 % | 1.5e+00 / 2.2e+00 / 4.0e+00 |
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("s1slc_cvdl")
+series = CovarianceSeries("s1slc_cvdl", "spatial", window=(25, 25), step=(25, 25))  # 4 x 4 windows of 25 x 25
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

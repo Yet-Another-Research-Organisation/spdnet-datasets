@@ -273,7 +273,7 @@ class (`max_samples_per_class=300`).
 ```{dataset-figure} pastis_r/series_s1s2_fusion
 ```
 
-Measured on the real data (BERTHA, 2026-11-19, default parameters of each mode,
+Measured on the real data (BERTHA, November 2026, default parameters of each mode,
 `describe()`): number of samples, tokens per series, observations per token among the
 unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
 tokens.

@@ -195,6 +195,61 @@ datasets' official servers or NEMAR) into `MNE_DATA`.
 | pyriemann | 0.12 |
 | Python | 3.11 |
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each EEG epoch into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} moabb
+```
+
+`MOABBCovariances` is built from a MOABB dataset and paradigm, so the series
+wraps an instance (no loader name). The sampling rate is read from it (`sfreq`: the
+paradigm's `resample`, otherwise `(n_times - 1)` over the epoch duration). The filter bank
+needs epochs that keep 4-40 Hz: the default `LeftRightImagery` filters 8-32 Hz, which leaves
+the outer bands nearly empty and gives a warning; build the paradigm with
+`LeftRightImagery(fmin=1, fmax=45)`, as below. `temporal` uses windows of 4C samples when that
+gives at least 4 windows, otherwise the window that gives 4 (never below 2C); an epoch too
+short for 2 windows raises `ValueError`. Measured on BNCI2014_001 (C = 22, 250 Hz, 9
+subjects) and Cho2017 (C = 64, 512 Hz, 5 subjects).
+
+```{dataset-figure} moabb/series_filter_bank
+```
+
+```{dataset-figure} moabb/series_temporal
+```
+
+Measured on the real data (BERTHA, November 2026, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `filter_bank` (BNCI2014_001, 9 subjects) | 2 592 | 9 / 9 | 22 | 1 001 (1 001) | 45.5 | 100.00 % | 1.3e+04 / 5.3e+04 / 2.5e+05 |
+| `temporal` (BNCI2014_001, 9 subjects) | 2 592 | 22 / 22 | 22 | 88 (88) | 4.0 | 99.99 % | 5.3e+04 / 1.6e+05 / 5.8e+05 |
+| `filter_bank` (Cho2017, 5 subjects) | 1 000 | 9 / 9 | 64 | 1 537 (1 537) | 24.0 | 99.31 % | 1.0e+10 / 5.6e+10 / 3.2e+11 |
+| `temporal` (Cho2017, 5 subjects) | 1 000 | 12 / 12 | 64 | 256 (256) | 4.0 | 100.00 % | 1.8e+07 / 6.1e+07 / 4.8e+08 |
+
+The adapter is built from objects, so the series wraps an instance; every default
+can be overridden:
+
+```python
+from moabb.datasets import BNCI2014_001
+from moabb.paradigms import LeftRightImagery
+from spdnet_datasets.moabb import MOABBCovariances
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+# a pass band that covers the filter bank (4-40 Hz)
+epochs = MOABBCovariances(BNCI2014_001(), LeftRightImagery(fmin=1, fmax=45), subjects=[1, 2])
+series = CovarianceSeries(epochs)  # filter_bank: 9 tokens of 22 x 22
+series = CovarianceSeries(epochs, "temporal", window=125)  # windows of 0.5 s at 250 Hz
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this adapter in a publication, cite

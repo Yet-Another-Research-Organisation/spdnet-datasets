@@ -221,7 +221,7 @@ step 100 (`cover=False`: the last 75 columns are not used, as before), Ledoit-Wo
 ```{dataset-figure} ci4r/series_spectro_temporal
 ```
 
-Measured on the real data (BERTHA, 2026-11-19, default parameters of each mode,
+Measured on the real data (BERTHA, November 2026, default parameters of each mode,
 `describe()`): number of samples, tokens per series, observations per token among the
 unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
 tokens.

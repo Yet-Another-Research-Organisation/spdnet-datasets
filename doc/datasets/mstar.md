@@ -145,6 +145,46 @@ x, y = ds[0]                         # (128, 128, 1) float32, class index
 train_idx = ds.splits["official"]["train"]
 ```
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each chip into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} mstar
+```
+
+The region-covariance features of Tuzel et al. (ECCV 2006) on the complex chips
+(loader `source="complex"`): pixel coordinates x and y, amplitude I = |z|, absolute first
+derivatives (filter `[1, 0, -1]`) and second derivatives (filter `[-1, 2, -1]`) of I along
+columns and rows, and the phase as its cosine and sine (a circular variable: two real
+variables, so p = 9). Each variable is standardised on the training chips. There is no series
+for FUSAR-Ship (decision of the maintainers).
+
+```{dataset-figure} mstar/series_spatial
+```
+
+Measured on the real data (BERTHA, November 2026, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `spatial` | 5 172 | 16 / 16 | 9 | 1 024 (1 024) | 113.8 | 100.00 % | 1.7e+01 / 2.0e+01 / 3.1e+02 |
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("mstar")
+series = CovarianceSeries("mstar", "spatial", window=(64, 64), step=(32, 32))  # 3 x 3 windows of 64 x 64
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

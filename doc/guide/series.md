@@ -230,6 +230,29 @@ grid), PASTIS-R (`s2_dates`, `s1s2_periods`) and Dop-NET (`doppler_bands`: the 1
 central Doppler bins of `real.series.dopnet_series`). HDM05 has no trajectories:
 the local and ETH copies hold covariances only, and its hook raises a clear error.
 
+The SAR loaders without covariance get real variables, never a complex covariance:
+log-amplitudes of the channels and the absolute derivatives of their mean (S1SLC_CVDL,
+ATRNet-STAR, AIR-PolSAR-Seg), the region-covariance features of Tuzel et al. on the
+complex MSTAR chips, and every dual-polarisation date of a CPAZMaL block
+(`CPAZMaLDataset.date_stack`, one orbit or both). The adapters have hooks too:
+`MOABBCovariances.structured_raw` (epoch `T × C`, with `sfreq` and `passband`) and
+`NilearnConnectomes.structured_raw` (scan `T × regions`). Built from objects, they are
+passed as instances; a mode parameter listed in `from_loader` (the sampling rate of the
+filter bank) is then read from the instance.
+
+### Samples the loader drops
+
+A loader drops a sample whose own `p × p` covariance cannot be estimated: fewer than `2p`
+non-silent frames (audio), frames with a body (NTU), frames (Dop-NET) or pixels (Rices_90
+grains). That rule is global, while a token has its own `n_t`: a clip of 100 log-mel frames
+has no `64 × 64` covariance, but its tokens of 16 bands do. Built by name, these loaders
+store their short samples (`min_frames=1`, `min_pixels=1`), and `CovarianceSeries` wraps
+the copy their `series_samples()` hook returns: every stored sample, with task, class
+selection and splits rebuilt by the loader's rules on that list (groups kept, so no
+leakage). Silent or empty samples stay excluded and listed (`loader.excluded`).
+`recover=False` keeps the loader's samples only; `describe()["n_loader"]` gives their
+number.
+
 The former builders of `spdnet_datasets.real.series*` stay available for the
 datasets outside the loaders (finance, UEA, PTB-XL, AVIRIS, TreeSat, BreizhCrops,
 TenGeoP, FMCW, UrbanSound8K); their docstrings point to this API for the others.

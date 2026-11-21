@@ -207,6 +207,60 @@ ds.dates                             # the 20 retained dates
 blocks = CPAZMaLDataset(block=16, min_pixels=120, return_raw=True)
 ```
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each 12 x 12 pixel block of a parcel into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} cpazmal
+```
+
+The samples are the 12 × 12 pixel blocks of the parcels (loader `block=12`,
+`n_dates=12`, `min_pixels=48`: at least 2p = 48 pixels valid on the loader's 12 dates), grouped
+by parcel. `CPAZMaLDataset.date_stack` reads from the HDF5 file every date common to HH and HV
+of the orbit (30 descending dates: 4 windows; `loader_kwargs={"orbit": "ASC"}` gives the 21
+ascending dates and 3 windows). A pixel invalid on a date of a window (outside the polygon,
+nodata) is left out of that token only, and a token with fewer than 48 valid pixels is masked.
+
+`dates_both` mixes the two orbits. The geocoded stacks of the ascending and descending passes
+share their grid to within 0.15 pixel (median 0.06, measured on the 66 parcels with both
+orbits; the shapes differ by at most one row or column, cropped), so a block is read at the
+same rows and columns of both. Each of the 21 ascending dates is paired with a distinct
+descending date (`dataset.date_pairs`, `pair_dates`: 2 to 13 days apart, median 2), and the
+orbit stays in the variables (HH and HV ascending, then descending), so that a variable keeps
+one meaning: incidence, layover and shadow differ between the orbits. The 8 descending dates
+after the last ascending HV acquisition (2020-10-11) are not used.
+
+```{dataset-figure} cpazmal/series_dates
+```
+
+```{dataset-figure} cpazmal/series_dates_both
+```
+
+Measured on the real data (BERTHA, November 2026, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `dates` | 10 695 | 4 / 4 | 24 | 144 (48) | 6.0 | 99.76 % | 4.6e+01 / 1.6e+02 / 1.5e+03 |
+| `dates_both` | 10 695 | 6 / 6 | 24 | 144 (48) | 6.0 | 98.18 % | 4.1e+01 / 1.5e+02 / 1.1e+03 |
+| `dates` (ascending orbit) | 11 713 | 3 / 3 | 24 | 144 (48) | 6.0 | 99.92 % | 3.5e+01 / 1.5e+02 / 1.2e+03 |
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("cpazmal")
+series = CovarianceSeries("cpazmal", "dates", window=6, step=3)  # windows of 6 dates (p = 12)
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

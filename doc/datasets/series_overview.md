@@ -25,8 +25,15 @@ measurement.
 
 ## Measured on the real data
 
-The statistics of every mode on the full datasets (fraction of SPD tokens, condition
-numbers, `n_t / p`) are on the dataset pages, section *Covariance series*. Datasets
-without a mode yet (CPAZMaL, S1SLC_CVDL, ATRNet-STAR, AIR-PolSAR-Seg, FUSAR-Ship,
-MSTAR, MOABB, nilearn) wait for a choice of tokens. HDM05 has modes but no data to
-build them from: its copies hold covariances only.
+The statistics of every mode on the real data (fraction of SPD tokens, condition
+numbers, `n_t / p`, samples kept) are on the dataset pages, section *Covariance series*.
+MOABB and nilearn are adapters: their series wrap an instance (`MOABBCovariances`,
+`NilearnConnectomes`), see {doc}`moabb` and {doc}`nilearn`. FUSAR-Ship has no series, by
+decision. HDM05 has modes but no data to build them from: its copies hold covariances only.
+
+Some loaders drop, while preprocessing, the samples too short for their own `p × p`
+covariance (fewer than `2p` frames or pixels). A token has its own `n_t`, so the series keep
+them: built by name, these loaders store their short samples and
+`CovarianceSeries` wraps the copy returned by their `series_samples()` hook (audio, NTU
+RGB+D 120, Dop-NET, Rices_90), with splits rebuilt by the loader's rules on the longer list
+(groups kept). Silent or empty samples stay excluded and counted.

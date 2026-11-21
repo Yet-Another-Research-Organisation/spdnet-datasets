@@ -183,6 +183,45 @@ protocol_overlap(a="SOC_40classes", b="EOC_depression")
 # {('train', 'train'): 3891, ('train', 'test'): 13112, ('test', 'train'): 1666, ('test', 'test'): 5577}
 ```
 
+<!-- covariance-series: generated section, edit write_sections.py -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each chip into a series of
+covariance tokens (see {doc}`/guide/series` and {doc}`series_overview`). The modes and
+their defaults come from the registry; the first one is the default.
+
+```{series-table} atrnet_star
+```
+
+Real variables only (no complex covariance): the log-amplitudes of the four
+polarisations of the `Slant_Range` chips (`log(A + 10⁻³ Ā)`), then the absolute derivatives
+along columns and rows of their mean; `ATRNetSTARDataset.structured_raw`. Each variable is
+standardised on the training chips. The statistics below are measured on 300 chips per class
+(`max_samples_per_class=300`) of `SOC_40classes`.
+
+```{dataset-figure} atrnet_star/series_spatial
+```
+
+Measured on the real data (BERTHA, November 2026, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `spatial` | 12 000 | 16 / 16 | 6 | 1 024 (1 024) | 170.7 | 99.98 % | 3.6e+00 / 8.1e+00 / 2.8e+01 |
+
+Every default can be overridden by name:
+
+```python
+from spdnet_datasets.series import CovarianceSeries, collate_series
+
+series = CovarianceSeries("atrnet_star")
+series = CovarianceSeries("atrnet_star", "spatial", window=(64, 64), step=(32, 32))  # 3 x 3 windows of 64 x 64
+(tokens, mask), label = series[0]
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite
