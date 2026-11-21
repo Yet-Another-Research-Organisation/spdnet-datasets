@@ -81,7 +81,7 @@ def _check_loader(ds, mode, overridden=()):
 def _settings(ds):
     """Loader settings: attributes, feature and fetch arguments."""
     out = dict(vars(ds))
-    for key in ("feature_kwargs", "fetch_kwargs", "_fetch"):
+    for key in ("feature_kwargs", "fetch_kwargs", "_fetch", "_fetch_kwargs"):
         extra = getattr(ds, key, None)
         if isinstance(extra, dict):  # ``_fetch`` is a method of some loaders
             out.update(extra)
