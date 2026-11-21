@@ -399,71 +399,6 @@ def test_nki_regions_labels_and_phenotypes(cache, nki):
     assert age.labels.dtype == np.float32 and "site_grouped" not in age.splits
 
 
-# ---------------------------------------------------------------- Haxby
-N_VOX = 40
-
-
-class FakeHaxby:
-    """Stand-in for ``fetch_haxby``: 2 runs of [rest 3, cat 9, rest 2, face 9, house 5]."""
-
-    def __init__(self):
-        lab = ["rest"] * 3 + ["cat"] * 9 + ["rest"] * 2 + ["face"] * 9 + ["house"] * 5
-        self.labels = np.array(lab * 2)
-        self.runs = np.repeat([0, 1], len(lab))
-        self.calls = []
-
-    def fetch(self, data_dir=None, subjects=(2,), verbose=1, **kwargs):
-        self.calls.append(subjects)
-        subjects = [subjects] if np.isscalar(subjects) else list(subjects)
-        names = [f"s{k}" for k in subjects]
-        return Bunch(func=names, session_target=names, mask_vt=names, mask_face=names,
-                     mask_house=names)
-
-    def signals(self, func, target, mask):
-        rng = np.random.default_rng(int(func[1:]))
-        X = rng.standard_normal((len(self.labels), N_VOX))
-        X[self.labels == "face"] *= 3.0
-        return X, self.labels, self.runs
-
-
-@pytest.fixture
-def haxby(monkeypatch):
-    fake = FakeHaxby()
-    monkeypatch.setattr(nl_datasets, "fetch_haxby", fake.fetch)
-    monkeypatch.setattr(nl_mod, "_haxby_run_signals", fake.signals)
-    return fake
-
-
-def test_haxby_blocks_runs_and_splits(cache, haxby):
-    ds = _make(cache, dataset="haxby", n_subjects=3, return_raw=True, return_mean=True)
-    assert haxby.calls == [(1, 2, 3)]
-    # per subject: cat and face blocks in 2 runs; house (5 volumes) and rest dropped
-    assert len(ds) == 12 and ds.covariances.shape == (12, 9, 9)
-    assert ds.classes[ds.labels[0]] == "cat"
-    assert set(ds.metadata["label"]) == {"cat", "face"}
-    assert {"run", "block"} <= set(ds.metadata.columns)
-    assert (ds.metadata["n_timepoints"] == N_VOX).all()
-    cov, mean, raw = ds[0][0]
-    assert tuple(raw.shape) == (N_VOX, 9)
-    np.testing.assert_allclose(Covariances().fit_transform([raw.numpy().astype(float)])[0],
-                               cov.numpy(), rtol=1e-4, atol=1e-6)
-    assert ds.groups[0] == "subj1_run0"
-    assert {"run_grouped", "subject_grouped", "stratified"} <= set(ds.splits)
-    sp = ds.splits["recommended"]
-    assert sp is ds.splits["run_grouped"]
-    assert_no_leakage(ds.groups[sp["train"]], ds.groups[sp["test"]])
-    sub = ds.splits["subject_grouped"]
-    subj = ds.metadata["subject"].to_numpy()
-    assert not set(subj[sub["train"]]) & set(subj[sub["test"]])
-
-
-def test_haxby_rejects_regression_and_unknown_mask(cache, haxby):
-    with pytest.raises(ValueError, match="haxby has no age"):
-        _make(cache, dataset="haxby", task="regression")
-    with pytest.raises(ValueError, match="atlas"):
-        _make(cache, dataset="haxby", atlas="msdl")
-
-
 def test_nki_phenotypic_first_row_is_kept(cache, nki):
     """nilearn drops the first subject of the CSV (header=1): it is read again."""
     nki.root.mkdir(parents=True, exist_ok=True)
@@ -474,3 +409,189 @@ def test_nki_phenotypic_first_row_is_kept(cache, nki):
     ds = _make(cache, dataset="nki", split=None)
     assert ds.metadata["subject"].tolist() == nki.ids
     assert ds.metadata["age"].tolist() == [30.0 + k for k in range(6)]
+
+
+# ---------------------------------------------------------------- ds000030
+DS30_URL = "https://s3.amazonaws.com/openneuro/ds000030/ds000030_R1.0.4/uncompressed/"
+DS30_DIAG = ["CONTROL"] * 8 + ["ADHD"] * 6 + ["BIPOLAR"] * 5 + ["SCHZ"] * 6
+DS30_MISSING = "sub-10013"  # an ADHD participant without a preprocessed resting state
+
+
+class FakeDS30:
+    """Stand-in for ``fetch_ds000030_urls`` and ``fetch_openneuro_dataset``: 25
+    participants, one without fMRIPrep resting-state files."""
+
+    def __init__(self, tmp_path):
+        self.root = tmp_path / "ds000030"
+        self.ids = [f"sub-{10000 + k}" for k in range(len(DS30_DIAG))]
+        self.urls = [DS30_URL + "participants.tsv", DS30_URL + "README"]
+        for s in self.ids:
+            self.urls.append(DS30_URL + f"{s}/func/{s}_task-rest_bold.nii.gz")  # raw BIDS
+            if s == DS30_MISSING:
+                continue
+            d = DS30_URL + f"derivatives/fmriprep/{s}/func/{s}_task-"
+            self.urls += [d + "rest_bold_confounds.tsv",
+                          d + "rest_bold_space-MNI152NLin2009cAsym_preproc.nii.gz",
+                          d + "rest_bold_space-T1w_preproc.nii.gz",
+                          d + "bart_bold_confounds.tsv"]
+        self.requested = []
+
+    def index(self, data_dir=None, verbose=1):
+        return "urls.json", list(self.urls)
+
+    def fetch(self, urls=None, data_dir=None, verbose=1, **kwargs):
+        self.requested += urls
+        rng = np.random.default_rng(0)
+        for u in urls:
+            path = self.root / u.split("/uncompressed/", 1)[1]
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if u.endswith("participants.tsv"):
+                pd.DataFrame({"participant_id": self.ids, "diagnosis": DS30_DIAG,
+                              "age": np.arange(len(self.ids)) + 20.0,
+                              "gender": ["F", "M"] * 12 + ["F"], "rest": 1,
+                              "ScannerSerialNumber": [35343.0, 35426.0] * 12 + [35343.0]}
+                             ).to_csv(path, sep="\t", index=False, na_rep="n/a")
+            elif u.endswith("confounds.tsv"):
+                c = pd.DataFrame(rng.standard_normal((152, 9)),
+                                 columns=["WhiteMatter", "GlobalSignal", "X", "Y", "Z",
+                                          "RotX", "RotY", "RotZ", "FramewiseDisplacement"])
+                c.loc[0, "FramewiseDisplacement"] = np.nan
+                c.to_csv(path, sep="\t", index=False, na_rep="n/a")
+        return str(self.root), []
+
+
+def _fake_extract_ds30(func, confounds, atlas, data_dir, t_r):
+    _fake_extract_ds30.calls.append((list(func), confounds, t_r))
+    rng = np.random.default_rng(2)
+    return [rng.standard_normal((152, 39)) for _ in func]
+
+
+@pytest.fixture
+def ds30(monkeypatch, tmp_path):
+    fake = FakeDS30(tmp_path)
+    monkeypatch.setattr(nl_datasets, "fetch_ds000030_urls", fake.index)
+    monkeypatch.setattr(nl_datasets, "fetch_openneuro_dataset", fake.fetch)
+    _fake_extract_ds30.calls = []
+    monkeypatch.setattr(nl_mod, "_extract_timeseries", _fake_extract_ds30)
+    return fake
+
+
+def test_ds000030_files_labels_and_missing_subject(cache, ds30):
+    ds = _make(cache, dataset="ds000030")
+    # only participants.tsv, the MNI resting-state images and their confounds
+    assert all(nl_mod.DS000030_FILES.search(u) for u in ds30.requested)
+    assert len(ds30.requested) == 1 + 2 * 24
+    assert not any("T1w" in u or "bart" in u or "fmriprep" not in u
+                   for u in ds30.requested[1:])
+    assert len(ds) == 24 and ds.n_excluded_missing == 1 and ds.n_excluded == 1
+    assert DS30_MISSING not in set(ds.metadata["subject"])
+    assert ds.classes == ["control", "adhd", "bipolar", "schz"]
+    assert np.bincount(ds.labels).tolist() == [8, 5, 5, 6]
+    assert set(ds.sites) == {"scanner_35343", "scanner_35426"}
+    assert len(set(ds.groups)) == 24 and "site_grouped" not in ds.splits
+    (func, conf, t_r), = _fake_extract_ds30.calls
+    assert t_r == 2.0 and all("MNI152NLin2009cAsym_preproc" in str(f) for f in func)
+    # 7 confounds and their first differences, the first difference set to 0
+    assert conf[0].shape == (152, 14) and not np.isnan(conf[0]).any()
+    np.testing.assert_array_equal(conf[0][0, 7:], 0)
+    assert ds.covariances.shape == (24, 39, 39)
+
+
+def test_ds000030_diagnosis_reuses_the_cache(cache, ds30):
+    full = _make(cache, dataset="ds000030")
+    adhd = _make(cache, dataset="ds000030", diagnosis="adhd")
+    assert len(_fake_extract_ds30.calls) == 1
+    assert adhd.paths.covariance_dir == full.paths.covariance_dir
+    assert adhd.classes == ["control", "adhd"] and len(adhd) == 13
+    assert np.bincount(adhd.labels).tolist() == [8, 5]
+    assert set(adhd.metadata["label"]) == {"control", "adhd"}
+    assert len(adhd.phenotypic) == len(adhd.covs) == len(adhd.subject_index) == 13
+    age = _make(cache, dataset="ds000030", task="regression", diagnosis="schz")
+    assert len(age) == 14 and age.labels.dtype == np.float32
+    _make(cache, dataset="ds000030", confounds=False)
+    assert len(_fake_extract_ds30.calls) == 2 and _fake_extract_ds30.calls[1][1] is None
+
+
+def test_diagnosis_is_a_ds000030_option(cache, abide, ds30):
+    with pytest.raises(ValueError, match="diagnosis"):
+        _make(cache, diagnosis="adhd")
+    with pytest.raises(ValueError, match="diagnosis"):
+        _make(cache, dataset="ds000030", diagnosis="ADHD")
+
+
+# ---------------------------------------------------------------- fold splits
+def _assert_folds(ds, prefix, n_folds):
+    names = [n for n in ds.splits if n.startswith(prefix)]
+    assert len(names) == n_folds
+    tested = np.concatenate([ds.splits[n]["test"] for n in names])
+    assert np.array_equal(np.sort(tested), np.arange(len(ds)))  # each subject tested once
+    for n in names:
+        sp = ds.splits[n]
+        assert sum(map(len, sp.values())) == len(ds)
+        assert len(np.unique(np.concatenate(list(sp.values())))) == len(ds)
+    return names
+
+
+def test_site_folds_leave_one_site_out(cache, abide):
+    ds = _make(cache)  # 5 sites left (KKI excluded)
+    names = _assert_folds(ds, "site_fold_", 5)
+    sites = sorted(set(ds.sites))
+    for k, n in enumerate(sorted(names, key=lambda s: int(s.rsplit("_", 1)[1]))):
+        sp = ds.splits[n]
+        assert set(ds.sites[sp["test"]]) == {sites[k]}
+        assert set(ds.sites[sp["val"]]) == {sites[(k + 1) % 5]}
+        for a, b in (("train", "test"), ("train", "val"), ("val", "test")):
+            assert_no_leakage(ds.sites[sp[a]], ds.sites[sp[b]], what="site")
+    assert not any(n.startswith("stratified_fold") for n in ds.splits)
+    assert ds.splits["recommended"] is ds.splits["site_grouped"]
+
+
+def test_two_sites_give_folds_without_val(cache, abide):
+    ds = _make(cache, fetcher_kwargs={"SITE_ID": ["NYU", "UM_1"]})
+    _assert_folds(ds, "site_fold_", 2)
+    assert len(ds.splits["site_fold_0"]["val"]) == 0
+
+
+def test_stratified_folds_on_single_site(cache, ds30):
+    ds = _make(cache, dataset="ds000030")
+    _assert_folds(ds, "stratified_fold_", nl_mod.N_FOLDS)
+    for k in range(nl_mod.N_FOLDS):
+        sp = ds.splits[f"stratified_fold_{k}"]
+        assert set(ds.labels[sp["test"]]) == {0, 1, 2, 3}  # stratified on the diagnosis
+    reg = _make(cache, dataset="ds000030", task="regression")
+    _assert_folds(reg, "stratified_fold_", nl_mod.N_FOLDS)
+
+
+# ---------------------------------------------------------------- cross-validation
+def _lr_on(i, j):
+    from sklearn.linear_model import LogisticRegression
+
+    def fit_predict(X_train, y_train, X_test):
+        model = LogisticRegression().fit(X_train[:, i, j, None], y_train)
+        return model.predict(X_test[:, i, j, None])
+    return fit_predict
+
+
+def test_cross_validate_folds_signal_and_noise(cache, monkeypatch):
+    from spdnet_datasets.nilearn import cross_validate_folds
+
+    monkeypatch.setattr(nl_datasets, "fetch_abide_pcp", FakeABIDE(T_short_site=None))
+    ds = _make(cache)  # 6 sites x 4 subjects, class carried by cov[0, 1]
+    res = cross_validate_folds(ds, _lr_on(0, 1), n_permutations=99, n_bootstrap=200)
+    assert res["folds"] == [f"site_fold_{k}" for k in range(6)] and len(res["scores"]) == 6
+    assert res["mean"] > 0.9 and res["p_value"] == 0.01
+    assert res["ci"][0] <= res["mean"] <= res["ci"][1] + 1e-12
+    noise = cross_validate_folds(ds, _lr_on(2, 3), n_permutations=99, n_bootstrap=200)
+    assert noise["p_value"] > 0.05 and noise["ci"][0] < 0.5 < noise["ci"][1]
+
+
+def test_cross_validate_folds_constant_predictor_has_p_one(cache, abide):
+    from spdnet_datasets.nilearn import cross_validate_folds
+
+    ds = _make(cache)
+    res = cross_validate_folds(ds, lambda Xtr, ytr, Xte: np.zeros(len(Xte), dtype=int),
+                               n_permutations=20, n_bootstrap=50)
+    # labels shuffled within each site: every left-out site keeps its classes
+    assert res["mean"] == 0.5 and res["p_value"] == 1.0
+    with pytest.raises(ValueError, match="stratified_fold"):
+        cross_validate_folds(ds, _lr_on(0, 1), prefix="stratified_fold", n_permutations=0)

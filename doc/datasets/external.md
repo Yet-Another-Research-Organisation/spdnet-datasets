@@ -30,8 +30,8 @@ paradigms, with MOABB's evaluations.
 :class-card: sd-card-hover
 
 One connectome per subject for ABIDE, ADHD-200, the development fMRI
-dataset and NKI enhanced (surface), with site-grouped splits; Haxby stimulus
-blocks with run-grouped splits.
+dataset, NKI enhanced (surface) and the OpenNeuro ds000030 cohort (four
+diagnoses), with site-grouped splits and cross-validation folds.
 
 {bdg-secondary-line}`regions × regions` {bdg-info-line}`extra nilearn`
 :::

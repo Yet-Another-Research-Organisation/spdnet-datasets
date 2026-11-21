@@ -15,7 +15,7 @@ Five nilearn datasets are supported:
 | `"adhd"` | `fetch_adhd` | 40 subjects | ADHD (1) vs control (0) | acquisition site (5) |
 | `"development"` | `fetch_development_fmri` | 155 subjects | child vs adult | subject (single site) |
 | `"nki"` | `fetch_surf_nki_enhanced` | 102 subjects | sex (F / M), or age | subject (single site) |
-| `"haxby"` | `fetch_haxby` | 6 subjects × 96 stimulus blocks | 8 object categories | run (12 per subject) |
+| `"ds000030"` | `fetch_ds000030_urls` + `fetch_openneuro_dataset` | 261 subjects with a preprocessed resting state (of 272) | control, ADHD, bipolar, schizophrenia; or one of them vs control | subject (single site, 2 scanners) |
 
 - ABIDE: Autism Brain Imaging Data Exchange.
 - PCP: the Preprocessed Connectomes Project, which shares ABIDE time series
@@ -26,9 +26,9 @@ Five nilearn datasets are supported:
 - NKI: the Nathan Kline Institute Rockland Sample. nilearn ships the resting
   state of 102 adults projected on the fsaverage5 cortical surface; the adapter
   averages it in the 148 regions of the Destrieux atlas.
-- Haxby: the visual object recognition study of Haxby et al. (2001), a block
-  design (faces, houses, cats, bottles, scissors, shoes, chairs, scrambled
-  pictures) with 12 runs per subject.
+- ds000030: the UCLA Consortium for Neuropsychiatric Phenomics LA5c study
+  (Poldrack et al., 2016), release R1.0.4 on OpenNeuro, with its fMRIPrep 1.0.4
+  derivatives. Only the resting-state run is used.
 
 ```{dataset-preview} nilearn
 ```
@@ -101,7 +101,8 @@ pipe = make_pipeline(Covariances("scm"), TangentSpace(), LogisticRegression())
 ## Output contract
 
 Each item is `(x, y)`. `y` indexes `ds.classes`: `["control", "autism"]`,
-`["control", "adhd"]` or `["adult", "child"]`. With `task="regression"`, `y`
+`["control", "adhd"]`, `["adult", "child"]`, `["F", "M"]` or, for
+`ds000030`, `["control", "adhd", "bipolar", "schz"]`. With `task="regression"`, `y`
 is the age in years, as a float.
 
 | Flags | `x` |
@@ -123,7 +124,9 @@ Other attributes:
 - `ds.metadata`, one row per kept subject: `subject`, `site`, `label`, `age`,
   `sex` and `n_timepoints`;
 - `ds.phenotypic`: the full nilearn phenotypic rows of the kept subjects;
-- `ds.groups`: the site for `abide` and `adhd`, the subject for `development`.
+- `ds.groups`: the site for `abide` and `adhd`, the subject for the
+  single-site datasets (`development`, `nki`, `ds000030`);
+- `ds.sites`: the acquisition site (the scanner for `ds000030`).
 
 One subject gives exactly one sample. A duplicated subject identifier raises an
 error.
@@ -222,7 +225,9 @@ level:
 |---|---|---|
 | `stratified` | stratified on the label, 10 % test (as in spdlearn), 10 % val | ⚠️ sites mixed between train and test: optimistic; a warning is raised |
 | `site_grouped` | `StratifiedGroupKFold` on sites: test = fold 0 of `min(5, n_sites)`, val = fold 0 of the remaining sites; `assert_no_leakage` on every pair | `abide`, `adhd` |
-| `recommended` | `site_grouped`, or `stratified` for `development` (single site, one sample per subject) | default |
+| `site_fold_<k>` | leave-one-site-out: test = every subject of the k-th site (sites sorted by name), val = the next site, train = the others | `abide`, `adhd`: one fold per site |
+| `stratified_fold_<k>` | fold k of a shuffled 5-fold `StratifiedKFold` on the label (`KFold` for regression); val = fold k + 1 | single-site datasets: `development`, `nki`, `ds000030` |
+| `recommended` | `site_grouped`, or `stratified` for the single-site datasets (one sample per subject) | default |
 
 Each split is built on its own. On a small cohort, the `stratified` test and
 validation parts are enlarged to hold at least one subject per class; a split
@@ -235,6 +240,63 @@ For `adhd`, the cohorts `Peking_1`, `Peking_2` and `Peking_3` count as one site,
 {doc}`/guide/outputs`) is fitted on the training indices of `split`; the means
 and the time series are then multiplied by `sqrt(s)`, so that they stay consistent
 with the covariances. Pass the same name to `create_dataloaders(split=...)`.
+
+### Cross-validation over the folds
+
+Over all the folds of a family, every subject is tested exactly once.
+`cross_validate_folds` scores a model on each fold and summarises the result:
+
+```python
+from spdnet_datasets.nilearn import NilearnConnectomes, cross_validate_folds
+
+def fit_predict(X_train, y_train, X_test):
+    pipe = make_pipeline(TangentSpace(), StandardScaler(),
+                         LogisticRegression(C=0.1, class_weight="balanced"))
+    return pipe.fit(X_train, y_train).predict(X_test)
+
+ds = NilearnConnectomes("adhd", split="site_fold_0")
+res = cross_validate_folds(ds, fit_predict)          # prefix="site_fold" by default
+print(res["scores"], res["mean"], res["ci"], res["p_value"])
+```
+
+- `X` is the unscaled covariances `ds.covs`, so no scale fitted on another
+  fold leaks into the test fold; each fold trains on its `train` and `val`
+  subjects.
+- The score is the balanced accuracy by default (R² for regression): its
+  chance level is 1 / n_classes whatever the class balance.
+- `ci` is the 95 % bootstrap interval (1 000 resamples of the subjects) of the
+  score of the pooled out-of-fold predictions.
+- `p_value` comes from a permutation test: the labels are shuffled *within each
+  site* (1 000 permutations by default) and the whole cross-validation is run
+  again, so a site effect cannot pass for a diagnosis effect.
+  p = (1 + #{null ≥ observed}) / (1 + n_permutations).
+
+````{admonition} ADHD: how to read a score
+:class: warning
+
+The nilearn ADHD-200 sample has 40 subjects; 2 KKI subjects (T = 77 < 2p = 78)
+are excluded, which leaves 38, 19 with ADHD and 19 controls, in 5 sites:
+
+| Site | ADHD | Control |
+|---|---|---|
+| KKI | 3 | 3 |
+| NYU | 4 | 4 |
+| NeuroImage | 4 | 4 |
+| OHSU | 4 | 4 |
+| Peking (Peking_1–3) | 4 | 4 |
+
+- A single test site holds 6 to 8 subjects. On 8 subjects, the 95 % interval
+  of an accuracy of 0.5 is about ±0.35: one `site_grouped` score says nothing.
+- Use the 5 `site_fold_<k>` folds with `cross_validate_folds`, and report the
+  mean, the interval and the permutation p-value.
+- Measured on BERTHA (2026-11-19), MSDL, tangent space + standard scaling +
+  logistic regression (C = 0.1, balanced class weights): balanced accuracy
+  per left-out site KKI 0.33, NYU 0.75, NeuroImage 0.38, OHSU 0.63,
+  Peking 0.13; mean **0.44**, 95 % CI [0.29, 0.61], permutation p = 0.75
+  (1 000 permutations within sites). This is chance level.
+- For a diagnosis effect on more subjects, use `ds000030` (see below), a
+  single-centre cohort with 40 ADHD subjects and 122 controls.
+````
 
 ### Indicative score
 
@@ -277,40 +339,67 @@ reads the downloaded file again with its real header, so every subject keeps
 its phenotype.
 ```
 
-## Haxby (block design)
+## ds000030 (UCLA CNP, OpenNeuro)
 
 ```python
-ds = NilearnConnectomes("haxby", return_raw=True)          # 6 subjects, VT mask
-one = NilearnConnectomes("haxby", fetcher_kwargs={"subjects": (2,)})
+from spdnet_datasets.nilearn import NilearnConnectomes
+
+ds = NilearnConnectomes("ds000030", split="stratified_fold_0")   # 4 diagnoses
+adhd = NilearnConnectomes("ds000030", diagnosis="adhd")          # ADHD vs control
+age = NilearnConnectomes("ds000030", task="regression")          # age in years
 ```
 
-One sample is a stimulus block: 9 volumes (22.5 s, TR 2.5 s). Nine time points
-are far too few to estimate a covariance between regions, so the roles are
-swapped:
+The UCLA Consortium for Neuropsychiatric Phenomics LA5c study (Poldrack et
+al., 2016) scanned 272 adults: healthy controls and patients with
+schizophrenia, bipolar disorder or ADHD. The adapter uses release R1.0.4 on
+OpenNeuro and its fMRIPrep 1.0.4 derivatives.
 
-- variables: the 9 volumes of the block (p = 9);
-- observations: the voxels of the mask (`atlas="vt"`, `"face"` or `"house"`,
-  several hundred voxels), detrended and z-scored per run;
-- `raw`: the `(n_voxels, 9)` array, `mean`: the mean signal of each volume.
+- **Download.** `fetch_ds000030_urls()` gives the index of the release (about
+  411 000 files). Only the files matched by `DS000030_FILES` are passed to
+  `fetch_openneuro_dataset`: `participants.tsv` and, per subject,
+  `derivatives/fmriprep/sub-<id>/func/sub-<id>_task-rest_bold_space-MNI152NLin2009cAsym_preproc.nii.gz`
+  and `sub-<id>_task-rest_bold_confounds.tsv`. On BERTHA (2026-11-19) these 523 files
+  took **25.8 GB** and 28 minutes to download (about 99 MB per subject).
+  `fetch_openneuro_dataset` also adds symbolic links with the newer BIDS
+  derivative names; the adapter reads the original files.
+- **Subjects.** 261 of the 272 participants have a preprocessed resting state
+  (122 controls, 40 ADHD, 49 bipolar, 50 schizophrenia). The 11 others
+  (8 controls, 3 ADHD) are excluded and counted in `n_excluded_missing`.
+- **Signals.** MSDL atlas (p = 39) with a `NiftiMapsMasker`, TR = 2 s,
+  T = 152 volumes (128 for one subject), so T ≥ 2p = 78 holds for every
+  subject. The confounds are
+  the 6 motion parameters and the white-matter signal, with their first
+  differences (14 regressors, `DS000030_CONFOUNDS`). The fMRIPrep 1.0.4
+  tables of this release have no CSF column, and the global signal is not
+  regressed out. `confounds=False` keeps the raw MSDL signals.
+- **Labels.** `task="fine"`: `["control", "adhd", "bipolar", "schz"]`.
+  `diagnosis="adhd"` (or `"bipolar"`, `"schz"`) keeps the controls and that
+  diagnosis, a binary task. `diagnosis` is applied after the cache, so
+  switching it does not extract the signals again. `task="regression"`: age.
+- **Groups and splits.** One centre, so the groups are the subjects:
+  `stratified` and the 5 `stratified_fold_<k>` folds. The participants were
+  scanned on two Siemens Trio scanners, and the controls mostly on one of them
+  (106 of 130). `ds.sites` holds the scanner (`scanner_35343`,
+  `scanner_35426`), and `cross_validate_folds` permutes the labels within each
+  scanner.
 
-The covariance therefore describes how the spatial pattern evolves during the
-block, not which voxels respond.
+Measured on BERTHA (2026-11-19), 261 subjects, MSDL, `cross_validate_folds`
+on the 5 `stratified_fold_<k>` folds, tangent space + standard scaling +
+logistic regression (C = 0.1, balanced class weights), 1 000 permutations
+within scanners. κ (condition number) of the covariances: median 544, range
+161–2 969.
 
-```{warning}
-On subject 2 (VT mask, `run_grouped` split, 8 classes, chance 0.125), tangent
-space + logistic regression on these 9 × 9 covariances scores **0.08**
-(0.125 when the block is shifted by two volumes for the hemodynamic delay),
-while a logistic regression on the `raw` voxel pattern averaged over the block
-scores **0.67**. The category is carried by the spatial pattern, which this
-covariance discards: use Haxby for models on `raw`, or as a negative control
-for covariance models.
-```
+| Task | Subjects | Balanced accuracy per fold | Mean | 95 % CI | p | Chance |
+|---|---|---|---|---|---|---|
+| 4 diagnoses | 261 (122 / 40 / 49 / 50) | 0.36, 0.39, 0.39, 0.37, 0.44 | **0.39** | [0.33, 0.45] | 0.001 | 0.25 |
+| ADHD vs control | 162 (40 / 122) | 0.46, 0.51, 0.50, 0.52, 0.65 | **0.53** | [0.46, 0.59] | 0.25 | 0.50 |
+| Schizophrenia vs control | 172 (50 / 122) | 0.63, 0.63, 0.81, 0.69, 0.67 | **0.69** | [0.61, 0.76] | 0.001 | 0.50 |
+| Bipolar vs control | 171 (49 / 122) | 0.59, 0.64, 0.71, 0.59, 0.49 | **0.60** | [0.52, 0.67] | 0.004 | 0.50 |
 
-Splits: `run_grouped` (recommended: no run on two sides, the within-subject
-protocol of the original study), `subject_grouped` (cross-subject, from two
-subjects) and `stratified` (blocks of a run on both sides: optimistic).
-`metadata` has `run` and `block` columns; `n_timepoints` holds the number of
-voxels.
+Schizophrenia is the most separable diagnosis from resting-state connectomes
+here, bipolar disorder is weaker, and ADHD is not distinguished from controls
+in this cohort: the same conclusion as the leave-one-site-out ADHD-200 result
+above, on a cohort four times larger.
 
 ## Cache and `keep`
 
@@ -350,7 +439,7 @@ recomputes both.
 
 The real-data test (`tests/unit/test_nilearn_real.py`, `-m "slow and network"`)
 covers ABIDE, `tt`, with 20 subjects from PITT, USM, UM_1 and YALE.
-`adhd`, `development`, `nki` and `haxby` are covered by unit tests only,
+`adhd`, `development`, `nki` and `ds000030` are covered by unit tests only,
 because their images are too large for CI; they were run on real data in the
 end-to-end validation.
 
@@ -366,8 +455,8 @@ end-to-end validation.
 - Nooner, K. B., et al. (2012). The NKI-Rockland Sample: a model for
   accelerating the pace of discovery science in psychiatry. *Frontiers in
   Neuroscience*, 6, 152.
-- Haxby, J. V., et al. (2001). Distributed and overlapping representations of
-  faces and objects in ventral temporal cortex. *Science*, 293, 2425–2430.
+- Poldrack, R. A., Congdon, E., Triplett, W., et al. (2016). A phenome-wide
+  examination of neural and cognitive function. *Scientific Data*, 3, 160110.
 - Destrieux, C., Fischl, B., Dale, A., Halgren, E. (2010). Automatic
   parcellation of human cortical gyri and sulci using standard anatomical
   nomenclature. *NeuroImage*, 53, 1–15.
