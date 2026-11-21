@@ -393,6 +393,13 @@ within scanners. κ (condition number) of the covariances: median 544, range
 |---|---|---|---|---|---|---|
 | 4 diagnoses | 261 (122 / 40 / 49 / 50) | 0.36, 0.39, 0.39, 0.37, 0.44 | **0.39** | [0.33, 0.45] | 0.001 | 0.25 |
 | ADHD vs control | 162 (40 / 122) | 0.46, 0.51, 0.50, 0.52, 0.65 | **0.53** | [0.46, 0.59] | 0.25 | 0.50 |
+| Schizophrenia vs control | 172 (50 / 122) | 0.63, 0.63, 0.81, 0.69, 0.67 | **0.69** | [0.61, 0.76] | 0.001 | 0.50 |
+| Bipolar vs control | 171 (49 / 122) | 0.59, 0.64, 0.71, 0.59, 0.49 | **0.60** | [0.52, 0.67] | 0.004 | 0.50 |
+
+Schizophrenia is the most separable diagnosis from resting-state connectomes
+here, bipolar disorder is weaker, and ADHD is not distinguished from controls
+in this cohort: the same conclusion as the leave-one-site-out ADHD-200 result
+above, on a cohort four times larger.
 
 ## Cache and `keep`
 
