@@ -110,9 +110,25 @@ def test_splits_have_no_leakage(bunch):
         assert set(bunch.groups[s["test"]]) == {PERSONS[k]}
 
 
-def test_min_frames_below_2p_is_refused(data, tmp_path):
-    with pytest.raises(ValueError, match="n >= 2p"):
-        fetch_dopnet(data, tmp_path, p=P, min_frames=10, verify=None)
+def test_min_frames_below_2p_stores_short_gestures_for_the_series(data, bunch, tmp_path):
+    with pytest.raises(ValueError, match=">= 1"):
+        fetch_dopnet(data, tmp_path, p=P, min_frames=0, verify=None)
+    short = fetch_dopnet(data, tmp_path, p=P, min_frames=1, verify=None)
+    # same covariances and energy band: the short gestures have no p x p covariance
+    assert short.info["band"] == bunch.info["band"]
+    assert len(short.meta) == len(bunch.meta)
+    assert short.info["rejected_n_lt_2p"] == len(PERSONS) * 4
+    ds = DopNetDataset(data, p=P, min_frames=1, cache_dir=tmp_path, verify=None, verbose=False)
+    full = ds.series_samples()
+    assert len(full) == len(ds) + len(PERSONS) * 4
+    assert (full.meta.n_frames < 2 * P).sum() == len(PERSONS) * 4
+    i = int(np.flatnonzero(full.meta.n_frames.to_numpy() < 2 * P)[0])
+    assert full.structured_raw(i).shape == (full.meta.n_frames.iloc[i], P)
+    assert full.doppler_bands(i).shape[0] == full.meta.n_frames.iloc[i]
+    for k in range(len(PERSONS)):
+        s = full.splits[f"person{k}"]
+        assert_no_leakage(full.groups[s["train"]], full.groups[s["test"]])
+        assert set(full.groups[s["test"]]) == {PERSONS[k]}
 
 
 def test_dataset(data, bunch, tmp_path_factory):

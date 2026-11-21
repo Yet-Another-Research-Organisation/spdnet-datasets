@@ -194,15 +194,17 @@ def skeleton_features(record, features="parts"):
     return np.concatenate([centred[:, list(j)].mean(axis=1) for j in PARTS.values()], axis=1)
 
 
-def _process(source, out_dir, *, root, limit, features):
+def _process(source, out_dir, *, root, limit, features, min_frames=None):
     index = ntu_index(root)
     index = index.iloc[evenly_spaced(len(index), limit)]
     p = 15 if features == "parts" else 75
+    least = 2 * p if min_frames is None else max(int(min_frames), 1)
     feats, rows, excluded = [], [], []
     for rec in index.to_dict("records"):
         X = skeleton_features(_load(Path(root, rec.pop("path"))), features)
-        reason = ("no body" if X is None else
-                  f"n < 2p ({len(X)} frames with a body, 2p = {2 * p})" if len(X) < 2 * p else None)
+        reason = ("no body" if X is None or len(X) == 0 else
+                  f"n < 2p ({len(X)} frames with a body, 2p = {2 * p})" if len(X) < least
+                  else None)
         if reason:
             excluded.append({"id": rec["id"], "label": rec["label"], "reason": reason})
             continue
@@ -234,7 +236,7 @@ def ntu120_splits(meta, labels, groups, val_fraction=0.2, seed=0):
 
 
 def fetch_ntu120(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
-                 verify="size", features="parts", limit=None, archive=None):
+                 verify="size", features="parts", limit=None, archive=None, min_frames=None):
     """Covariances of the NTU RGB+D 120 skeleton sequences.
 
     Parameters
@@ -270,12 +272,15 @@ def fetch_ntu120(data_dir=None, cache_dir=None, keep=None, estimator="scm", forc
         root = ingest_ntu120(archive, cache_dir)
     params = {"data_dir": str(root.resolve()), "features": features, "limit": limit,
                   "estimator": estimator}
+    if min_frames is not None:  # absent by default: the cache key of the default is unchanged
+        params["min_frames"] = min_frames
     if root == downloads_dir(cache_dir, "ntu120"):  # zips share this folder: name them
         params["archive"] = sorted(Path(a).name for a in
                                    ([archive] if isinstance(archive, (str, Path)) else archive))
     run = run_pipeline(
         "ntu120", params=params,
-        process_fn=partial(_process, root=root, limit=limit, features=features),
+        process_fn=partial(_process, root=root, limit=limit, features=features,
+                           min_frames=min_frames),
         covariance_fn=partial(estimate_stage, estimator=estimator),
         cache_dir=cache_dir, keep=keep, force=force)
     return load_result(run, ntu120_splits)

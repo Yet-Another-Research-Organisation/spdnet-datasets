@@ -54,7 +54,7 @@ def finish_processed(out_dir, meta, info):
     (Path(out_dir) / "info.json").write_text(json.dumps(info, indent=1, default=str))
 
 
-def covariance_stage(estimator):
+def covariance_stage(estimator, skip_short=False):
     """Return the ``covariance_fn`` of :func:`run_pipeline` for ``estimator``.
 
     Every covariance goes through :func:`core.estimate_covariance` with
@@ -65,6 +65,10 @@ def covariance_stage(estimator):
     SCM and M-estimate. Unless ``estimator="ledoit_wolf"`` (shrinkage keeps it
     SPD), such samples are rejected and counted in
     ``info["rejected_constant_channel"]``; any other non-SPD estimate raises.
+
+    ``skip_short``: a sample with fewer than ``2p`` frames (stored for the covariance series
+    only, Dop-NET ``min_frames < 2p``) is skipped and counted in ``info["rejected_n_lt_2p"]``
+    instead of raising.
     """
 
     def covariance_fn(processed_dir, out_dir):
@@ -74,9 +78,12 @@ def covariance_stage(estimator):
         meta = pd.read_csv(processed_dir / "meta.csv", dtype={"group": str, "participant": str})
         meta["raw_index"] = np.arange(len(meta))
         p = raw.shape[1]
-        covs, means, kept = [], [], []
+        covs, means, kept, n_short = [], [], [], 0
         for i, (a, b) in enumerate(zip(offsets[:-1], offsets[1:], strict=True)):
             X = np.asarray(raw[a:b], dtype=np.float64)
+            if skip_short and len(X) < 2 * p:  # stored for the covariance series only
+                n_short += 1
+                continue
             if estimator != "ledoit_wolf" and np.any(X.std(axis=0) == 0):
                 continue
             try:
@@ -90,7 +97,8 @@ def covariance_stage(estimator):
         meta.iloc[kept].to_csv(out_dir / "meta.csv", index=False)
         info = json.loads((processed_dir / "info.json").read_text())
         info["estimator"] = estimator
-        info["rejected_constant_channel"] = len(meta) - len(kept)
+        info["rejected_n_lt_2p"] = n_short
+        info["rejected_constant_channel"] = len(meta) - len(kept) - n_short
         info["n_samples"] = len(kept)
         (out_dir / "info.json").write_text(json.dumps(info, indent=1, default=str))
 

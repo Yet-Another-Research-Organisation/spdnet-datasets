@@ -119,7 +119,8 @@ def n_features(features, n_mfcc=20, n_mels=64):
     return n_mfcc if features == "mfcc" else n_mels
 
 
-def process_recordings(records, out_dir, *, features="mfcc", n_mfcc=20, n_mels=64):
+def process_recordings(records, out_dir, *, features="mfcc", n_mfcc=20, n_mels=64,
+                       min_frames=None):
     """Processed stage of an audio dataset.
 
     Parameters
@@ -131,19 +132,25 @@ def process_recordings(records, out_dir, *, features="mfcc", n_mfcc=20, n_mels=6
     out_dir : Path
         Processed stage directory (see :func:`._common.write_processed`).
 
-    Recordings with fewer than ``2p`` non-silent frames are excluded and counted.
+    Recordings with fewer than ``min_frames`` non-silent frames (default ``2p``) are excluded
+    and counted. A smaller ``min_frames`` (at least 1: silent recordings stay excluded) stores
+    the short recordings too, for the covariance series (their own ``p x p`` covariance is then
+    excluded at the covariance stage).
     """
     from ._common import write_processed
 
     p = n_features(features, n_mfcc, n_mels)
+    least = 2 * p if min_frames is None else max(int(min_frames), 1)
     feats, index, excluded = [], [], []
     for rec in records:
         blob, crop = rec.pop("blob"), rec.pop("crop", None)
         x, sr = decode(blob, *crop) if crop else decode(blob)
         F = frame_features(x, sr, features, n_mfcc, n_mels)
-        if len(F) < 2 * p:
-            excluded.append({"id": rec["id"], "label": rec["label"],
-                             "reason": f"n < 2p ({len(F)} non-silent frames, 2p = {2 * p})"})
+        if len(F) < least:
+            reason = (f"n < 2p ({len(F)} non-silent frames, 2p = {2 * p})" if min_frames is None
+                      else "silent (no non-silent frame)" if len(F) == 0
+                      else f"n < {least} ({len(F)} non-silent frames)")
+            excluded.append({"id": rec["id"], "label": rec["label"], "reason": reason})
             continue
         rec["sr"] = sr
         feats.append(F.astype(np.float32))

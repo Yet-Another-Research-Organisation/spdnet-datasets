@@ -42,6 +42,7 @@ zip has the layout read here (``index.csv``, ``Data-VIS-<session>/``; the CRC-32
 (the zip, or the extracted folder).
 """
 
+import copy
 import os
 import urllib.parse
 from pathlib import Path
@@ -127,11 +128,16 @@ def grain_boxes(cube, dark):
 
 
 def fetch_rices90(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
-                  verify="size", *, band_bin=4, val_fraction=0.2, seed=0, archive=None):
+                  verify="size", *, band_bin=4, val_fraction=0.2, seed=0, archive=None,
+                  min_pixels=None):
     """Grain covariances of Rices_90.
 
     Parameters
     ----------
+    min_pixels : int, optional
+        Fewest pixels of a stored grain (default ``2p``). A smaller value (at least 1) stores
+        the small grains for :meth:`Rices90Dataset.series_samples`; they get no ``p x p``
+        covariance (counted in ``info["excluded_n_lt_2p_at_estimation"]``).
     archive : path, optional
         The Zenodo zip already downloaded, or its extracted folder (see
         "Download" in the module docstring).
@@ -151,7 +157,10 @@ def fetch_rices90(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
         cache_dir=cache_dir, archive=archive, checksum=ZIP_MD5, size=ZIP_SIZE, verify=verify,
         download=lambda d: download(URL, d / ZIP, checksum=ZIP_MD5, algo="md5", size=ZIP_SIZE))
     p = N_BANDS // band_bin
+    least = 2 * p if min_pixels is None else max(int(min_pixels), 1)
     params = {"band_bin": band_bin, "source": str(root.resolve()), "version": 2}
+    if min_pixels is not None:  # absent by default: the cache key of the default is unchanged
+        params["min_pixels"] = min_pixels
 
     def process(_, out_dir):
         index = pd.read_csv(root / "index.csv")
@@ -163,7 +172,7 @@ def fetch_rices90(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
                 darks[folder] = np.asarray(black, np.float32).mean(0)
             grains = segment_grains(read_envi(root / folder / f"{name}.hdr"), darks[folder])
             for g, pixels in enumerate(grains):
-                if len(pixels) < 2 * p:
+                if len(pixels) < least:
                     short += 1
                     continue
                 binned = pixels.reshape(len(pixels), p, band_bin).mean(-1).astype(np.float32)
@@ -196,6 +205,7 @@ def fetch_rices90(data_dir=None, cache_dir=None, keep=None, estimator="scm", for
         splits=map_splits(bundle_splits(out.meta_all, val_fraction, seed), meta["proc_index"],
                           len(out.meta_all)),
         processed_path=res.processed_dir, covariance_path=res.covariance_dir, root=root,
+        val_fraction=val_fraction, seed=seed,
     )
 
 
@@ -237,13 +247,34 @@ class Rices90Dataset(HSIDataset):
 
     def __init__(self, data_dir=None, *, band_bin=4, val_fraction=0.2, split="recommended",
                  subset=None, cache_dir=None, keep=None, force=False, verify="size",
-                 **kwargs):
+                 min_pixels=None, **kwargs):
         root = dataset_path(DOMAIN, NAME, data_dir)
         super().__init__(data_dir=str(existing_dir(root, cache_dir)), **kwargs)
         bunch = fetch_rices90(root, cache_dir, keep, self.estimator, force, verify,
-                              band_bin=band_bin, val_fraction=val_fraction)
+                              band_bin=band_bin, val_fraction=val_fraction,
+                              min_pixels=min_pixels)
         self.data_dir = Path(bunch.root)
         self._setup(bunch, split, subset)
+
+    def series_samples(self):
+        """Copy of the loader over every stored grain (the processed stage), including those
+        without a ``p x p`` covariance (fewer than ``2p`` pixels with ``min_pixels < 2p``, not
+        SPD). Splits rebuilt by :func:`bundle_splits` on this list (cubes kept as groups). No
+        covariance in the copy: ``structured_raw`` only."""
+        b = self.bunch
+        if b.processed_path is None:
+            raise ValueError("series_samples needs the processed stage (keep != "
+                             "'keep_covariance')")
+        meta = pd.read_csv(Path(b.processed_path) / "meta.csv")
+        meta["proc_index"] = np.arange(len(meta))
+        view = type(b)(b)
+        view.update(meta=meta, labels=meta["label"].to_numpy(), groups=meta["cube"].to_numpy(),
+                    covariances=None, means=None,
+                    splits=bundle_splits(meta, b.val_fraction, b.seed))
+        out = copy.copy(self)
+        out.normalize, out.verbose = False, False
+        out._setup(view, self.split, None)
+        return out
 
     def structured_raw(self, i):
         """Grain of sample ``i`` in its bounding box, ``(h, w, p)`` float32 binned reflectances,

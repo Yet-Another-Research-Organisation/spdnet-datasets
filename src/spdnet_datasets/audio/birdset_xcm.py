@@ -416,7 +416,7 @@ def shard_index(metadata, shard_dirs, min_recordings=10):
 
 
 def _process(source, out_dir, *, root, shards, limit, min_recordings, crop_s, features,
-             n_mfcc, n_mels):
+             n_mfcc, n_mels, min_frames=None):
     if shards is None:  # local xcm_*.parquet copy
         index, kept = _index(root, min_recordings)
     else:
@@ -441,7 +441,8 @@ def _process(source, out_dir, *, root, shards, limit, min_recordings, crop_s, fe
                 rec["crop"] = (max(0.0, centre - crop_s / 2), crop_s)
             yield rec
 
-    process_recordings(records(), out_dir, features=features, n_mfcc=n_mfcc, n_mels=n_mels)
+    process_recordings(records(), out_dir, features=features, n_mfcc=n_mfcc, n_mels=n_mels,
+                       min_frames=min_frames)
 
 
 def birdset_xcm_splits(meta, labels, groups, fold=1, seed=0):
@@ -452,7 +453,8 @@ def birdset_xcm_splits(meta, labels, groups, fold=1, seed=0):
 
 def fetch_birdset_xcm(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
                       verify="size", features="mfcc", n_mfcc=20, n_mels=64, limit=None,
-                      fold=1, min_recordings=10, crop_s=None, shards=None, archive=None):
+                      fold=1, min_recordings=10, crop_s=None, shards=None, archive=None,
+                      min_frames=None):
     """Covariances of the BirdSet XCM recordings (partial copy, see module docstring).
 
     Parameters are those of :func:`spdnet_datasets.audio.esc50.fetch_esc50`
@@ -500,11 +502,13 @@ def fetch_birdset_xcm(data_dir=None, cache_dir=None, keep=None, estimator="scm",
     params = {"data_dir": source, "features": features, "n_mfcc": n_mfcc,
                   "n_mels": n_mels, "limit": limit, "min_recordings": min_recordings, "crop_s": crop_s,
                   "estimator": estimator}
+    if min_frames is not None:  # absent by default: the cache key of the default is unchanged
+        params["min_frames"] = min_frames
     run = run_pipeline(
         "birdset_xcm", params=params,
         process_fn=partial(_process, root=root, shards=published, limit=limit,
                            min_recordings=min_recordings, crop_s=crop_s, features=features,
-                           n_mfcc=n_mfcc, n_mels=n_mels),
+                           n_mfcc=n_mfcc, n_mels=n_mels, min_frames=min_frames),
         covariance_fn=partial(estimate_stage, estimator=estimator),
         cache_dir=cache_dir, keep=keep, force=force)
     return load_result(run, birdset_xcm_splits, fold=fold)

@@ -104,7 +104,7 @@ def _index(root):
             for _, row in iter_parquet_rows(_files(root), ["file", "genre"])]
 
 
-def _process(source, out_dir, *, root, limit, features, n_mfcc, n_mels):
+def _process(source, out_dir, *, root, limit, features, n_mfcc, n_mels, min_frames=None):
     root = root if source is None else source  # downloaded shards
     index = _index(root)
     removed = {b for _, b in DUPLICATES}
@@ -116,7 +116,8 @@ def _process(source, out_dir, *, root, limit, features, n_mfcc, n_mels):
             name, genre = index[pos]
             yield {"id": name, "label": genre, "group": name, "blob": row["audio"]["bytes"]}
 
-    process_recordings(records(), out_dir, features=features, n_mfcc=n_mfcc, n_mels=n_mels)
+    process_recordings(records(), out_dir, features=features, n_mfcc=n_mfcc, n_mels=n_mels,
+                       min_frames=min_frames)
 
 
 def gtzan_splits(meta, labels, groups, fold=1, seed=0):
@@ -127,7 +128,7 @@ def gtzan_splits(meta, labels, groups, fold=1, seed=0):
 
 def fetch_gtzan(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
                 verify="size", features="mfcc", n_mfcc=20, n_mels=64, limit=None, fold=1,
-                archive=None):
+                archive=None, min_frames=None):
     """Covariances of the GTZAN excerpts (exact duplicates removed).
 
     Parameters are those of :func:`spdnet_datasets.audio.esc50.fetch_esc50`
@@ -155,10 +156,12 @@ def fetch_gtzan(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
         raw_fn, source = partial(download_files, FILES), f"hf:{HF_REPO}@{HF_REVISION}"
     params = {"data_dir": source, "features": features, "n_mfcc": n_mfcc,
                   "n_mels": n_mels, "limit": limit}
+    if min_frames is not None:  # absent by default: the cache key of the default is unchanged
+        params["min_frames"] = min_frames
     run = run_pipeline(
         "gtzan", params=params, covariance_params={"estimator": estimator}, raw_fn=raw_fn,
         process_fn=partial(_process, root=root, limit=limit, features=features,
-                           n_mfcc=n_mfcc, n_mels=n_mels),
+                           n_mfcc=n_mfcc, n_mels=n_mels, min_frames=min_frames),
         covariance_fn=partial(estimate_stage, estimator=estimator),
         cache_dir=cache_dir, keep=keep, force=force)
     return load_result(run, gtzan_splits, fold=fold)

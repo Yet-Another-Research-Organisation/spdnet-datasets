@@ -91,7 +91,7 @@ def _index(root):
     return pd.DataFrame(rows)
 
 
-def _process(source, out_dir, *, root, limit, features, n_mfcc, n_mels):
+def _process(source, out_dir, *, root, limit, features, n_mfcc, n_mels, min_frames=None):
     root = root if source is None else source  # downloaded shards
     index = _index(root)
     keep = evenly_spaced(len(index), limit)
@@ -103,7 +103,8 @@ def _process(source, out_dir, *, root, limit, features, n_mfcc, n_mels):
                    "fold": int(meta.fold), "target": int(meta.target),
                    "esc10": bool(meta.esc10), "blob": row["audio"]["bytes"]}
 
-    process_recordings(records(), out_dir, features=features, n_mfcc=n_mfcc, n_mels=n_mels)
+    process_recordings(records(), out_dir, features=features, n_mfcc=n_mfcc, n_mels=n_mels,
+                       min_frames=min_frames)
 
 
 def esc50_splits(meta, labels, groups, fold=1):
@@ -114,7 +115,7 @@ def esc50_splits(meta, labels, groups, fold=1):
 
 def fetch_esc50(data_dir=None, cache_dir=None, keep=None, estimator="scm", force=False,
                 verify="size", features="mfcc", n_mfcc=20, n_mels=64, limit=None, fold=1,
-                archive=None):
+                archive=None, min_frames=None):
     """Covariances of the ESC-50 clips.
 
     Parameters
@@ -137,6 +138,9 @@ def fetch_esc50(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
         Process at most ``limit`` clips, evenly spread (quick tests).
     fold : int
         Official test fold (1..5) of the returned ``splits``.
+    min_frames : int, optional
+        Fewest non-silent frames of a stored clip (default ``2p``); see
+        :func:`~spdnet_datasets.audio._features.process_recordings`.
     archive : path, optional
         Folder, zip or tar holding the parquet shards, used when ``data_dir``
         does not exist (see "Download" in the module docstring).
@@ -163,10 +167,12 @@ def fetch_esc50(data_dir=None, cache_dir=None, keep=None, estimator="scm", force
         raw_fn, source = partial(download_files, FILES), f"hf:{HF_REPO}@{HF_REVISION}"
     params = {"data_dir": source, "features": features, "n_mfcc": n_mfcc,
                   "n_mels": n_mels, "limit": limit}
+    if min_frames is not None:  # absent by default: the cache key of the default is unchanged
+        params["min_frames"] = min_frames
     run = run_pipeline(
         "esc50", params=params, covariance_params={"estimator": estimator}, raw_fn=raw_fn,
         process_fn=partial(_process, root=root, limit=limit, features=features,
-                           n_mfcc=n_mfcc, n_mels=n_mels),
+                           n_mfcc=n_mfcc, n_mels=n_mels, min_frames=min_frames),
         covariance_fn=partial(estimate_stage, estimator=estimator),
         cache_dir=cache_dir, keep=keep, force=force)
     return load_result(run, esc50_splits, fold=fold)

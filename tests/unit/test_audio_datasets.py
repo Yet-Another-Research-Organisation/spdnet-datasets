@@ -233,3 +233,40 @@ def test_limit_is_part_of_the_cache_key(esc50_dir, tmp_path):
         small = fetch_esc50(esc50_dir, cache_dir=tmp_path / "cache", limit=10)
     full = fetch_esc50(esc50_dir, cache_dir=tmp_path / "cache")
     assert len(small.labels) + len(small.excluded) == 10 and len(full.labels) == 39
+
+
+def test_series_samples_recover_the_short_clips(tmp_path):
+    """A clip with fewer than 2p non-silent frames has no p x p covariance, but the
+    covariance series keep it (min_frames=1, series_samples); the silent clip stays out."""
+    root = tmp_path / "ESC-50"
+    root.mkdir()
+    rows = []
+    for fold in range(1, 6):
+        for target in (0, 1):
+            for take in "AB":
+                name = f"{fold}-{fold * 100 + target}-{take}-{target}.wav"
+                short = fold == 2 and target == 1 and take == "B"
+                silent = fold == 1 and target == 0 and take == "A"
+                rows.append({"filename": name, "fold": fold, "target": target,
+                             "category": f"cat{target:02d}", "esc10": True,
+                             "src_file": fold * 100 + target, "take": take,
+                             "audio": _audio(_wav(len(rows), silent, 0.3 if short else 1.0),
+                                             name)})
+    pq.write_table(pa.Table.from_pylist(rows), root / "esc50_0.parquet")
+    ds = ESC50Dataset(root, cache_dir=tmp_path / "cache", verbose=False, min_frames=1)
+    assert len(ds) == 18  # 20 clips: silent and short ones have no 20 x 20 covariance
+    full = ds.series_samples()
+    assert len(full) == 19 and len(ds) == 18
+    reasons = full.excluded.reason.tolist()
+    assert reasons == ["silent (no non-silent frame)"]
+    short = full.meta["id"].tolist().index("2-201-B-1.wav")
+    assert 0 < len(full.structured_raw(short)) < 40
+    # official folds on the larger list: the kept clips keep their part, no source shared
+    for name, parts in full.splits.items():
+        for part, idx in parts.items():
+            ids = set(full.meta["id"].iloc[idx])
+            assert set(ds.meta["id"].iloc[ds.splits[name][part]]) <= ids
+        assert_no_leakage(full.groups[parts["train"]], full.groups[parts["test"]])
+    # the default preprocessing (no min_frames) keeps its cache key and excludes both
+    b = fetch_esc50(root, cache_dir=tmp_path / "cache")
+    assert len(b.excluded) == 2 and len(b.meta) == 18

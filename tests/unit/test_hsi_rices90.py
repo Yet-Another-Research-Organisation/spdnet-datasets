@@ -62,3 +62,13 @@ def test_raw_is_the_binned_grain(rices_dir, tmp_path):
     X = raw.numpy().astype(float)
     np.testing.assert_allclose(cov.numpy(), np.cov(X.T, bias=True), rtol=1e-5)
     assert ds.classes == ["A", "B"]
+
+
+def test_series_samples_without_small_grains_match_the_loader(rices_dir, tmp_path):
+    ds = Rices90Dataset(rices_dir, cache_dir=tmp_path / "c", verbose=False, min_pixels=1)
+    full = ds.series_samples()
+    assert len(full) == len(ds) == 16
+    for name, parts in ds.splits.items():
+        for part, idx in parts.items():
+            np.testing.assert_array_equal(full.splits[name][part], idx)
+    np.testing.assert_array_equal(full.structured_raw(3), ds.structured_raw(3))

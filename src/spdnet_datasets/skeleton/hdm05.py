@@ -321,6 +321,8 @@ class HDM05Dataset(SequenceCovarianceDataset):
         return fetch_hdm05(self.data_dir, features=self.features, fold=self.fold,
                            source=self.source, **self.fetch_kwargs)
 
+    series_samples = None  # the copies hold covariances only: nothing to recover
+
     def structured_raw(self, i):
         """Not available: the local and ETH copies hold covariances only.
 

@@ -21,6 +21,7 @@ A sequence with ``n < 2p`` frames or whose estimate is not SPD is excluded and
 counted (``excluded.csv``), never regularised silently.
 """
 
+import copy
 import warnings
 from pathlib import Path
 
@@ -257,6 +258,9 @@ class SequenceCovarianceDataset(BaseDataset):
     cache_dir, keep, force, verify, limit
         Passed to the fetch function (``limit``: at most that many sequences,
         evenly spread, for quick tests).
+    min_frames : int, optional
+        Passed to the fetch function when given: fewest frames of a stored sequence (default
+        ``2p``). A smaller value stores the short sequences for :meth:`series_samples`.
     archive : path, optional
         Downloaded archive or folder, passed to the fetch (see its "Download"
         section) when ``data_dir`` does not exist.
@@ -286,7 +290,7 @@ class SequenceCovarianceDataset(BaseDataset):
 
     def __init__(self, data_dir=None, *, split="recommended", subset=None, fold=1,
                  cache_dir=None, keep=None, force=False, verify="size", limit=None,
-                 archive=None, **kwargs):
+                 archive=None, min_frames=None, **kwargs):
         root = dataset_path(self.DOMAIN, self.NAME, data_dir)
         if root.exists() or not (self.DOWNLOADABLE or archive is not None):
             super().__init__(data_dir=root, **kwargs)
@@ -304,6 +308,8 @@ class SequenceCovarianceDataset(BaseDataset):
                              "verify": verify, "limit": limit, "estimator": self.estimator}
         if archive is not None:  # only the fetches with a manual / archive mode take it
             self.fetch_kwargs["archive"] = archive
+        if min_frames is not None:
+            self.fetch_kwargs["min_frames"] = min_frames
         self._load_data()
 
     # -- to implement -----------------------------------------------------
@@ -317,7 +323,13 @@ class SequenceCovarianceDataset(BaseDataset):
     def _load_data(self):
         b = self._fetch()
         self.excluded = b.excluded
-        y, keep, names = apply_task(b.labels, task=self.task, coarse_map=self.COARSE_MAP,
+        self._processed = b.processed_path
+        self._build(b.meta, b.labels, b.groups, b.covariances, b.means)
+
+    def _build(self, all_meta, all_labels, all_groups, covs, means):
+        """Class selection, splits, scale and exposed rows over the sequences ``all_meta``
+        (``covs`` and ``means`` aligned with it, or ``None`` for :meth:`series_samples`)."""
+        y, keep, names = apply_task(all_labels, task=self.task, coarse_map=self.COARSE_MAP,
                                     drop_classes=self.drop_classes,
                                     merge_classes=self.merge_classes)
         self.classes = self._limit_classes(list(names))
@@ -329,14 +341,13 @@ class SequenceCovarianceDataset(BaseDataset):
         if len(idx) == 0:
             raise ValueError("No sample left after the class selection")
 
-        meta = b.meta.iloc[idx].reset_index(drop=True)
+        meta = all_meta.iloc[idx].reset_index(drop=True)
         labels = np.array([self.class_to_idx[c] for c in task_class[idx]], dtype=np.int64)
-        groups = np.asarray(b.groups)[idx]
+        groups = np.asarray(all_groups)[idx]
         self._labels_all = labels
-        self._covs = b.covariances[idx]
-        self._means = b.means[idx]
+        self._covs = None if covs is None else covs[idx]
+        self._means = None if means is None else means[idx]
         self._rows = meta["row"].to_numpy() if "row" in meta else None
-        self._processed = b.processed_path
         if self.return_raw and (self._processed is None or self._rows is None):
             raise ValueError("return_raw=True needs the preprocessed sequences: fetch with "
                              "keep='keep_processed' or 'keep_full'")
@@ -360,7 +371,7 @@ class SequenceCovarianceDataset(BaseDataset):
                 parts["train"] = train[balance_indices(labels[train], self.balance,
                                                        seed=self.seed)]
         self.scale = (geometric_scale(self._covs[parts["train"]])
-                      if self.normalize and len(parts["train"]) else 1.0)
+                      if self.normalize and covs is not None and len(parts["train"]) else 1.0)
 
         # Public attributes are aligned with the exposed samples; ``splits``
         # indexes them only when the whole selection is exposed.
@@ -391,6 +402,29 @@ class SequenceCovarianceDataset(BaseDataset):
             self._offsets = np.load(proc / "offsets.npy")
         r = self._rows[j]
         return np.asarray(self._features[self._offsets[r]:self._offsets[r + 1]])
+
+    def series_samples(self):
+        """Copy of the loader over every stored sequence, for the covariance series.
+
+        The samples are the rows of the processed stage (``index.csv``), including the
+        sequences whose own ``p x p`` covariance was excluded at the covariance stage (fewer
+        than ``2p`` frames, not SPD): a token only needs ``2p`` observations of its own ``p``.
+        Task, class selection and splits follow the loader's rules on this list (groups kept,
+        so no leakage). The copy has no covariance (``structured_raw`` only); the sequences
+        excluded while preprocessing (silent, no body, fewer than ``min_frames`` frames) stay
+        listed in ``excluded``.
+        """
+        if self._processed is None:
+            raise ValueError("series_samples needs the preprocessed sequences: fetch with "
+                             "keep='keep_processed' or 'keep_full'")
+        index = pd.read_csv(Path(self._processed) / "index.csv",
+                            dtype={"id": str, "label": str}, **CSV)
+        index["row"] = np.arange(len(index))
+        out = copy.copy(self)
+        out.subset, out.return_raw = None, False
+        out.excluded = pd.read_csv(Path(self._processed) / "excluded.csv", dtype=str, **CSV)
+        out._build(index, index["label"].to_numpy(), index["group"].to_numpy(), None, None)
+        return out
 
     def structured_raw(self, i):
         """Preprocessed sequence of sample ``i``, ``(T, p)`` unscaled (axes frames x features).

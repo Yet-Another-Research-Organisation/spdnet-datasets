@@ -56,6 +56,7 @@ dop-net.com no longer resolves. One archive ``Gesture Data.zip`` (5.99 GB,
 Example: ``fetch_dopnet(archive="~/Downloads/Gesture Data.zip")``.
 """
 
+import copy
 import hashlib
 from pathlib import Path
 
@@ -173,7 +174,10 @@ def fetch_dopnet(data_dir=None, cache_dir=None, keep=None, estimator="scm", forc
     p : int
         Number of decimated Doppler channels.
     min_frames : int, optional
-        Shortest gesture kept (default ``2p``).
+        Shortest gesture stored (default ``2p``). Below ``2p`` (at least 1), the short gestures
+        are stored for :meth:`DopNetDataset.series_samples` but get no ``p x p`` covariance
+        (counted in ``info["rejected_n_lt_2p"]``); the energy band is always fitted on the
+        training gestures of at least ``max(min_frames, 2p)`` frames.
     fold : int
         Held-out person of ``splits["recommended"]`` (0 = A).
     archive : path, optional
@@ -187,8 +191,8 @@ def fetch_dopnet(data_dir=None, cache_dir=None, keep=None, estimator="scm", forc
     rejections, band), ``splits``, ``covariance_path`` and ``processed_path``.
     """
     min_frames = 2 * p if min_frames is None else min_frames
-    if min_frames < 2 * p:
-        raise ValueError(f"min_frames={min_frames} < 2p={2 * p}: covariances need n >= 2p")
+    if min_frames < 1:
+        raise ValueError(f"min_frames must be >= 1, got {min_frames}")
     root = dataset_path(DOMAIN, NAME, data_dir)
     if root.is_dir():
         check_local(root, verify=verify, required=("Training Data", TEST_FILE), strict=False)
@@ -203,7 +207,7 @@ def fetch_dopnet(data_dir=None, cache_dir=None, keep=None, estimator="scm", forc
             seen.add(md5)
             rows.append({"class_name": name, "person": person, "source": source, "index": i,
                          "n_frames": signal.shape[1], "md5": md5, "duplicate": duplicate})
-            keep_it = not duplicate and signal.shape[1] >= min_frames
+            keep_it = not duplicate and signal.shape[1] >= max(min_frames, 2 * p)
             if keep_it and source == "train":
                 power = (np.abs(signal) ** 2).sum(1)
                 profiles.append(power / power.sum())
@@ -236,21 +240,29 @@ def fetch_dopnet(data_dir=None, cache_dir=None, keep=None, estimator="scm", forc
     params = {"energy": energy, "p": p, "min_frames": min_frames,
               "source": str(root.resolve()), "version": 1}
     paths = run_pipeline("dopnet", params=params, process_fn=process_fn,
-                         covariance_fn=covariance_stage(estimator),
+                         covariance_fn=covariance_stage(estimator, skip_short=True),
                          covariance_params={"estimator": estimator}, cache_dir=cache_dir,
                          keep=keep, force=force)
     bunch = load_bunch(paths, CLASSES)
     bunch.source_dir = root
-    source = bunch.meta.source.to_numpy()
-    empty = np.array([], dtype=np.int64)
-    bunch.splits = {"official": {"train": np.flatnonzero(source == "train"), "val": empty,
-                                 "test": np.flatnonzero(source == "test")}}
-    persons = bunch.groups
-    for k, person in enumerate(PERSONS):
-        bunch.splits[f"person{k}"] = {"train": np.flatnonzero(persons != person), "val": empty,
-                                      "test": np.flatnonzero(persons == person)}
-    bunch.splits["recommended"] = bunch.splits[f"person{fold}"]
+    bunch.fold = fold
+    bunch.splits = dopnet_splits(bunch.meta, fold)
     return bunch
+
+
+def dopnet_splits(meta, fold=0):
+    """``official`` (training / test files), ``person<k>`` (person ``k`` held out) and
+    ``recommended`` (``person<fold>``) on the gestures of ``meta``."""
+    source = meta.source.to_numpy()
+    empty = np.array([], dtype=np.int64)
+    splits = {"official": {"train": np.flatnonzero(source == "train"), "val": empty,
+                           "test": np.flatnonzero(source == "test")}}
+    persons = meta.group.to_numpy()
+    for k, person in enumerate(PERSONS):
+        splits[f"person{k}"] = {"train": np.flatnonzero(persons != person), "val": empty,
+                                "test": np.flatnonzero(persons == person)}
+    splits["recommended"] = splits[f"person{fold}"]
+    return splits
 
 
 @DatasetManager.register_dataset("dopnet")
@@ -286,6 +298,28 @@ class DopNetDataset(RadarCovarianceDataset):
                              min_frames=min_frames, fold=fold, archive=archive)
         super().__init__(bunch, split=split, subset=subset, data_dir=bunch.source_dir,
                          estimator=estimator, **kwargs)
+
+    def series_samples(self):
+        """Copy of the loader over every stored gesture (the processed stage), including those
+        without a ``p x p`` covariance (fewer than ``2p`` frames, with ``min_frames < 2p``).
+        Splits rebuilt by :func:`dopnet_splits` (persons kept as groups). No covariance in the
+        copy: ``structured_raw`` and ``doppler_bands`` only."""
+        b = self._bunch
+        if b.processed_path is None:
+            raise ValueError("series_samples needs the processed stage (keep != "
+                             "'keep_covariance')")
+        meta = pd.read_csv(Path(b.processed_path) / "meta.csv",
+                           dtype={"group": str, "participant": str})
+        meta["raw_index"] = np.arange(len(meta))
+        view = type(b)(b)
+        view.update(meta=meta, labels=meta["label"].to_numpy(dtype=np.int64),
+                    groups=meta["group"].to_numpy(), covariances=None, means=None,
+                    splits=dopnet_splits(meta, b.fold))
+        out = copy.copy(self)
+        out._bunch, out.subset, out.normalize, out.return_raw = view, None, False, False
+        out.verbose = False
+        out._load_data()
+        return out
 
     def doppler_bands(self, i, n_bins=128, n_bands=16):
         """``(T, n_bands)`` log10 power of the ``n_bins`` central Doppler bins of gesture ``i``,
