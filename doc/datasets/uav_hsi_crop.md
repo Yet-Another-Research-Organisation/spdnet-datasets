@@ -200,7 +200,18 @@ windows of 48 bands at step 8, of 64 at step 6, Ledoit-Wolf, `cover=False`).
 ```{dataset-figure} uav_hsi_crop/series_spectral_w64
 ```
 
-Not measured: no copy of the data can feed these modes.
+Measured on the real data (BERTHA, 2026-11-19, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `spectral` | 12 923 | 12 / 12 | 16 | 225 (200) | 14.1 | 100.00 % | 6.1e+01 / 8.7e+02 / 2.2e+03 |
+| `spatial` | 12 923 | 9 / 9 | 16 | 64 (39) | 4.0 | 100.00 % | 1.3e+02 / 3.9e+02 / 8.6e+02 |
+| `spatio_spectral` | 12 923 | 28 / 28 | 16 | 64 (39) | 4.0 | 100.00 % | 1.2e+01 / 3.1e+02 / 8.2e+02 |
+| `spectral_w48` | 12 923 | 7 / 7 | 48 | 225 (200) | 4.7 | 100.00 % | 1.1e+03 / 3.8e+03 / 8.1e+03 |
+| `spectral_w64` | 12 923 | 7 / 7 | 64 | 225 (200) | 3.5 | 100.00 % | 1.3e+03 / 5.3e+03 / 1.1e+04 |
 
 Every default can be overridden by name:
 

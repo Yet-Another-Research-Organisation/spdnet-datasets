@@ -209,7 +209,16 @@ official spatial split with its buffer), with one band in two (64 bands).
 ```{dataset-figure} chikusei/series_spatio_spectral
 ```
 
-Not measured: no copy of the data can feed these modes.
+Measured on the real data (BERTHA, 2026-11-19, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `spectral` | 4 199 | 7 / 7 | 16 | 225 (225) | 14.1 | 100.00 % | 2.1e+03 / 2.9e+05 / 4.7e+07 |
+| `spatial` | 4 199 | 9 / 9 | 16 | 64 (64) | 4.0 | 100.00 % | 4.1e+03 / 2.6e+05 / 2.9e+06 |
+| `spatio_spectral` | 4 199 | 16 / 16 | 16 | 64 (64) | 4.0 | 100.00 % | 1.5e+03 / 5.6e+04 / 4.1e+07 |
 
 Every default can be overridden by name:
 

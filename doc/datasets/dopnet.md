@@ -194,7 +194,16 @@ energy-band channels of the loader.
 ```{dataset-figure} dopnet/series_spectro_temporal
 ```
 
-Not measured: no copy of the data can feed these modes.
+Measured on the real data (BERTHA, 2026-11-19, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `temporal` | 2 145 | 21 / 5 | 16 | 48 (48) | 3.0 | 100.00 % | 4.4e+03 / 1.8e+04 / 5.9e+04 |
+| `spectral` | 2 145 | 5 / 5 | 16 | 155 (96) | 9.7 | 100.00 % | 3.4e+01 / 3.9e+02 / 2.7e+03 |
+| `spectro_temporal` | 2 145 | 12 / 12 | 16 | 62 (38) | 3.9 | 100.00 % | 1.4e+02 / 5.9e+03 / 5.0e+04 |
 
 Every default can be overridden by name:
 

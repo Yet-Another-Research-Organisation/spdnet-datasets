@@ -192,7 +192,17 @@ so Ledoit-Wolf and `allow_small_n=True` by default.
 ```{dataset-figure} mvdoppler/series_temporal_w64
 ```
 
-Not measured: no copy of the data can feed these modes.
+Measured on the real data (BERTHA, 2026-11-19, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `temporal` | 54 834 | 7 / 7 | 16 | 64 (64) | 4.0 | 100.00 % | 1.8e+02 / 5.6e+02 / 1.5e+03 |
+| `spectral` | 54 834 | 4 / 4 | 16 | 256 (256) | 16.0 | 100.00 % | 6.9e+00 / 6.6e+01 / 2.1e+02 |
+| `spectro_temporal` | 54 834 | 16 / 16 | 16 | 102 (102) | 6.4 | 100.00 % | 1.7e+01 / 1.2e+02 / 4.0e+02 |
+| `temporal_w64` | 54 834 | 7 / 7 | 64 | 64 (64) | 1.0 | 100.00 % | 9.6e+01 / 2.3e+02 / 5.8e+02 |
 
 Every default can be overridden by name:
 

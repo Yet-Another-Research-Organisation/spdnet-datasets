@@ -204,7 +204,16 @@ bounding box; quadrants are halves of the box.
 ```{dataset-figure} deephsfruit/series_spatio_spectral
 ```
 
-Not measured: no copy of the data can feed these modes.
+Measured on the real data (BERTHA, 2026-11-19, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `spectral` | 384 | 27 / 27 | 16 | 33 519 (2 001) | 2094.9 | 100.00 % | 6.9e+01 / 7.7e+03 / 8.0e+04 |
+| `spatial` | 384 | 4 / 4 | 16 | 8 445 (326) | 527.8 | 100.00 % | 1.3e+04 / 3.2e+05 / 7.0e+05 |
+| `spatio_spectral` | 384 | 28 / 28 | 32 | 8 445 (326) | 263.9 | 100.00 % | 2.7e+02 / 1.8e+04 / 1.9e+05 |
 
 Every default can be overridden by name:
 

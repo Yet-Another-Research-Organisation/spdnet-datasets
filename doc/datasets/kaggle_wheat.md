@@ -184,7 +184,18 @@ and 6 tokens instead of 10 and 8.
 ```{dataset-figure} kaggle_wheat/series_spectral_w64
 ```
 
-Not measured: no copy of the data can feed these modes.
+Measured on the real data (BERTHA, 2026-11-19, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `spectral` | 575 | 13 / 13 | 16 | 1 024 (778) | 64.0 | 100.00 % | 1.9e+03 / 6.8e+03 / 1.4e+04 |
+| `spatial` | 575 | 9 / 9 | 16 | 256 (101) | 16.0 | 100.00 % | 8.1e+02 / 2.0e+03 / 3.9e+03 |
+| `spatio_spectral` | 575 | 28 / 28 | 16 | 256 (101) | 16.0 | 100.00 % | 8.5e+02 / 2.1e+03 / 3.9e+03 |
+| `spectral_w48` | 575 | 8 / 8 | 48 | 1 024 (778) | 21.3 | 100.00 % | 6.5e+03 / 2.3e+04 / 4.4e+04 |
+| `spectral_w64` | 575 | 6 / 6 | 64 | 1 024 (778) | 16.0 | 100.00 % | 8.2e+03 / 3.1e+04 / 5.8e+04 |
 
 Every default can be overridden by name:
 

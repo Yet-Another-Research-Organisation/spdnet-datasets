@@ -158,8 +158,8 @@ their defaults come from the registry; the first one is the default.
 ```
 
 The spectral modes and `temporal_mel64` need the 64 log-mel bands (loader built with
-`features="logmel"`), with which the loader keeps 885 of the 985 MFCC clips. `temporal_mel64`
-(R23) has `n_t = 258 ≥ 2p`: no derogation.
+`features="logmel"`). Both front ends keep 985 of the 1 000 clips (the loader's preprocessing
+drops the others). `temporal_mel64` (R23) has `n_t = 258 ≥ 2p`: no derogation.
 
 ```{dataset-figure} gtzan/series_temporal
 ```
@@ -181,9 +181,9 @@ tokens.
 | Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
 |---|---|---|---|---|---|---|---|
 | `temporal` | 985 | 20 / 20 | 20 | 258 (258) | 12.9 | 99.92 % | 1.3e+02 / 5.2e+02 / 5.9e+03 |
-| `spectral` | 885 | 7 / 7 | 16 | 2 582 (2 397) | 161.4 | 100.00 % | 5.0e+01 / 2.2e+02 / 1.4e+03 |
-| `spectro_temporal` | 885 | 16 / 16 | 16 | 1 032 (958) | 64.5 | 99.27 % | 5.0e+01 / 2.3e+02 / 2.0e+03 |
-| `temporal_mel64` | 885 | 20 / 20 | 64 | 258 (258) | 4.0 | 100.00 % | 2.8e+02 / 1.2e+03 / 4.0e+03 |
+| `spectral` | 985 | 7 / 7 | 16 | 2 582 (2 397) | 161.4 | 98.55 % | 5.1e+01 / 2.2e+02 / 1.3e+03 |
+| `spectro_temporal` | 985 | 16 / 16 | 16 | 1 032 (958) | 64.5 | 96.80 % | 5.1e+01 / 2.4e+02 / 1.9e+03 |
+| `temporal_mel64` | 985 | 20 / 20 | 64 | 258 (258) | 4.0 | 100.00 % | 3.0e+02 / 1.2e+03 / 4.5e+03 |
 
 Every default can be overridden by name:
 

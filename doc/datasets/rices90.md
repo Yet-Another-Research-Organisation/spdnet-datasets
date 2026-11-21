@@ -191,7 +191,16 @@ across sessions.
 ```{dataset-figure} rices90/series_spatio_spectral
 ```
 
-Not measured: no copy of the data can feed these modes.
+Measured on the real data (BERTHA, 2026-11-19, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `spectral` | 8 803 | 7 / 7 | 16 | 399 (141) | 24.9 | 100.00 % | 2.8e+03 / 1.1e+04 / 2.3e+04 |
+| `spatial` | 8 803 | 4 / 4 | 16 | 107 (32) | 6.7 | 99.40 % | 2.5e+04 / 5.5e+04 / 1.1e+05 |
+| `spatio_spectral` | 8 803 | 16 / 16 | 16 | 107 (32) | 6.7 | 99.40 % | 1.7e+03 / 1.1e+04 / 3.6e+04 |
 
 Every default can be overridden by name:
 

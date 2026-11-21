@@ -221,7 +221,16 @@ step 100 (`cover=False`: the last 75 columns are not used, as before), Ledoit-Wo
 ```{dataset-figure} ci4r/series_spectro_temporal
 ```
 
-Not measured: no copy of the data can feed these modes.
+Measured on the real data (BERTHA, 2026-11-19, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `temporal` | 646 | 13 / 13 | 16 | 200 (200) | 12.5 | 100.00 % | 1.1e+02 / 4.3e+02 / 1.4e+03 |
+| `spectral` | 646 | 7 / 7 | 16 | 1 475 (1 475) | 92.2 | 100.00 % | 5.6e+02 / 1.7e+03 / 4.0e+03 |
+| `spectro_temporal` | 646 | 16 / 16 | 16 | 590 (590) | 36.9 | 99.15 % | 2.0e+02 / 1.0e+03 / 2.4e+03 |
 
 Every default can be overridden by name:
 

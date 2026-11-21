@@ -206,7 +206,14 @@ patches of 8 × 8 pixels, each log-power standardised on the training cells, Led
 ```{dataset-figure} pol_insar_island/series_spatial
 ```
 
-Not measured: no copy of the data can feed these modes.
+Measured on the real data (BERTHA, 2026-11-19, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `spatial` | 5 033 | 16 / 16 | 12 | 64 (64) | 5.3 | 100.00 % | 2.9e+00 / 8.4e+00 / 3.5e+01 |
 
 Every default can be overridden by name:
 

@@ -183,7 +183,16 @@ Windows of 8 bands (37 bands in all); the spatial mode keeps every band
 ```{dataset-figure} placenta/series_spatio_spectral
 ```
 
-Not measured: no copy of the data can feed these modes.
+Measured on the real data (BERTHA, 2026-11-19, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `spectral` | 77 203 | 9 / 9 | 8 | 576 (561) | 72.0 | 99.82 % | 2.4e+00 / 1.2e+01 / 3.0e+02 |
+| `spatial` | 77 203 | 9 / 9 | 37 | 144 (144) | 3.9 | 99.10 % | 8.8e+01 / 1.8e+02 / 1.8e+03 |
+| `spatio_spectral` | 77 203 | 20 / 20 | 8 | 144 (137) | 18.0 | 99.72 % | 2.5e+00 / 7.3e+00 / 1.2e+02 |
 
 Every default can be overridden by name:
 

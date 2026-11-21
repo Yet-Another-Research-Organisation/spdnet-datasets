@@ -205,7 +205,16 @@ the observations of every token.
 ```{dataset-figure} gsoff/series_spatio_spectral
 ```
 
-Not measured: no copy of the data can feed these modes.
+Measured on the real data (BERTHA, 2026-11-19, default parameters of each mode,
+`describe()`): number of samples, tokens per series, observations per token among the
+unmasked tokens, fraction of SPD (unmasked) tokens and condition number κ of the unmasked
+tokens.
+
+| Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
+|---|---|---|---|---|---|---|---|
+| `spectral` | 1 249 | 7 / 7 | 16 | 225 (225) | 14.1 | 100.00 % | 3.9e+02 / 2.9e+03 / 8.8e+04 |
+| `spatial` | 1 249 | 9 / 9 | 16 | 64 (64) | 4.0 | 100.00 % | 3.3e+03 / 1.0e+04 / 3.2e+04 |
+| `spatio_spectral` | 1 249 | 16 / 16 | 16 | 64 (64) | 4.0 | 100.00 % | 4.3e+02 / 3.8e+03 / 2.7e+04 |
 
 Every default can be overridden by name:
 
