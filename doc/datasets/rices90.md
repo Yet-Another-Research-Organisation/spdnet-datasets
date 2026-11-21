@@ -174,7 +174,9 @@ The grain is read again in its bounding box (`Rices90Dataset.structured_raw`,
 same segmentation as the loader, 64 binned bands, 0 outside the grain); the quadrants are
 halves of the box. With the 64 bands, a quadrant has about 100 pixels for `2p = 128`, so
 the `spatial` mode pools them into 16 (`CovarianceSeries("rices90", "spatial",
-n_channels=None)` raises `ValueError` unless `allow_small_n=True`).
+n_channels=None)` raises `ValueError` unless `allow_small_n=True`). Built by name, the loader
+also stores the grains with fewer than 2p = 128 pixels (`min_pixels=1`) and the series keep
+them through `series_samples()`, with the bundle splits rebuilt on the longer list.
 
 ```{warning}
 For 73 of the 90 varieties both bundles come from the same session: the variety is

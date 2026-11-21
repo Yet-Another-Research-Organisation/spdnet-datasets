@@ -173,9 +173,9 @@ their defaults come from the registry; the first one is the default.
 
 The modes read the 5 s excerpt centred on the first detected event (loader
 `crop_s=5`), as the data atlas and `real.series_audio.birdset_series`: whole recordings last up
-to several minutes (6 443 windows of 1 s for the longest). The log-mel front end keeps 5 141
-recordings, the MFCC one 5 184 (exclusions of the loader's preprocessing: fewer than 2p
-non-silent frames).
+to several minutes (6 443 windows of 1 s for the longest). The loader stores every recording with a
+non-silent frame (`min_frames=1`) and the series keep the short ones through
+`series_samples()` (column *Samples*: series and loader counts).
 
 ```{dataset-figure} birdset_xcm/series_temporal
 ```
@@ -193,9 +193,9 @@ tokens.
 
 | Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
 |---|---|---|---|---|---|---|---|
-| `temporal` | 5 184 | 9 / 9 | 20 | 62 (42) | 3.1 | 97.82 % | 2.4e+02 / 5.6e+03 / 5.9e+05 |
-| `spectral` | 5 141 | 7 / 7 | 16 | 309 (129) | 19.3 | 90.22 % | 1.1e+01 / 2.6e+02 / 2.2e+03 |
-| `spectro_temporal` | 5 141 | 16 / 16 | 16 | 123 (51) | 7.7 | 83.37 % | 1.3e+01 / 2.1e+02 / 2.7e+03 |
+| `temporal` | 5 185 (loader 5 184) | 9 / 9 | 20 | 62 (42) | 3.1 | 97.82 % | 2.5e+02 / 5.9e+03 / 7.1e+05 |
+| `spectral` | 5 185 (loader 5 141) | 7 / 7 | 16 | 309 (35) | 19.3 | 90.24 % | 1.1e+01 / 2.6e+02 / 2.3e+03 |
+| `spectro_temporal` | 5 185 (loader 5 141) | 16 / 16 | 16 | 123 (32) | 7.7 | 83.24 % | 1.3e+01 / 2.0e+02 / 2.8e+03 |
 
 Every default can be overridden by name:
 

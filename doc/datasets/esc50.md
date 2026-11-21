@@ -182,11 +182,11 @@ their defaults come from the registry; the first one is the default.
 ```
 
 The spectral modes and `temporal_mel64` need the 64 log-mel bands: built by name,
-the loader gets `features="logmel"`. The series keep every clip of the loader's preprocessing
-(the loader is built with Ledoit-Wolf, so no clip is lost because its single covariance is
-singular): 1 996 clips with the MFCC (4 clips with fewer than 2p = 40 non-silent frames), 1 905
-with the log-mel bands (95 clips with fewer than 2p = 128 non-silent frames, an exclusion of
-the loader's preprocessing for its own 64 × 64 covariance). `temporal_mel64` (R23) has
+the loader gets `features="logmel"`. Built by name, the loader also stores the clips with
+fewer than 2p non-silent frames (`min_frames=1`; 2p = 40 with the MFCC, 128 with the log-mel
+bands) and the series wrap the copy returned by `series_samples()`: they keep the clips that
+have no `p × p` covariance of the loader (column *Samples*: both counts); clips without any
+non-silent frame stay excluded. The official folds are those of the loader. `temporal_mel64` (R23) has
 `n_t = 86 < 2p = 128`: Ledoit-Wolf, `allow_small_n=True` by default. A clip shorter than one
 window gives a single token over the whole clip; silent windows are masked.
 
@@ -209,10 +209,10 @@ tokens.
 
 | Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
 |---|---|---|---|---|---|---|---|
-| `temporal` | 1 996 | 9 / 9 | 20 | 86 (45) | 4.3 | 97.43 % | 1.5e+02 / 4.2e+03 / 6.8e+06 |
-| `spectral` | 1 905 | 7 / 7 | 16 | 427 (129) | 26.7 | 93.30 % | 2.6e+01 / 8.0e+02 / 1.2e+04 |
-| `spectro_temporal` | 1 905 | 16 / 16 | 16 | 170 (51) | 10.6 | 85.50 % | 2.1e+01 / 6.6e+02 / 1.7e+04 |
-| `temporal_mel64` | 1 905 | 9 / 9 | 64 | 86 (86) | 1.3 | 99.96 % | 4.3e+01 / 8.3e+02 / 5.7e+03 |
+| `temporal` | 2 000 (loader 1 996) | 9 / 9 | 20 | 86 (45) | 4.3 | 97.41 % | 1.5e+02 / 4.2e+03 / 6.8e+06 |
+| `spectral` | 2 000 (loader 1 905) | 7 / 7 | 16 | 427 (33) | 26.7 | 93.31 % | 2.8e+01 / 8.7e+02 / 1.4e+04 |
+| `spectro_temporal` | 2 000 (loader 1 905) | 16 / 16 | 16 | 170 (32) | 10.6 | 83.83 % | 2.2e+01 / 7.1e+02 / 2.0e+04 |
+| `temporal_mel64` | 2 000 (loader 1 905) | 9 / 9 | 64 | 86 (30) | 1.3 | 99.96 % | 4.3e+01 / 8.4e+02 / 5.7e+03 |
 
 Every default can be overridden by name:
 

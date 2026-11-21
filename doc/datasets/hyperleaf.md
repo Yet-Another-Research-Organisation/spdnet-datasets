@@ -178,9 +178,9 @@ their defaults come from the registry; the first one is the default.
 ```
 
 The default mode is the user's design: 6 spatial windows of 48 × 58 pixels
-along the leaf times 4 windows of 48 bands (24 tokens, `p = 48`). The 4 band windows are spread
-evenly, which leaves 4 bands unused between two windows; `band_window=51` covers the 204 bands
-exactly. The source is the whole image (`HyperLeafDataset.structured_raw`) and only the leaf
+along the leaf times 4 windows of 48 bands (24 tokens, `p = 48`). The 5 band windows of 48 bands start at
+0, 39, 78, 117 and 156: they overlap by 9 bands and cover the 204 bands (the 4 windows of the
+first version left 4 bands unused between two windows; `band_n_windows=4` gives them back). The source is the whole image (`HyperLeafDataset.structured_raw`) and only the leaf
 pixels are observations: a spatial window holds far fewer than 2 784 of them, and a token with
 fewer than `2p` leaf pixels is masked. The `spatial` mode keeps the 204 bands (`2p = 408`).
 `spectral_w48`, `spectral_w64` and `spectral_w96` are the R23 large-p series (step 16).
@@ -223,7 +223,7 @@ Every default can be overridden by name:
 from spdnet_datasets.series import CovarianceSeries, collate_series
 
 series = CovarianceSeries("hyperleaf")
-series = CovarianceSeries("hyperleaf", "spatio_spectral", band_window=51, n_windows=(1, 8))  # 8 x 4 windows of 51 bands
+series = CovarianceSeries("hyperleaf", "spatio_spectral", band_window=51, band_n_windows=4)  # 4 windows of 51 bands, no overlap
 (tokens, mask), label = series[0]
 ```
 <!-- /covariance-series -->

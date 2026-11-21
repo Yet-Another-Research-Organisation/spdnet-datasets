@@ -181,8 +181,10 @@ their defaults come from the registry; the first one is the default.
 The `temporal` mode reproduces `real.series.dopnet_series`: the `.mat` files are
 read again (`DopNetDataset.doppler_bands`) to take the log power of the 128 central Doppler
 bins in 16 bands, with windows of 48 frames at step 24; gestures have different lengths,
-padded by `collate_series`. The samples are those of the loader (gestures of at least 96
-frames, duplicates removed, training and test files). The two other modes cut the 48
+padded by `collate_series`. Built by name, the loader stores the gestures shorter than 2p = 96 frames too (`min_frames=1`;
+duplicates still removed, energy band still fitted on the gestures of at least 96 frames):
+the series keep them through `series_samples()`, with the official and per-person splits
+rebuilt on the longer list (column *Samples*: series and loader counts). The two other modes cut the 48
 energy-band channels of the loader.
 
 ```{dataset-figure} dopnet/series_temporal
@@ -201,9 +203,9 @@ tokens.
 
 | Mode | Samples | S (max / median) | p | n_t (median, min) | n_t / p | SPD tokens | κ (5 / 50 / 95 %) |
 |---|---|---|---|---|---|---|---|
-| `temporal` | 2 145 | 21 / 5 | 16 | 48 (48) | 3.0 | 100.00 % | 4.4e+03 / 1.8e+04 / 5.9e+04 |
-| `spectral` | 2 145 | 5 / 5 | 16 | 155 (96) | 9.7 | 100.00 % | 3.4e+01 / 3.9e+02 / 2.7e+03 |
-| `spectro_temporal` | 2 145 | 12 / 12 | 16 | 62 (38) | 3.9 | 100.00 % | 1.4e+02 / 5.9e+03 / 5.0e+04 |
+| `temporal` | 2 721 (loader 2 145) | 21 / 4 | 16 | 48 (43) | 3.0 | 100.00 % | 4.5e+03 / 1.8e+04 / 5.8e+04 |
+| `spectral` | 2 721 (loader 2 145) | 5 / 5 | 16 | 134 (43) | 8.4 | 100.00 % | 4.2e+01 / 5.8e+02 / 6.4e+03 |
+| `spectro_temporal` | 2 721 (loader 2 145) | 12 / 12 | 16 | 57 (32) | 3.6 | 90.33 % | 1.7e+02 / 7.6e+03 / 8.1e+04 |
 
 Every default can be overridden by name:
 

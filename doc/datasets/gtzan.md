@@ -158,8 +158,8 @@ their defaults come from the registry; the first one is the default.
 ```
 
 The spectral modes and `temporal_mel64` need the 64 log-mel bands (loader built with
-`features="logmel"`). Both front ends keep 985 of the 1 000 clips (the loader's preprocessing
-drops the others). `temporal_mel64` (R23) has `n_t = 258 ≥ 2p`: no derogation.
+`features="logmel"`). The loader stores every clip with a non-silent frame (`min_frames=1`) and the series keep
+them through `series_samples()` (column *Samples*: series and loader counts). `temporal_mel64` (R23) has `n_t = 258 ≥ 2p`: no derogation.
 
 ```{dataset-figure} gtzan/series_temporal
 ```
