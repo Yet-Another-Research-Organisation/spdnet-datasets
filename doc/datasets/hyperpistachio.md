@@ -128,6 +128,32 @@ ds = HyperPistachioDataset(unit="window")                   # 2 541 × 77 × 77
 ds = HyperPistachioDataset(unit="window", task="fine")      # 26 levels, by_index split
 ```
 
+<!-- covariance-series: written by hand (not by write_sections.py) -->
+## Covariance series
+
+{class}`~spdnet_datasets.series.CovarianceSeries` cuts each pistachio into a series of
+covariance tokens, the patches of a vision transformer (see {doc}`/guide/series` and
+{doc}`series_overview`).
+
+```{series-table} hyperpistachio
+```
+
+`inner_windows` (default): the windows of 32 × 32 pixels on a grid of step 16 that lie
+entirely inside the nut, one band in 6 (`p = 77`, `n_t = 1 024`): the windows of
+`unit="window"`, grouped by pistachio. The source is the cube cropped to the nut
+(`HyperPistachioDataset.structured_raw`, crop aligned on multiples of 16 so that the grid is
+the one of the frame). S depends on the size of the nut: 20 to 71 tokens (median 49, 2 541
+in all), padded with masked tokens; it exceeds the S ≤ 32 rule of the other modes by design.
+Measured: 100 % SPD tokens, κ median 8.9e3.
+
+```python
+from spdnet_datasets.series import CovarianceSeries
+
+series = CovarianceSeries("hyperpistachio")                         # (S, 77, 77), S = 20..71
+series = CovarianceSeries("hyperpistachio", window=48, step=24, decimate=3)
+```
+<!-- /covariance-series -->
+
 ## How to cite
 
 ````{admonition} If you use this dataset in a publication, cite

@@ -120,7 +120,10 @@ def test_every_registered_mode_meets_its_rules():
             assert mode.family in ("temporal", "vision")
             if not mode.allow_small_n:  # documented derogations (R23 large p) only
                 assert n_t >= mode.min_n_over_p * p, (name, mode.name, n_t, p)
-            if (name, mode.name) != ("air_polsar_seg", "spatial"):  # 8 x 8 grid: user's choice
+            # user's choices: 8 x 8 grid (AIR-PolSAR), every 32 x 32 window of a pistachio
+            # (20 to 71 per nut)
+            if (name, mode.name) not in (("air_polsar_seg", "spatial"),
+                                         ("hyperpistachio", "inner_windows")):
                 assert 4 <= S <= 32, (name, mode.name, S)
 
 

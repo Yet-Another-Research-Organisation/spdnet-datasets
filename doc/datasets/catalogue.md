@@ -11,7 +11,7 @@ ones of {doc}`/guide/loading` (`max_classes`, `max_samples_per_class`, `seed`, â
 
 ## Modes of the hyperspectral loaders
 
-The hyperspectral loaders (HyperLeaf, Chikusei, GSOFF, UAV, DeepHS-Fruit,
+The hyperspectral loaders (HyperLeaf, Chikusei, GSOFF, UAV,
 Placenta, Kaggle Wheat) can serve the same images in several forms:
 
 `mode="cov"`

@@ -1,9 +1,7 @@
 {
  "name": "deephsfruit",
- "kwargs": {
-  "verbose": false
- },
- "split": "by_fruit",
+ "kwargs": {},
+ "split": "recommended",
  "p": 224,
  "n_samples": 3193,
  "classes": [
@@ -15,15 +13,15 @@
  ],
  "counts": {
   "train": [
-   558,
-   223,
+   559,
+   222,
    658,
-   322,
-   154
+   323,
+   153
   ],
   "val": [
-   187,
-   74,
+   186,
+   75,
    219,
    108,
    51
@@ -32,8 +30,8 @@
    187,
    74,
    219,
-   108,
-   51
+   107,
+   52
   ]
  }
 }

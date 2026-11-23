@@ -588,7 +588,7 @@ SERIES_MODES["hyperpistachio"] = {
         "inner_windows", _inner_windows, ("H", "W", "B"),
         {"window": 32, "step": 16, "decimate": 6},
         "windows of 32 x 32 pixels (step 16) entirely inside the pistachio, one band in 6 "
-        "(p = 77): 20 to 71 tokens per nut", (192, 160, 462),
+        "(p = 77): 20 to 71 tokens per nut (median 49)", (128, 128, 462),
         loader_defaults={"unit": "pistachio"}),
 }
 

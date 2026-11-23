@@ -96,9 +96,10 @@ Measured values (BERTHA, November 2026, default parameters; the pages give the c
 | {doc}`rices90 <rices90>` | `spectral` | 8 803 | 7 / 7 | 16 | 399 | 24.9 | 100.0 % | 1.1e+04 |
 | {doc}`rices90 <rices90>` | `spatial` | 8 803 | 4 / 4 | 16 | 107 | 6.7 | 99.4 % | 5.5e+04 |
 | {doc}`rices90 <rices90>` | `spatio_spectral` | 8 803 | 16 / 16 | 16 | 107 | 6.7 | 99.4 % | 1.1e+04 |
-| {doc}`deephsfruit <deephsfruit>` | `spectral` | 384 | 27 / 27 | 16 | 33 519 | 2094.9 | 100.0 % | 7.7e+03 |
-| {doc}`deephsfruit <deephsfruit>` | `spatial` | 384 | 4 / 4 | 16 | 8 445 | 527.8 | 100.0 % | 3.2e+05 |
-| {doc}`deephsfruit <deephsfruit>` | `spatio_spectral` | 384 | 28 / 28 | 32 | 8 445 | 263.9 | 100.0 % | 1.8e+04 |
+| {doc}`deephsfruit <deephsfruit>` | `spectral` | 596 | 27 / 27 | 16 | 36 077 | 2 254.8 | 100.0 % | 7.2e+03 |
+| {doc}`deephsfruit <deephsfruit>` | `spatial` | 596 | 4 / 4 | 16 | 8 970 | 560.6 | 100.0 % | 3.1e+05 |
+| {doc}`deephsfruit <deephsfruit>` | `spatio_spectral` | 596 | 28 / 28 | 32 | 8 970 | 280.3 | 100.0 % | 1.7e+04 |
+| {doc}`hyperpistachio <hyperpistachio>` | `inner_windows` | 52 | 71 / 49 | 77 | 1 024 | 13.3 | 100.0 % | 8.9e+03 |
 | {doc}`pol_insar_island <pol_insar_island>` | `spatial` | 5 033 | 16 / 16 | 12 | 64 | 5.3 | 100.0 % | 8.4e+00 |
 | {doc}`cpazmal <cpazmal>` | `dates` | 10 695 | 4 / 4 | 24 | 144 | 6.0 | 99.8 % | 1.6e+02 |
 | {doc}`cpazmal <cpazmal>` (ascending orbit) | `dates` | 11 713 | 3 / 3 | 24 | 144 | 6.0 | 99.9 % | 1.5e+02 |
