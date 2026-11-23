@@ -31,6 +31,7 @@ from ..core.config import get_cache_dir
 from ..core.estimators import InsufficientSamplesError, NotSPDError
 from ..core.fetch import run_pipeline
 from ..core.normalize import geometric_scale
+from ..core.splits import assert_no_leakage
 from ..manager import DatasetManager
 from .covariances import epochs_to_covariances
 
@@ -148,9 +149,9 @@ def stratified_split(y, val_size=0.1, test_size=0.15, seed=42) -> dict:
     """Trial-level train/val/test split, stratified by class over all trials.
 
     The test set is drawn first, then the validation set from the rest, so both
-    sizes are fractions of all trials. Every subject keeps trials in the three
-    parts: this is a within-subject protocol. Unlike the MOABB protocols, it
-    has a validation set.
+    sizes are fractions of all trials. Subjects are mixed across the three
+    parts (within-subject protocol). Unlike the MOABB protocols, it has a
+    validation set.
     """
     y = np.asarray(y)
     idx = np.arange(len(y))
@@ -158,6 +159,87 @@ def stratified_split(y, val_size=0.1, test_size=0.15, seed=42) -> dict:
     train, val = train_test_split(rest, test_size=val_size / (1.0 - test_size),
                                   random_state=seed, stratify=y[rest])
     return {"train": np.sort(train), "val": np.sort(val), "test": np.sort(test)}
+
+
+def subject_fold_splits(labels, subjects, sessions, n_folds, val_groups=1,
+                        calib_fraction=0.5, seed=0) -> dict:
+    """Cross-subject folds: training, validation and test subjects never shared.
+
+    The subjects are shuffled with ``seed`` and cut into ``n_folds`` groups of
+    nearly equal size. Fold ``k`` tests group ``k``, validates on the next
+    ``val_groups`` groups (cyclically) and trains on the others, as
+    ``stratified_fold_<k>`` in :mod:`spdnet_datasets.nilearn`: over
+    ``k = 0 .. n_folds - 1`` every subject is tested exactly once.
+
+    Each session of a validation or test subject is cut in recording order
+    (the order of the cached trials): its first ``calib_fraction`` trials
+    (rounded down) form an unlabeled calibration pool, the others are
+    evaluated. An adaptation to the session thus only sees trials recorded
+    before the evaluated ones, in the same session. The first ``K`` trials of a
+    pool are the calibration of size ``K``, and the evaluated trials do not
+    depend on ``K``. The labels are only used to check that both parts of each
+    session hold all its classes: a loader that stores the trials class by
+    class (MOABB's Cho2017) does not keep the recording order.
+
+    Returns
+    -------
+    dict
+        ``"subject_fold_<k>" -> {"train", "val", "test", "calib_val", "calib"}``:
+        ``calib_val`` and ``calib`` are the calibration pools of the validation
+        and test sessions, in recording order.
+
+    Raises
+    ------
+    ValueError
+        If ``n_folds`` is not between ``val_groups + 2`` and the number of
+        subjects, if ``calib_fraction`` is not in ``(0, 1)``, or if a part of a
+        cut session is empty or misses a class of the session.
+    """
+    labels, subjects, sessions = map(np.asarray, (labels, subjects, sessions))
+    ids = np.unique(subjects)
+    if not val_groups + 2 <= n_folds <= len(ids):
+        raise ValueError(f"subject folds need {val_groups + 2} <= n_folds <= {len(ids)} "
+                         f"(the number of subjects), got {n_folds}")
+    if not 0 < calib_fraction < 1:
+        raise ValueError(f"calib_fraction must be in (0, 1), got {calib_fraction}")
+    # RandomState: the same groups across NumPy versions
+    groups = np.array_split(np.random.RandomState(seed).permutation(ids), n_folds)
+
+    def pool_and_rest(group):
+        pool, rest = [], []
+        for s in group:
+            idx = np.flatnonzero(subjects == s)
+            for session in dict.fromkeys(sessions[idx]):  # recording order
+                trials = idx[sessions[idx] == session]
+                n = int(calib_fraction * len(trials))
+                classes = set(labels[trials].tolist())
+                first, last = set(labels[trials[:n]].tolist()), set(labels[trials[n:]].tolist())
+                if not first == last == classes:
+                    raise ValueError(
+                        f"subject {s}, session {session}: its first {n} and last "
+                        f"{len(trials) - n} trials do not both hold its classes "
+                        f"{sorted(classes)}; the loader may store the trials class by class")
+                pool.append(trials[:n])
+                rest.append(trials[n:])
+        return np.concatenate(pool), np.concatenate(rest)
+
+    out = {}
+    for k in range(n_folds):
+        test_subjects = groups[k]
+        val_subjects = np.concatenate([groups[(k + i) % n_folds]
+                                       for i in range(1, val_groups + 1)])
+        calib, test = pool_and_rest(test_subjects)
+        calib_val, val = pool_and_rest(val_subjects)
+        train = np.flatnonzero(~np.isin(subjects, np.concatenate([test_subjects,
+                                                                  val_subjects])))
+        held_val = subjects[np.concatenate([calib_val, val])]
+        held_test = subjects[np.concatenate([calib, test])]
+        assert_no_leakage(subjects[train], held_val, what="subject")
+        assert_no_leakage(subjects[train], held_test, what="subject")
+        assert_no_leakage(held_val, held_test, what="subject")
+        out[f"subject_fold_{k}"] = {"train": train, "val": val, "test": test,
+                                    "calib_val": calib_val, "calib": calib}
+    return out
 
 
 def _channel_mismatch(exc) -> bool:
@@ -198,6 +280,18 @@ class MOABBCovariances(BaseDataset):
     holdout : (float, float), optional
         ``(val_size, test_size)`` of an extra ``stratified`` split
         (:func:`stratified_split`). Default: no such split.
+    subject_folds : int, optional
+        Number of cross-subject folds ``subject_fold_<k>``
+        (:func:`subject_fold_splits`). Default: no such folds.
+    val_groups : int
+        Number of subject groups of the validation set of these folds.
+    calib_fraction : float
+        Fraction of the trials of each session of a validation or test
+        subject, the first in recording order, kept as its calibration pool in
+        these folds.
+    fold_seed : int
+        Random state of the subject groups of these folds. Kept apart from
+        ``seed`` so that a subject stays in the same fold across runs.
     cache_dir : path, optional
         Default: ``$SPDNET_CACHE_DIR``.
     force : bool
@@ -219,8 +313,8 @@ class MOABBCovariances(BaseDataset):
         ``within_session_<k>``, ``cross_session_<k>``, ``cross_subject_<k>``
         (see :func:`moabb_splits`), ``recommended``, an alias of the first
         fold of the strictest protocol available (cross-subject, then
-        cross-session, then within-session), and ``stratified`` when
-        ``holdout`` is set.
+        cross-session, then within-session), ``stratified`` when ``holdout``
+        is set, and ``subject_fold_<k>`` when ``subject_folds`` is set.
     scale : float
         Geometric scale applied to the covariances.
     channels : list of str
@@ -237,7 +331,8 @@ class MOABBCovariances(BaseDataset):
 
     def __init__(self, dataset, paradigm, subjects=None, *, estimator="scm", keep=None,
                  return_mean=False, return_raw=False, split=None, normalize=True,
-                 n_folds=5, holdout=None, cache_dir=None, force=False, seed=42,
+                 n_folds=5, holdout=None, subject_folds=None, val_groups=1,
+                 calib_fraction=0.5, fold_seed=0, cache_dir=None, force=False, seed=42,
                  verbose=False):
         cache_dir = get_cache_dir() if cache_dir is None else Path(cache_dir).expanduser()
         cache_dir.mkdir(parents=True, exist_ok=True)
@@ -250,6 +345,8 @@ class MOABBCovariances(BaseDataset):
         self.subjects_requested = sorted(subjects or dataset.subject_list)
         self.keep, self.force, self.n_folds = keep, force, n_folds
         self.holdout = None if holdout is None else tuple(holdout)
+        self.subject_folds, self.val_groups = subject_folds, val_groups
+        self.calib_fraction, self.fold_seed = calib_fraction, fold_seed
         self.split = split
         self._load_data()
 
@@ -295,6 +392,10 @@ class MOABBCovariances(BaseDataset):
         counts = Counter(tuple(part[3]) for part in parts.values())
         channels = max(counts, key=lambda c: (counts[c], len(c)))
         kept = [s for s, part in parts.items() if tuple(part[3]) == channels]
+        n_times = {s: parts[s][0].shape[-1] for s in kept}
+        if len(set(n_times.values())) > 1:
+            raise ValueError(f"{self.dataset.code}: epochs of different lengths per subject "
+                             f"{n_times}; set the paradigm's resample, tmin and tmax")
         excluded = sorted(excluded + [s for s in parts if s not in kept])
         np.save(out / "channels.npy", np.asarray(channels))
         np.save(out / "excluded_subjects.npy", np.asarray(excluded))
@@ -375,6 +476,10 @@ class MOABBCovariances(BaseDataset):
         if self.holdout is not None:
             self.splits["stratified"] = stratified_split(self.labels, *self.holdout,
                                                          seed=self.seed)
+        if self.subject_folds is not None:
+            self.splits.update(subject_fold_splits(
+                self.labels, self.subjects, self.sessions, self.subject_folds,
+                self.val_groups, self.calib_fraction, self.fold_seed))
         self.scale = 1.0
         if self.split is not None:
             if self.split not in self.splits:

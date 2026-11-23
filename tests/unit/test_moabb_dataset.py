@@ -53,12 +53,12 @@ class FakeParadigm:
         return (as_epochs(X) if return_epochs else X), y, metadata
 
     def _data(self, dataset, subjects):
-        rng = np.random.default_rng(0)
+        rng = np.random.default_rng(subjects[0])  # subjects differ when loaded one by one
         X, y, rows = [], [], []
         for s in subjects:
             for k in range(dataset.n_sessions):
-                for label in self.events:
-                    for _ in range(dataset.n_per_class):
+                for _ in range(dataset.n_per_class):
+                    for label in self.events:  # cues alternate, as in a recording
                         scale = 1.0 if label == "left_hand" else 3.0
                         X.append(rng.standard_normal((N_CH, dataset.n_times)) * scale)
                         y.append(label)

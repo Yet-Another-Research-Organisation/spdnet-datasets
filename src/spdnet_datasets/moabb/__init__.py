@@ -21,7 +21,9 @@ from .dataset import (
     MOABBDataset,
     moabb_splits,
     stratified_split,
+    subject_fold_splits,
 )
 
 __all__ = ["SPLIT_KINDS", "Covariances", "MOABBCovariances", "MOABBDataset",
-           "epochs_to_covariances", "moabb_splits", "stratified_split"]
+           "epochs_to_covariances", "moabb_splits", "stratified_split",
+           "subject_fold_splits"]

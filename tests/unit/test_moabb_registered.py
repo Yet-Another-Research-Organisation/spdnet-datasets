@@ -122,12 +122,30 @@ class OtherOrder(FakeParadigm):
         return as_epochs(X, names), y, meta
 
 
-def test_channel_order_counts_and_ties_go_to_the_longer_list(tmp_path):
+def test_channel_order_counts(tmp_path):
     with pytest.warns(UserWarning):
         ds = MOABBCovariances(FakeDataset(n_subjects=4), OtherOrder(), cache_dir=tmp_path)
     # two subjects with N_CH - 1 channels, one with N_CH, one with N_CH in another order
     assert ds.channels == [f"C{i}" for i in range(N_CH - 1)]
     assert ds.excluded_subjects == [1, 2]
+
+
+class OneLess(FakeParadigm):
+    """Subjects 3 and 4 have one channel less than subjects 1 and 2."""
+
+    def get_data(self, dataset, subjects=None, return_epochs=False):
+        X, y, meta = self._data(dataset, subjects)
+        names = [f"C{i}" for i in range(N_CH)]
+        if subjects in ([3], [4]):
+            X, names = X[:, :-1], names[:-1]
+        return as_epochs(X, names), y, meta
+
+
+def test_channel_ties_go_to_the_longer_list(tmp_path):
+    with pytest.warns(UserWarning):
+        ds = MOABBCovariances(FakeDataset(n_subjects=4), OneLess(), cache_dir=tmp_path)
+    assert ds.channels == [f"C{i}" for i in range(N_CH)]  # 2 subjects against 2
+    assert ds.excluded_subjects == [3, 4]
 
 
 def test_no_subject_left_raises(fakes, tmp_path):

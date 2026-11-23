@@ -39,7 +39,9 @@ export MNE_DATA=/path/to/mne_data
 |---|---|
 | `Covariances` | First step of a scikit-learn pipeline passed to a MOABB evaluation |
 | `MOABBCovariances` | PyTorch dataset of the covariances, with groups and MOABB splits, for SPDNet training |
+| `MOABBDataset` | The same dataset built from class names, registered as `"moabb"` for spdnet-training configs |
 | `moabb_splits(y, metadata)` | Train/test indices of the three MOABB protocols |
+| `stratified_split`, `subject_fold_splits` | Within- and cross-subject splits with a validation set |
 
 `Covariances` and `MOABBCovariances` estimate each covariance with
 `spdnet_datasets.core.estimators.estimate_covariance`:
@@ -56,7 +58,7 @@ export MNE_DATA=/path/to/mne_data
   reference (rank `n_channels - 1`) or a flat channel;
 - every kept trial has the same channels, in the same order
   (`dataset.channels`). Subjects whose channel list differs from the most
-  common one in the dataset, or differs between their own sessions, are
+  common one in the dataset, or differs between their own sessions or runs, are
   excluded with a warning and listed in `dataset.excluded_subjects`.
 
 `Covariances` is not `pyriemann.estimation.Covariances`. Both map
@@ -143,12 +145,43 @@ depends on the `return_*` flags:
 | `cross_subject_<k>` | leave one subject out (≥ 2 subjects) | `CrossSubjectEvaluation` |
 | `recommended` | first fold of the strictest available protocol | |
 | `stratified` | trials split into train / val / test, stratified by class (only with `holdout=(val_size, test_size)`) | |
+| `subject_fold_<k>` | cross-subject folds with held-out validation subjects and a calibration pool (only with `subject_folds=n`) | |
 
-Every split is `{"train", "val", "test"}`. In the MOABB protocols `val` is
-empty, since MOABB has no validation set: carve one out of `train` yourself,
-for example with `core.splits.group_split`. The `stratified` split is
-within-subject: every subject has trials in the three parts. It is the one to
-use with `spdnet-train`, whose early stopping monitors the validation set.
+Every split has `train`, `val` and `test` (the `subject_fold_<k>` splits also
+`calib_val` and `calib`). In the MOABB protocols `val` is empty, since MOABB has
+no validation set: carve one out of `train` yourself, for example with
+`core.splits.group_split`. The `stratified` split is within-subject: it draws
+trials, stratified by class, so the subjects are mixed across the three parts.
+It and `subject_fold_<k>` are the splits to use with `spdnet-train`, whose early
+stopping monitors the validation set.
+
+The `subject_fold_<k>` splits (`subject_folds=n`, {func}`~spdnet_datasets.moabb.subject_fold_splits`)
+are the cross-subject counterpart, built like `stratified_fold_<k>` of the
+nilearn datasets:
+
+- the subjects are cut into `n` groups of nearly equal size, drawn with
+  `fold_seed` (default 0, kept apart from `seed` so that a subject stays in the
+  same fold across runs; excluding a subject changes every group). Fold `k` tests group `k`, validates on the next
+  `val_groups` groups (default 1) and trains on the others. Every subject is
+  tested once over the `n` folds;
+- each session of a validation or test subject is cut in recording order: its
+  first trials (`calib_fraction`, default one half, rounded down) form an unlabeled
+  calibration pool (`calib_val`, `calib`), the others are evaluated (`val`,
+  `test`). An adaptation to the session only sees trials recorded before the
+  evaluated ones, in the same session, so the folds stay purely cross-subject
+  for datasets with several sessions. The first `K` trials of a pool are the
+  calibration of size `K`, and `val` and `test` do not depend on `K`. The
+  loader must keep the recording order. MOABB keeps it for BNCI2014_001,
+  Weibo2014 and Schirrmeister2017, and stores Cho2017 class by class: the labels
+  are only used to raise an error when a part of a session misses a class.
+
+Leakage risks and measures:
+
+| Risk | Measure | Residual |
+|---|---|---|
+| same subject in training and evaluation | subject groups, checked by `core.splits.assert_no_leakage` | none |
+| calibration recorded after the evaluated trials | first trials of each session in recording order | loaders that do not keep the recording order: detected when they store the trials class by class (Cho2017) |
+| geometric scale fitted on held-out subjects | fitted on `train` only | none |
 
 ### Normalization
 
