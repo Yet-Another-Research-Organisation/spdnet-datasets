@@ -26,7 +26,7 @@ cache), leakage-free splits and a documentation page.
 | Skeleton | HDM05, NTU RGB+D 120 |
 | Micro-Doppler radar | CI4R (77 GHz, xethru), MVDoppler, DopNet |
 | Satellite image time series (SITS) | PASTIS-R (scenarios A–E) |
-| Hyperspectral (HSI) | GSOFF, Chikusei, UAV-HSI-Crop, Wheat disease, Placenta, Rices_90, HyperLeaf2024, DeepHS-Fruit |
+| Hyperspectral (HSI) | GSOFF, Chikusei, UAV-HSI-Crop, Wheat disease, Placenta, Rices_90, HyperLeaf2024, DeepHS-Fruit, HyperPistachio |
 | Synthetic aperture radar (SAR) | Pol-InSAR-Island, CPAZMaL, S1SLC_CVDL, AIR-PolSAR-Seg, ATRNet-STAR, FUSAR-Ship 1.0, MSTAR |
 
 Branches: `timeseries` (series of covariances for Transformers), `local`
