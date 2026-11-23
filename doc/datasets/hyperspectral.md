@@ -109,9 +109,9 @@ Laboratory, fruit ripeness
 :img-alt: preview of HyperPistachio
 :class-card: sd-card-hover
 
-Aflatoxin in pistachios; reference page, no loader
+Laboratory, aflatoxin in pistachios
 
-{bdg-secondary-line}`462 bands` {bdg-warning-line}`no loader`
+{bdg-secondary-line}`462×462` {bdg-secondary-line}`EU limit / 26 levels` {bdg-secondary-line}`regression`
 :::
 
 ::::

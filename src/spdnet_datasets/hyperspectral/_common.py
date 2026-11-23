@@ -56,6 +56,54 @@ def band_index(n_bands, band_step=1, start=0, stop=None):
     return np.arange(n_bands)[start:stop:band_step]
 
 
+ENVI_DTYPES = {1: "u1", 2: "i2", 3: "i4", 4: "f4", 5: "f8", 12: "u2", 13: "u4"}
+
+
+def read_envi_header(header):
+    """Fields of an ENVI header (lower-case keys; ``{...}`` lists kept as text)."""
+    fields, key = {}, None
+    for line in Path(header).read_text(errors="ignore").splitlines():
+        if key is not None:  # continuation of a {...} value
+            fields[key] += " " + line.strip()
+            if "}" in line:
+                key = None
+            continue
+        if "=" in line:
+            k, v = line.split("=", 1)
+            k, v = k.strip().lower(), v.strip()
+            fields[k] = v
+            if v.startswith("{") and "}" not in v:
+                key = k
+    return fields
+
+
+def envi_cube(header, data_file=None):
+    """ENVI cube as a read-only (lines, samples, bands) memory-mapped view.
+
+    Handles the ``bil``, ``bip`` and ``bsq`` interleaves and the integer and
+    float data types of :data:`ENVI_DTYPES`. ``data_file`` defaults to the
+    header path without its ``.hdr`` suffix plus the first existing suffix
+    among ``.bil``, ``.bin``, ``.raw``, ``.img`` and no suffix.
+    """
+    header = Path(header)
+    f = read_envi_header(header)
+    lines, samples, bands = int(f["lines"]), int(f["samples"]), int(f["bands"])
+    dtype = np.dtype(ENVI_DTYPES[int(f["data type"])]).newbyteorder(
+        ">" if f.get("byte order", "0") == "1" else "<")
+    if data_file is None:
+        stem = header.with_suffix("")
+        candidates = [stem.with_suffix(s) for s in (".bil", ".bin", ".raw", ".img")] + [stem]
+        data_file = next((c for c in candidates if c.is_file()), None)
+        if data_file is None:
+            raise FileNotFoundError(f"No data file next to {header}")
+    layout = f.get("interleave", "bsq").lower()
+    shape = {"bil": (lines, bands, samples), "bip": (lines, samples, bands),
+             "bsq": (bands, lines, samples)}[layout]
+    raw = np.memmap(data_file, dtype=dtype, mode="r", offset=int(f.get("header offset", 0)),
+                    shape=shape)
+    return {"bil": raw.transpose(0, 2, 1), "bip": raw, "bsq": raw.transpose(1, 2, 0)}[layout]
+
+
 def write_json(path, obj):
     Path(path).write_text(json.dumps(obj, indent=1, sort_keys=True, default=_to_builtin))
 

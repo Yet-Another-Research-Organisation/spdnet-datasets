@@ -19,6 +19,7 @@ CASES = {
     "rices90": ("Rices_90", {}),
     "hyperleaf": ("HyperLeaf2024", {}),
     "deephsfruit": ("DeepHS-Fruit", {}),
+    "hyperpistachio": ("HyperPistachio", {}),
 }
 
 
