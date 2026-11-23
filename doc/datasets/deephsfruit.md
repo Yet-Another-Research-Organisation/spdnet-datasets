@@ -134,6 +134,42 @@ by a scalar fitted on the training part of `split`.
 | both faces of one fruit on both sides (official split: 46 / 72 val, 46 / 140 test) | groups = physical fruit in `by_fruit`; checked by the real-data test | none for the faces |
 | the same fruit recorded on several days | — | not traceable: the number `k` is reused by other fruits |
 
+## End-to-end validation
+
+The whole chain (raw cubes → mask → clipping → covariance → normalisation fitted on the
+training part → outputs) was checked on the real data on 23 November 2026, through the
+end-to-end harness of the package:
+
+- every covariance is SPD (596 and 3 193 checked, symmetric to machine precision);
+- the geometric mean of the eigenvalues of the training covariances is 1 after scaling
+  (mean log-eigenvalue below 1e-13);
+- the outputs are coherent: on 50 training samples, the covariance of `raw` equals
+  `cov` (relative error ≤ 9e-8) and the mean of `raw` equals `mean` (≤ 9e-9), which
+  checks the factors `s` on `cov` and `√s` on `raw` and `mean`;
+- two builds give bit-identical covariances and identical splits; `by_fruit` has no
+  physical fruit on two sides, while the leak of `official` is detected;
+- the data loaders serve every sample of each part.
+
+Balanced accuracy on the test part (chance 0.33 for ripeness, 0.20 for fruit), tangent
+space + logistic regression (TS-LR, C = 0.1) and an MLP on the log-Euclidean features (mean
+± standard deviation over 3 seeds):
+
+| Configuration | Split | TS-LR | MLP |
+|---|---|---|---|
+| ripeness, p = 224, SCM | `by_fruit` | 0.48 | 0.52 ± 0.03 |
+| ripeness, p = 224, Ledoit-Wolf | `by_fruit` | 0.48 | 0.54 ± 0.02 |
+| ripeness, `band_bin=4` (p = 56) | `by_fruit` | 0.56 | 0.57 ± 0.01 |
+| ripeness, p = 224 | `official` | 0.39 | 0.52 ± 0.02 |
+| ripeness, p = 224 | random (ignores the fruits) | — | 0.60 |
+| fruit, p = 224 | `by_fruit` | 0.99 | 1.00 ± 0.00 |
+
+Ripeness is the hard task: with the faces of a fruit kept together, about 0.5 to 0.57.
+Splitting at random, ignoring the physical fruit, inflates the MLP score by about 8
+points. Recognising the fruit is trivial (0.99). The standardisation of the authors
+(fixed per-band mean and standard deviation of the VIS camera, `normalize.py` of their
+repository), applied to the covariances as `D⁻¹ C D⁻¹`, raises the median condition number
+from 6.5e5 to 1.1e6 and leaves TS-LR unchanged (0.47); it is not applied by the loader.
+
 ## Supported tasks
 
 - `classification_mode="fruit"` (5 classes) or `"ripeness"` (3 classes), both
