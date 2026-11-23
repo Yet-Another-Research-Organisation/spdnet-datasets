@@ -320,6 +320,21 @@ class HyperPistachioDataset(HSIDataset):
         X = next(_pixels(self.bunch.root, proc, row, self.bunch.bands, self.window))
         return X if self.unit == "pistachio" else X.reshape(self.window, self.window, -1)
 
+    def structured_raw(self, i):
+        """Cube of sample ``i`` cropped to its pistachio, ``(h, w, 462)`` float32 reflectance,
+        0 outside the mask (all bands, whatever ``decimate``). Source of
+        :class:`~spdnet_datasets.series.CovarianceSeries` (mode ``inner_windows``).
+
+        The crop starts on multiples of 16 pixels, so that a window grid of step 16 (or a
+        divisor of 16) on the crop is the grid of the frame, as for ``unit="window"``."""
+        row = self.meta_all.iloc[int(self._index[i])]
+        cube = envi_cube(cube_header(self.bunch.root, int(row["level"]), int(row["index"])))
+        mask = np.load(Path(self.bunch.processed_path) / "masks.npy",
+                       mmap_mode="r")[int(row["mask"])]
+        rows, cols = np.flatnonzero(mask.any(1)), np.flatnonzero(mask.any(0))
+        box = (slice(rows[0] // 16 * 16, rows[-1] + 1), slice(cols[0] // 16 * 16, cols[-1] + 1))
+        return np.asarray(cube[box], dtype=np.float32) / 1e4 * mask[box][..., None]
+
 
 __all__ = ["CONCENTRATION", "EU_LIMIT", "HyperPistachioDataset", "fetch_hyperpistachio",
            "inner_windows", "nut_mask"]

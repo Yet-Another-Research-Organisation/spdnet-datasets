@@ -553,6 +553,45 @@ SERIES_MODES["rices90"] = {
         "4 quadrants of the grain box x windows of 16 bands, spatial-major", (21, 17, 64),
         drop_invalid=True),
 }
+# ---------------------------------------------------------------------------
+# HyperPistachio (HyperPistachioDataset.structured_raw: the cube cropped to the pistachio,
+# 0 outside its mask, 462 bands): tokens = the windows of 32 x 32 pixels on a grid of
+# step 16 that lie entirely in the nut (2 541 in all, 20 to 71 per pistachio, as the
+# window unit of the loader), one band in 6 kept (p = 77): the patches of a vision
+# transformer. S varies with the size of the nut: padded with masked tokens.
+
+
+def _inner_windows(x, *, window=32, step=None, decimate=6):
+    """Windows of ``window`` pixels on a grid of step ``step`` (default ``window // 2``) whose
+    pixels are all non-zero (inside the object), row-major; variables = one band in
+    ``decimate``. A sample without background (no zero pixel) is covered entirely."""
+    step = step or max(window // 2, 1)
+    inside = np.any(x != 0, axis=-1)
+    if not inside.any():
+        inside = np.ones(x.shape[:2], dtype=bool)
+    S = np.zeros((inside.shape[0] + 1, inside.shape[1] + 1), dtype=np.int64)
+    S[1:, 1:] = np.cumsum(np.cumsum(inside, axis=0), axis=1)
+    full = (S[window:, window:] - S[:-window, window:] - S[window:, :-window]
+            + S[:-window, :-window]) == window * window
+    bands = np.arange(x.shape[-1])[::decimate]
+    obs, pos = [], []
+    for r0 in range(0, full.shape[0], step):
+        for c0 in range(0, full.shape[1], step):
+            if full[r0, c0]:
+                obs.append(x[r0:r0 + window, c0:c0 + window][..., bands].reshape(-1, len(bands)))
+                pos.append([(r0, r0 + window), (c0, c0 + window), (0, x.shape[-1])])
+    return obs, pos
+
+
+SERIES_MODES["hyperpistachio"] = {
+    "inner_windows": SeriesMode(
+        "inner_windows", _inner_windows, ("H", "W", "B"),
+        {"window": 32, "step": 16, "decimate": 6},
+        "windows of 32 x 32 pixels (step 16) entirely inside the pistachio, one band in 6 "
+        "(p = 77): 20 to 71 tokens per nut", (192, 160, 462),
+        loader_defaults={"unit": "pistachio"}),
+}
+
 SERIES_MODES["deephsfruit"] = {
     "spectral": SeriesMode(
         "spectral", _spectral, ("H", "W", "B"),

@@ -207,3 +207,36 @@ def test_hyperleaf_band_windows_cover_every_band():
     _, pos = mode.tokenize(np.zeros(mode.example_shape, np.float32), **mode.defaults)
     bands = sorted({tuple(p[2]) for p in pos})
     assert bands == [(0, 48), (39, 87), (78, 126), (117, 165), (156, 204)]
+
+
+def test_pistachio_inner_windows_match_the_window_unit(tmp_path, monkeypatch):
+    from spdnet_datasets.hyperspectral import hyperpistachio as HP
+    from tests.unit.test_hsi_hyperpistachio import N_BANDS, _write_cube
+
+    mode = SERIES_MODES["hyperpistachio"]["inner_windows"]
+    x = np.zeros((40, 48, 12), np.float32)
+    x[8:30, 10:32] = 1.0 + np.arange(12)  # square of 22 at (8, 10)
+    obs, pos = mode.tokenize(x, window=8, step=4, decimate=3)
+    assert len(obs) == 16 and obs[0].shape == (64, 4)
+    np.testing.assert_array_equal(obs[0][0], [1.0, 4.0, 7.0, 10.0])  # bands 0, 3, 6, 9
+    assert all(r0 % 4 == 0 and c0 % 4 == 0 for (r0, _), (c0, _), _ in pos)
+    # the loader hook gives the same tokens as the window unit of the loader
+    monkeypatch.setattr(HP, "N_BANDS", N_BANDS)
+    root = tmp_path / "HyperPistachio"
+    rng = np.random.default_rng(1)
+    for level in range(1, 27):
+        (root / f"Level {level:02d}").mkdir(parents=True)
+        for index in (1, 2):
+            cube = rng.integers(100, 110, size=(40, 48, N_BANDS)).astype(np.uint16)
+            cube[8:32, 10:34] = rng.integers(3000, 6000, size=(24, 24, N_BANDS))
+            _write_cube(root / f"Level {level:02d}" / f"L{level:02d}_{index:04d}.bil", cube,
+                        14.74)
+    ds = HP.HyperPistachioDataset(root, cache_dir=tmp_path / "c", verbose=False,
+                                  normalize=False)
+    win = HP.fetch_hyperpistachio(root, cache_dir=tmp_path / "c", unit="window", window=8,
+                                  decimate=6)
+    obs, _ = mode.tokenize(ds.structured_raw(0), window=8, step=4, decimate=6)
+    first = win.meta.cube == ds.meta.cube[0]
+    assert len(obs) == int(first.sum())
+    np.testing.assert_allclose(np.cov(obs[0].T, bias=True),
+                               win.covariances[int(np.flatnonzero(first)[0])], rtol=1e-4)
