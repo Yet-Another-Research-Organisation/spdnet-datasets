@@ -12,9 +12,9 @@
 * - Outputs
   - cov · mean · raw (n_pixels × p, one face of a fruit)
 * - Samples
-  - FRUIT_N cubes (fruit mode) · 596 (ripeness mode); none discarded
+  - 3 193 cubes (fruit mode) · 596 (ripeness mode); none discarded
 * - Splits
-  - `by_fruit` = `recommended` (grouped by physical fruit; ripeness mode 356 / 120 / 120) · `official` (ripeness mode: 384 / 72 / 140, leaks)
+  - `by_fruit` = `recommended` (grouped by physical fruit; fruit mode 1 915 / 639 / 639, ripeness mode 356 / 120 / 120) · `official` (ripeness mode: 384 / 72 / 140, leaks)
 * - Module
   - `spdnet_datasets.hyperspectral.deephsfruit` (`fetch_deephsfruit`, `DeepHSFruitDataset`, registry name `deephsfruit`)
 ```
@@ -69,11 +69,24 @@ record (3 193 in VIS), `train_only_labeled_v2.json`, `val_v2.json` and
 `merged_annotations.json` is not used: it merges v1 and v2, and gives one file
 several fruits (different weights and firmness).
 
+```{dataset-figure} deephsfruit/ripeness/raw_samples
+```
+
 ## Classes
 
-- Fruit mode (every VIS record of `train_all_v2.json`): FRUIT_COUNTS.
+- Fruit mode (every VIS record of `train_all_v2.json`): Kiwi 1 096, Avocado 932,
+  Mango 538, Kaki 371 and Papaya 256.
 - Ripeness mode (the annotated VIS cubes): perfect 300, overripe 156 and unripe
   140. `ripe` is merged into `perfect`.
+
+```{dataset-figure} deephsfruit/class_hist
+```
+
+```{dataset-figure} deephsfruit/ripeness/class_hist
+```
+
+```{dataset-figure} deephsfruit/ripeness/class_means
+```
 
 ## Covariance construction
 
@@ -89,21 +102,30 @@ several fruits (different weights and firmness).
 | Mode | Cubes | p | n (min / median / max) | κ median (SCM) |
 |---|---|---|---|---|
 | ripeness | 596 | 224 | 2 001 / 35 078 / 107 509 | 6.5e5 |
-| fruit | FRUIT_N | 224 | FRUIT_NOBS | FRUIT_KAPPA |
+| fruit | 3 193 | 224 | 2 001 / 33 510 / 106 836 | 7.0e5 |
 
 `camera="NIR"` (252 bands) and `camera="VIS_COR"` (249 bands) read the other
 cameras. With `normalize=True` (the default), the covariances are multiplied
 by a scalar fitted on the training part of `split`.
 
+```{dataset-figure} deephsfruit/ripeness/cov_samples
+```
+
+```{dataset-figure} deephsfruit/ripeness/eigen_spectrum
+```
+
 ## Splits
 
 - **`by_fruit` (recommended)**: `StratifiedGroupKFold(5)` (seed 0), with
   groups = physical fruit `<Fruit>|<fruit>_<day>_<k>`, which brings both faces
-  together. Test = fold `fold` and validation = fold `fold + 1`. Ripeness mode:
-  356 / 120 / 120.
+  together. Test = fold `fold` and validation = fold `fold + 1`. Fruit mode:
+  1 915 / 639 / 639; ripeness mode: 356 / 120 / 120.
 - **`official`** (ripeness mode): the train / val / test files of the authors,
   384 / 72 / 140. It **leaks**: 46 of the 72 validation cubes and 46 of the 140
   test cubes have the other face of their fruit in the training part.
+
+```{dataset-figure} deephsfruit/ripeness/split_schema
+```
 
 ## Leakage risks and measures
 
