@@ -1,3 +1,2 @@
-% to confirm: the workshop presentation has no DOI; only the context article is verified.
-- C. Lin-Kwong-Chon and M. Gallet, "CPAZMAL: Cryosphere PAZ SAR Data for MAchine Learning", Workshop SAR & Cryosphere, LISTIC, 19 September 2024 ([slides](https://www.univ-smb.fr/listic/wp-content/uploads/sites/66/2024/10/04_christophe_linkwongchon_cpazmaldataset.pdf)). Data: <https://huggingface.co/datasets/musmb/CPAZMaL>
-- Context: S. Kaushik, B. Cerino, E. Trouvé, F. Karbou *et al.*, "Analysis of the Temporal Evolution of Ice Aprons in the Mont-Blanc Massif Using X and C-Band SAR Images", *Frontiers in Remote Sensing* 3, 2022. doi:[10.3389/frsen.2022.930021](https://doi.org/10.3389/frsen.2022.930021)
+- M. Gallet, S. Kaushik, C. Lin-Kwong-Chon, L. Ravanel and E. Trouvé, "CPAZMaL: A New Dataset of X-Band SAR Time Series in the French Alps for Machine Learning", *IEEE Journal of Selected Topics in Applied Earth Observations and Remote Sensing* 19, 2026, pp. 23685–23694. doi:[10.1109/JSTARS.2026.3713622](https://doi.org/10.1109/JSTARS.2026.3713622)
+- Data: <https://huggingface.co/datasets/musmb/CPAZMaL>

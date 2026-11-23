@@ -37,10 +37,17 @@ CDs (compact discs), radio and other recordings.
 - Reference: G. Tzanetakis and P. Cook, "Musical genre classification of audio
   signals", *IEEE (Institute of Electrical and Electronics Engineers) Transactions on Speech and Audio Processing* 10(5), 293–302,
   2002, doi:[10.1109/TSA.2002.800560](https://doi.org/10.1109/TSA.2002.800560).
-- Known defects: B. L. Sturm, "The GTZAN dataset: its contents, its faults,
-  their effects on evaluation, and its future use", 2013,
-  [arXiv:1306.1461](https://arxiv.org/abs/1306.1461): repetitions,
-  mislabelings and distortions.
+- Known defects: B. L. Sturm, "The State of the Art Ten Years After a State of
+  the Art: Future Research in Music Information Retrieval", *Journal of New
+  Music Research* 43(2), 147–172, 2014,
+  doi:[10.1080/09298215.2014.894533](https://doi.org/10.1080/09298215.2014.894533)
+  (preprint [arXiv:1306.1461](https://arxiv.org/abs/1306.1461)): 50 exact
+  repetitions (by audio fingerprint), 21 recording repetitions, 93
+  mislabelings and distortions (jazz 52, 54, 66 clipped; last 25 s of reggae 86
+  unusable). It analyses the original 1 000-excerpt collection, the one the
+  Hugging Face export copies; that export lacks `jazz.00054` (unreadable in the
+  original archive), and the loader drops 14 byte-identical files (exact
+  repetitions under any definition).
 - Licence: not clarified (commercial music excerpts); research use.
 - Local copy: Hugging Face export, parquet files under
   `<data root>/AUDIO/GTZAN` (columns `file`, `audio`, `genre`).

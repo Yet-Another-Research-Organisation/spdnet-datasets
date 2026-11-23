@@ -1,2 +1,3 @@
+- B. Aristimunha, I. Carrara, P. Guetschel, S. Sedlar, P. Rodrigues *et al.*, "Mother of all BCI Benchmarks" (MOABB), software, Zenodo, 2026 (version 1.7.2, the one this adapter is tested with). doi:[10.5281/zenodo.10034223](https://doi.org/10.5281/zenodo.10034223)
 - V. Jayaram and A. Barachant, "MOABB: trustworthy algorithm benchmarking for BCIs", *Journal of Neural Engineering* 15(6), 2018, 066011. doi:[10.1088/1741-2552/aadea0](https://doi.org/10.1088/1741-2552/aadea0)
 - and the original publication of each MOABB dataset you use (listed in its MOABB documentation page).

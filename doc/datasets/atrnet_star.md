@@ -33,10 +33,11 @@ and scenes. There are two representations:
   channels;
 - `Amplitude_8bit`: one 8-bit `.tif` per chip **and per polarisation**.
 
-- Liu Y. et al., *ATRNet-STAR: A Large Dataset and Benchmark Towards Remote
-  Sensing Object Recognition in the Wild*, arXiv:2501.13354
-  (<https://arxiv.org/abs/2501.13354>). Version 4 of the paper is in the
-  dataset folder.
+- Liu Y. et al., *ATRNet-STAR: A Large Dataset and Benchmark Toward Remote
+  Sensing Object Recognition in the Wild*, IEEE TPAMI 48(6), 2026,
+  pp. 6735–6753, doi:[10.1109/TPAMI.2026.3658649](https://doi.org/10.1109/TPAMI.2026.3658649)
+  (preprint arXiv:2501.13354; version 4 of the preprint is in the dataset
+  folder). The dataset card of the Hugging Face repository cites this article.
 - The licence is not stated in the local copy. See
   [Getting the data](#getting-the-data).
 

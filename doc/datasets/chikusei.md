@@ -32,8 +32,10 @@ pixels.
 
 - Reference: N. Yokoya and A. Iwasaki, "Airborne hyperspectral data over
   Chikusei", Space Application Laboratory, University of Tokyo, technical
-  report SAL-2016-05-27, May 2016. This citation comes from the `Readme.txt`
-  of the dataset and was not re-verified.
+  report SAL-2016-05-27, May 2016
+  ([ResearchGate](https://www.researchgate.net/publication/304013716)). This
+  citation is the one given in the `Readme.txt` of the dataset; the report has
+  no DOI.
 - Source: <https://www.sal.t.u-tokyo.ac.jp/hyperdata/> (formerly
   park.itc.u-tokyo.ac.jp/sal/hyperdata). Licence: CC BY 3.0, with an acknowledgement of the Space Application
   Laboratory and a citation of the report.
