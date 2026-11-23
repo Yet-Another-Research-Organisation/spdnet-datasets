@@ -1,1 +1,2 @@
 - G. Tzanetakis and P. Cook, "Musical genre classification of audio signals", *IEEE Transactions on Speech and Audio Processing* 10(5), 2002, pp. 293–302. doi:[10.1109/TSA.2002.800560](https://doi.org/10.1109/TSA.2002.800560)
+- B. L. Sturm, "The State of the Art Ten Years After a State of the Art: Future Research in Music Information Retrieval", *Journal of New Music Research* 43(2), 2014, pp. 147–172 (contents and faults of GTZAN; preprint [arXiv:1306.1461](https://arxiv.org/abs/1306.1461)). doi:[10.1080/09298215.2014.894533](https://doi.org/10.1080/09298215.2014.894533)
