@@ -299,12 +299,13 @@ def test_gsoff_manual_then_archive(gsoff_dir, tmp_path):  # noqa: F811
 
 
 def test_deephsfruit_manual_then_archive(fruit_dir, tmp_path):  # noqa: F811
-    with pytest.raises(ManualDownloadRequired, match="not in the sources"):
+    with pytest.raises(ManualDownloadRequired, match="v2 folder of the authors"):
         DHS.fetch_deephsfruit(tmp_path / "missing", cache_dir=tmp_path / "c")
     z = _zip_tree(fruit_dir, tmp_path / "fruit.zip", top="DeepHS-Fruit")
     b = DHS.fetch_deephsfruit(tmp_path / "missing", cache_dir=tmp_path / "c", archive=z)
-    ref = DHS.fetch_deephsfruit(fruit_dir)
-    assert b.meta.equals(ref.meta) and np.allclose(b.covariances[0], ref.covariances[0])
+    ref = DHS.fetch_deephsfruit(fruit_dir, cache_dir=tmp_path / "ref")
+    assert b.meta.drop(columns="proc_index").equals(ref.meta.drop(columns="proc_index"))
+    np.testing.assert_allclose(b.covariances[0], ref.covariances[0])
 
 
 # --- SAR ---------------------------------------------------------------------------------------
@@ -507,7 +508,7 @@ def test_hsi_classes_build_from_the_fetch_without_local_copy(rices_dir, fruit_di
         DHS.DeepHSFruitDataset(cache_dir=cache, verbose=False)
     DHS.fetch_deephsfruit(cache_dir=cache, archive=_zip_tree(fruit_dir, tmp_path / "f.zip"))
     ds = DHS.DeepHSFruitDataset(cache_dir=cache, verbose=False)
-    assert len(ds) > 0 and (ds.data_dir / "cov_VIS").is_dir()
+    assert len(ds) > 0 and (ds.data_dir / "annotations").is_dir()
     # HyperLeaf: the image mode resolves the sources without computing covariances
     with pytest.raises(MissingCredentialsError):
         HL.HyperLeafDataset(cache_dir=cache, mode="image", verbose=False)

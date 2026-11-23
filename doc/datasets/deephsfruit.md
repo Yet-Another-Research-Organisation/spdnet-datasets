@@ -1,26 +1,5 @@
 # DeepHS-Fruit
 
-```{warning}
-⚠️ **Outside the maintained selection.** DeepHS-Fruit is not one of the
-datasets maintained by this package. The loader is only adapted to the
-common interface: it reads the **historical precomputed covariances**
-(`cov_VIS/*.pt`) as they are. Their construction (pixel mask, estimator,
-scaling) is undocumented and has not been re-verified. Raw data and channel
-means are not served, and the n ≥ 2p rule cannot be checked. A `UserWarning`
-is raised at construction.
-```
-
-```{danger}
-**Ripeness labels were attributed to the wrong fruit by the former loader.**
-The `cov_VIS` files are numbered like the records of
-`merged_annotations.json`, but the v2 annotation files number their records
-differently: id 1 is fruit 01 in `merged`, and fruit 20 in
-`train_only_labeled_v2`. The former `ripeness` mode matched the two by id.
-**Every past result on ripeness obtained with the former loader is
-invalid.** The labels are now matched through the header file of each
-record.
-```
-
 ```{list-table}
 :stub-columns: 1
 
@@ -29,13 +8,13 @@ record.
 * - Task(s)
   - fine classification: `classification_mode="fruit"` (5 fruits) or `"ripeness"` (3 states)
 * - Covariance
-  - 224×224, precomputed (VIS, visible-range camera); n unknown
+  - 224×224 (VIS camera, all bands; `band_bin` averages groups of bands), one per cube, n = the pixels of the fruit (ripeness mode: 2 001 to 107 509, median 35 078)
 * - Outputs
-  - cov only
+  - cov · mean · raw (n_pixels × p, one face of a fruit)
 * - Samples
-  - 3 193 covariances (fruit mode) · 384 (ripeness mode)
+  - FRUIT_N cubes (fruit mode) · 596 (ripeness mode); none discarded
 * - Splits
-  - `by_fruit` = `recommended` (grouped by physical fruit; fruit mode 1 915 / 639 / 639, ripeness mode 230 / 77 / 77)
+  - `by_fruit` = `recommended` (grouped by physical fruit; ripeness mode 356 / 120 / 120) · `official` (ripeness mode: 384 / 72 / 140, leaks)
 * - Module
   - `spdnet_datasets.hyperspectral.deephsfruit` (`fetch_deephsfruit`, `DeepHSFruitDataset`, registry name `deephsfruit`)
 ```
@@ -58,20 +37,22 @@ firmness.
 
 - Reference: L. A. Varga, J. Makowski and A. Zell, "Measuring the ripeness of
   fruit with hyperspectral imaging and deep learning", IJCNN 2021
-  (International Joint Conference on Neural Networks). v2 annotations:
-  University of Tübingen, update of 9 January 2024. Neither was re-verified.
-- Repository: <https://github.com/cogsys-tuebingen/deephs_fruit> (URL not
-  verified). Licence: see the authors' repository (not verified).
+  (International Joint Conference on Neural Networks). The article describes
+  version 1; version 2 (the data read here) adds recordings and new
+  annotations (update of 9 January 2024) and is published in the same
+  repository, which still cites this article.
+- Repository: <https://github.com/cogsys-tuebingen/deephs_fruit>. Licence: not
+  stated.
 
 ## Getting the data
 
-Manual, and outside the selection: the `cov_VIS/*.pt` covariances read here
-are a local precomputation that no download provides, so the sources of the
-authors (226 GB, links in <https://github.com/cogsys-tuebingen/deephs_fruit>;
-servers unreachable on 2026-11-15) cannot feed this loader. Without a local copy,
+Manual (226 GB): the sources of the authors are listed in
+<https://github.com/cogsys-tuebingen/deephs_fruit> (HTTP index and torrent of the
+v2 folder; the server did not answer on 2026-11-15 and 2026-11-23). Without a
+local copy under `<SPDNET_DATA_ROOT>/HYPERSPECTRAL/DeepHS-Fruit`,
 `fetch_deephsfruit()` opens the repository page and raises
-`ManualDownloadRequired`; `archive=` accepts a copy with the local layout
-(`cov_VIS/`, `annotations/`).
+`ManualDownloadRequired`; `archive=` accepts the downloaded folder, or a zip of
+it, with the layout of the authors.
 
 ```python
 fetch_deephsfruit(archive="~/copies/DeepHS-Fruit")
@@ -79,106 +60,86 @@ fetch_deephsfruit(archive="~/copies/DeepHS-Fruit")
 
 ## Raw data
 
-Cubes are stored as `<Fruit>/<VIS|NIR|VIS_COR>/<day>/<fruit>_<day>_<k>_<front|back>.{hdr,bin}`,
-with annotations in `annotations/*.json`. The loader reads neither the
-cubes nor the masks: it reads `cov_VIS/<fruit>_VIS_<day>_<record>_<side>.pt`,
-one 224 × 224 covariance per VIS cube. There is therefore no raw-data figure.
+Cubes are stored as
+`<Fruit>/<VIS|NIR|VIS_COR>/<day>/<fruit>_<day>_<k>_<front|back>.{hdr,bin}`
+(ENVI, BIP, float32 reflectance, already cut out on a zero background), with
+the v2 annotations in `annotations/*_v2.json`. `train_all_v2.json` lists every
+record (3 193 in VIS), `train_only_labeled_v2.json`, `val_v2.json` and
+`test_v2.json` the annotated ones (384, 72 and 140 in VIS).
+`merged_annotations.json` is not used: it merges v1 and v2, and gives one file
+several fruits (different weights and firmness).
 
 ## Classes
 
-- Fruit mode (every VIS covariance): Kiwi 1 096, Avocado 932, Mango 538, Kaki
-  371 and Papaya 256.
-- Ripeness mode (the VIS cubes annotated in `train_only_labeled_v2`): perfect
-  216, overripe 86 and unripe 82. `ripe` is merged into `perfect`. By fruit,
-  these are Kiwi 138, Avocado 92, Kaki 56, Mango 56 and Papaya 42.
-
-```{dataset-figure} deephsfruit/class_hist
-```
-
-```{dataset-figure} deephsfruit/ripeness/class_hist
-```
+- Fruit mode (every VIS record of `train_all_v2.json`): FRUIT_COUNTS.
+- Ripeness mode (the annotated VIS cubes): perfect 300, overripe 156 and unripe
+  140. `ripe` is merged into `perfect`.
 
 ## Covariance construction
 
-The covariances are the historical `cov_VIS/*.pt` files, read **read-only**
-and converted to float64. The bands (224), the pixels kept and the estimator
-are not documented. The atlas notes that the cubes are already cut out
-(background at 0). It also notes values outside [0, 1] (VIS extremes −60 and
-111), which an unclipped estimator would include. The `estimator=` and
-`keep=` options have no effect.
+1. **Fruit mask**: Otsu threshold on the mean of bands 150–199 (VIS, about
+   800–930 nm; all bands for the other cameras), over the whole frame. The
+   zero background falls below it, and so does the dark rim of the fruit.
+2. **Clipping**: reflectances outside [0, 1] (extremes −60 and 111 in VIS) are
+   clipped.
+3. **Bands**: all of them by default (p = 224 in VIS); `band_bin=k` averages
+   groups of k bands (`band_bin=4`: p = 56).
+4. One covariance per cube, over the pixels of the mask.
 
-With `normalize=True` (the default), the covariances are multiplied by a
-scalar fitted on the training part of `split`, so that the geometric mean of
-their eigenvalues is 1.
+| Mode | Cubes | p | n (min / median / max) | κ median (SCM) |
+|---|---|---|---|---|
+| ripeness | 596 | 224 | 2 001 / 35 078 / 107 509 | 6.5e5 |
+| fruit | FRUIT_N | 224 | FRUIT_NOBS | FRUIT_KAPPA |
 
-The figures below show two covariances of each mode and the eigenvalue
-spectrum.
-
-```{dataset-figure} deephsfruit/cov_samples
-```
-
-```{dataset-figure} deephsfruit/eigen_spectrum
-```
-
-```{dataset-figure} deephsfruit/ripeness/cov_samples
-```
-
-```{dataset-figure} deephsfruit/ripeness/eigen_spectrum
-```
+`camera="NIR"` (252 bands) and `camera="VIS_COR"` (249 bands) read the other
+cameras. With `normalize=True` (the default), the covariances are multiplied
+by a scalar fitted on the training part of `split`.
 
 ## Splits
 
 - **`by_fruit` (recommended)**: `StratifiedGroupKFold(5)` (seed 0), with
-  groups = physical fruit. A physical fruit is `<Fruit>|<fruit>_<day>_<k>`,
-  which brings both faces together. Test = fold `fold` and validation = fold
-  `fold + 1`. Fruit mode has 1 644 groups and gives 1 915 / 639 / 639.
-  Ripeness mode has 238 groups and gives 230 / 77 / 77.
-- **The official v2 split is not offered.** The VIS cubes of `val_v2` (72) and
-  `test_v2` (140) are absent from `merged_annotations.json`, and have no
-  `cov_VIS` file. It would also leak: 46 of the 140 VIS test cubes have the
-  other face of their fruit in train.
-
-```{dataset-figure} deephsfruit/split_schema
-```
-
-```{dataset-figure} deephsfruit/ripeness/split_schema
-```
+  groups = physical fruit `<Fruit>|<fruit>_<day>_<k>`, which brings both faces
+  together. Test = fold `fold` and validation = fold `fold + 1`. Ripeness mode:
+  356 / 120 / 120.
+- **`official`** (ripeness mode): the train / val / test files of the authors,
+  384 / 72 / 140. It **leaks**: 46 of the 72 validation cubes and 46 of the 140
+  test cubes have the other face of their fruit in the training part.
 
 ## Leakage risks and measures
 
 | Risk | Measure | Residual |
 |---|---|---|
-| both faces of one fruit on both sides (official v2 split: 46 / 140 VIS test cubes) | groups = physical fruit; checked by the real-data test | none for the faces |
-| the same fruit under another number on another day | — | not verifiable without metadata |
-| ripeness labels matched to the wrong fruit (former loader) | matched by header file | none; past ripeness results invalid |
-| undocumented covariance construction | warning | unknown |
+| both faces of one fruit on both sides (official split: 46 / 72 val, 46 / 140 test) | groups = physical fruit in `by_fruit`; checked by the real-data test | none for the faces |
+| the same fruit recorded on several days | — | not traceable: the number `k` is reused by other fruits |
 
 ## Supported tasks
 
-- `classification_mode="fruit"` (5 classes) or `"ripeness"` (3 classes, 384
-  covariances), both with `task="fine"`. There is no coarse map and no
-  regression (the firmness is not served).
+- `classification_mode="fruit"` (5 classes) or `"ripeness"` (3 classes), both
+  with `task="fine"`. The firmness and the storage days are in `meta` but are
+  not served as regression targets.
 - `drop_classes`, `merge_classes` and `balance=...` work as for the other
-  datasets. Only the VIS modality exists (`modality="VIS"`).
+  datasets.
 
 ## Usage
 
 ```python
-import warnings
-from spdnet_datasets.hyperspectral.deephsfruit import DeepHSFruitDataset
+from spdnet_datasets.hyperspectral import DeepHSFruitDataset
 
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore", UserWarning)    # "historical precomputed covariances"
-    ripe = DeepHSFruitDataset(classification_mode="ripeness", subset="train")
+ripe = DeepHSFruitDataset(classification_mode="ripeness")             # 596 × 224 × 224
+ripe = DeepHSFruitDataset(classification_mode="ripeness", band_bin=4) # p = 56
+fruit = DeepHSFruitDataset(camera="NIR")                              # 252 bands
 ```
 
 ## Migration notes
 
-- Ripeness labels are now matched by header file (see the warning above).
-  Results from the former loader are invalid.
-- `return_mean=True` and `return_raw=True` raise an error.
-- `split="train"` raises an error: use `subset="train"`. `subset=None` is the
-  default.
+- The covariances are now computed from the raw cubes. The former loader read
+  the historical `cov_VIS/*.pt` files, whose construction was undocumented,
+  and its ripeness labels were matched to the wrong fruits (by record id
+  instead of header file): every result obtained with it is invalid.
+- Ripeness mode now holds the 596 annotated VIS cubes (384 before) and offers
+  the official split.
+- `return_mean=True` and `return_raw=True` are available; `modality=` is kept as
+  an alias of `camera=`.
 
 ## How to cite
 
