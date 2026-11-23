@@ -6,26 +6,33 @@ here. This module only caches what it derives from the epochs, under
 ``SPDNET_CACHE_DIR/moabb_<dataset code>/`` through
 :func:`spdnet_datasets.core.fetch.run_pipeline`::
 
-    processed/<hash>/   epochs.npy (float32), labels.npy, metadata.csv
+    processed/<hash>/   epochs.npy (float32), labels.npy, metadata.csv,
+                        channels.npy, excluded_subjects.npy
     covariance/<hash>/  covariances.npy, means.npy, labels.npy, metadata.csv,
-                        trial_index.npy, n_excluded.npy
+                        trial_index.npy, n_excluded.npy, channels.npy,
+                        excluded_subjects.npy
 
 The covariance stage is keyed on the estimator only on top of the epochs key,
 so changing the estimator does not call ``paradigm.get_data`` again.
 """
 
+import re
 import warnings
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import torch
+from sklearn.model_selection import train_test_split
 
 from ..base import BaseDataset
 from ..core.config import get_cache_dir
 from ..core.estimators import InsufficientSamplesError, NotSPDError
 from ..core.fetch import run_pipeline
 from ..core.normalize import geometric_scale
+from ..core.splits import assert_no_leakage
+from ..manager import DatasetManager
 from .covariances import epochs_to_covariances
 
 SPLIT_KINDS = ("within_session", "cross_session", "cross_subject")
@@ -138,6 +145,109 @@ def moabb_splits(y, metadata, n_folds=5, seed=42) -> dict:
     return out
 
 
+def stratified_split(y, val_size=0.1, test_size=0.15, seed=42) -> dict:
+    """Trial-level train/val/test split, stratified by class over all trials.
+
+    The test set is drawn first, then the validation set from the rest, so both
+    sizes are fractions of all trials. Subjects are mixed across the three
+    parts (within-subject protocol). Unlike the MOABB protocols, it has a
+    validation set.
+    """
+    y = np.asarray(y)
+    idx = np.arange(len(y))
+    rest, test = train_test_split(idx, test_size=test_size, random_state=seed, stratify=y)
+    train, val = train_test_split(rest, test_size=val_size / (1.0 - test_size),
+                                  random_state=seed, stratify=y[rest])
+    return {"train": np.sort(train), "val": np.sort(val), "test": np.sort(test)}
+
+
+def subject_fold_splits(labels, subjects, sessions, n_folds, val_groups=1,
+                        calib_fraction=0.5, seed=0) -> dict:
+    """Cross-subject folds: training, validation and test subjects never shared.
+
+    The subjects are shuffled with ``seed`` and cut into ``n_folds`` groups of
+    nearly equal size. Fold ``k`` tests group ``k``, validates on the next
+    ``val_groups`` groups (cyclically) and trains on the others, as
+    ``stratified_fold_<k>`` in :mod:`spdnet_datasets.nilearn`: over
+    ``k = 0 .. n_folds - 1`` every subject is tested exactly once.
+
+    Each session of a validation or test subject is cut in recording order
+    (the order of the cached trials): its first ``calib_fraction`` trials
+    (rounded down) form an unlabeled calibration pool, the others are
+    evaluated. An adaptation to the session thus only sees trials recorded
+    before the evaluated ones, in the same session. The first ``K`` trials of a
+    pool are the calibration of size ``K``, and the evaluated trials do not
+    depend on ``K``. The labels are only used to check that both parts of each
+    session hold all its classes: a loader that stores the trials class by
+    class (MOABB's Cho2017) does not keep the recording order.
+
+    Returns
+    -------
+    dict
+        ``"subject_fold_<k>" -> {"train", "val", "test", "calib_val", "calib"}``:
+        ``calib_val`` and ``calib`` are the calibration pools of the validation
+        and test sessions, in recording order.
+
+    Raises
+    ------
+    ValueError
+        If ``n_folds`` is not between ``val_groups + 2`` and the number of
+        subjects, if ``calib_fraction`` is not in ``(0, 1)``, or if a part of a
+        cut session is empty or misses a class of the session.
+    """
+    labels, subjects, sessions = map(np.asarray, (labels, subjects, sessions))
+    ids = np.unique(subjects)
+    if not val_groups + 2 <= n_folds <= len(ids):
+        raise ValueError(f"subject folds need {val_groups + 2} <= n_folds <= {len(ids)} "
+                         f"(the number of subjects), got {n_folds}")
+    if not 0 < calib_fraction < 1:
+        raise ValueError(f"calib_fraction must be in (0, 1), got {calib_fraction}")
+    # RandomState: the same groups across NumPy versions
+    groups = np.array_split(np.random.RandomState(seed).permutation(ids), n_folds)
+
+    def pool_and_rest(group):
+        pool, rest = [], []
+        for s in group:
+            idx = np.flatnonzero(subjects == s)
+            for session in dict.fromkeys(sessions[idx]):  # recording order
+                trials = idx[sessions[idx] == session]
+                n = int(calib_fraction * len(trials))
+                classes = set(labels[trials].tolist())
+                first, last = set(labels[trials[:n]].tolist()), set(labels[trials[n:]].tolist())
+                if not first == last == classes:
+                    raise ValueError(
+                        f"subject {s}, session {session}: its first {n} and last "
+                        f"{len(trials) - n} trials do not both hold its classes "
+                        f"{sorted(classes)}; the loader may store the trials class by class")
+                pool.append(trials[:n])
+                rest.append(trials[n:])
+        return np.concatenate(pool), np.concatenate(rest)
+
+    out = {}
+    for k in range(n_folds):
+        test_subjects = groups[k]
+        val_subjects = np.concatenate([groups[(k + i) % n_folds]
+                                       for i in range(1, val_groups + 1)])
+        calib, test = pool_and_rest(test_subjects)
+        calib_val, val = pool_and_rest(val_subjects)
+        train = np.flatnonzero(~np.isin(subjects, np.concatenate([test_subjects,
+                                                                  val_subjects])))
+        held_val = subjects[np.concatenate([calib_val, val])]
+        held_test = subjects[np.concatenate([calib, test])]
+        assert_no_leakage(subjects[train], held_val, what="subject")
+        assert_no_leakage(subjects[train], held_test, what="subject")
+        assert_no_leakage(held_val, held_test, what="subject")
+        out[f"subject_fold_{k}"] = {"train": train, "val": val, "test": test,
+                                    "calib_val": calib_val, "calib": calib}
+    return out
+
+
+def _channel_mismatch(exc) -> bool:
+    """Whether ``exc`` is the MNE error of concatenating epochs of other channels."""
+    return (isinstance(exc, ValueError)
+            and re.search(r"info\['(ch_names|nchan)'\]", str(exc)) is not None)
+
+
 class MOABBCovariances(BaseDataset):
     """SPD covariances of the epochs of a MOABB dataset, as a PyTorch dataset.
 
@@ -167,6 +277,21 @@ class MOABBCovariances(BaseDataset):
         covariances times ``s``, means and raw signals times ``sqrt(s)``.
     n_folds : int
         Folds of the within-session protocol.
+    holdout : (float, float), optional
+        ``(val_size, test_size)`` of an extra ``stratified`` split
+        (:func:`stratified_split`). Default: no such split.
+    subject_folds : int, optional
+        Number of cross-subject folds ``subject_fold_<k>``
+        (:func:`subject_fold_splits`). Default: no such folds.
+    val_groups : int
+        Number of subject groups of the validation set of these folds.
+    calib_fraction : float
+        Fraction of the trials of each session of a validation or test
+        subject, the first in recording order, kept as its calibration pool in
+        these folds.
+    fold_seed : int
+        Random state of the subject groups of these folds. Kept apart from
+        ``seed`` so that a subject stays in the same fold across runs.
     cache_dir : path, optional
         Default: ``$SPDNET_CACHE_DIR``.
     force : bool
@@ -186,11 +311,17 @@ class MOABBCovariances(BaseDataset):
         Subject and session of each trial.
     splits : dict
         ``within_session_<k>``, ``cross_session_<k>``, ``cross_subject_<k>``
-        (see :func:`moabb_splits`) and ``recommended``, an alias of the first
+        (see :func:`moabb_splits`), ``recommended``, an alias of the first
         fold of the strictest protocol available (cross-subject, then
-        cross-session, then within-session).
+        cross-session, then within-session), ``stratified`` when ``holdout``
+        is set, and ``subject_fold_<k>`` when ``subject_folds`` is set.
     scale : float
         Geometric scale applied to the covariances.
+    channels : list of str
+        Channel names, the same for every kept trial.
+    excluded_subjects : list
+        Subjects left out because their channels (names and order) differ from
+        the most common channel list, or differ between their own sessions.
     n_excluded : int
         Trials dropped because their covariance could not be estimated
         (too few time samples, or not SPD).
@@ -200,7 +331,9 @@ class MOABBCovariances(BaseDataset):
 
     def __init__(self, dataset, paradigm, subjects=None, *, estimator="scm", keep=None,
                  return_mean=False, return_raw=False, split=None, normalize=True,
-                 n_folds=5, cache_dir=None, force=False, seed=42, verbose=False):
+                 n_folds=5, holdout=None, subject_folds=None, val_groups=1,
+                 calib_fraction=0.5, fold_seed=0, cache_dir=None, force=False, seed=42,
+                 verbose=False):
         cache_dir = get_cache_dir() if cache_dir is None else Path(cache_dir).expanduser()
         cache_dir.mkdir(parents=True, exist_ok=True)
         super().__init__(cache_dir, seed=seed, verbose=verbose, return_mean=return_mean,
@@ -211,6 +344,9 @@ class MOABBCovariances(BaseDataset):
         self.dataset, self.paradigm = dataset, paradigm
         self.subjects_requested = sorted(subjects or dataset.subject_list)
         self.keep, self.force, self.n_folds = keep, force, n_folds
+        self.holdout = None if holdout is None else tuple(holdout)
+        self.subject_folds, self.val_groups = subject_folds, val_groups
+        self.calib_fraction, self.fold_seed = calib_fraction, fold_seed
         self.split = split
         self._load_data()
 
@@ -218,14 +354,55 @@ class MOABBCovariances(BaseDataset):
         return {"dataset": self.dataset.code, "subjects": self.subjects_requested,
                 "dataset_params": _key_attributes(self.dataset),
                 "paradigm": type(self.paradigm).__name__,
-                "paradigm_params": _key_attributes(self.paradigm)}
+                "paradigm_params": _key_attributes(self.paradigm),
+                "version": 2}  # 2: per-subject loading, channel names checked
+
+    def _get_epochs(self, subject):
+        """Epochs (float32), labels, metadata and channel names of one subject.
+
+        The epochs are scaled by the unit factor of the dataset, as in the
+        arrays returned by MOABB.
+        """
+        epochs, y, metadata = self.paradigm.get_data(dataset=self.dataset,
+                                                     subjects=[subject], return_epochs=True)
+        X = (epochs.get_data(copy=False) * self.dataset.unit_factor).astype(np.float32)
+        if len(X) != len(y):
+            raise ValueError(f"{self.dataset.code}: {len(X)} epochs for {len(y)} labels; "
+                             "paradigms with several filters are not supported")
+        return X, y, metadata, list(epochs.ch_names)
 
     def _process(self, _source, out):
-        X, y, metadata = self.paradigm.get_data(dataset=self.dataset,
-                                                subjects=self.subjects_requested)
-        np.save(out / "epochs.npy", np.asarray(X, dtype=np.float32))
-        np.save(out / "labels.npy", np.asarray(y).astype(str))
-        metadata.reset_index(drop=True).to_csv(out / "metadata.csv", index=False)
+        """Epochs of the subjects whose channels are the most common list.
+
+        Subjects are loaded one by one. A subject is excluded when its channel
+        list (names and order) differs from the most common one (ties go to the
+        longer list), or when its own sessions have different channels.
+        """
+        parts, excluded = {}, []
+        for s in self.subjects_requested:
+            try:
+                parts[s] = self._get_epochs(s)
+            except ValueError as exc:
+                if not _channel_mismatch(exc):
+                    raise
+                excluded.append(s)  # its sessions have different channels
+        if not parts:
+            raise ValueError(f"{self.dataset.code}: no subject left, the sessions of "
+                             f"subjects {excluded} have different channels")
+        counts = Counter(tuple(part[3]) for part in parts.values())
+        channels = max(counts, key=lambda c: (counts[c], len(c)))
+        kept = [s for s, part in parts.items() if tuple(part[3]) == channels]
+        n_times = {s: parts[s][0].shape[-1] for s in kept}
+        if len(set(n_times.values())) > 1:
+            raise ValueError(f"{self.dataset.code}: epochs of different lengths per subject "
+                             f"{n_times}; set the paradigm's resample, tmin and tmax")
+        excluded = sorted(excluded + [s for s in parts if s not in kept])
+        np.save(out / "channels.npy", np.asarray(channels))
+        np.save(out / "excluded_subjects.npy", np.asarray(excluded))
+        np.save(out / "epochs.npy", np.concatenate([parts[s][0] for s in kept]))
+        np.save(out / "labels.npy", np.concatenate([parts[s][1] for s in kept]).astype(str))
+        metadata = pd.concat([parts[s][2] for s in kept], ignore_index=True)
+        metadata.to_csv(out / "metadata.csv", index=False)
 
     def _covariances(self, processed, out):
         """Covariances of the epochs; trials whose estimate fails are excluded.
@@ -252,6 +429,8 @@ class MOABBCovariances(BaseDataset):
         np.save(out / "labels.npy", np.load(processed / "labels.npy")[kept])
         np.save(out / "trial_index.npy", kept)
         np.save(out / "n_excluded.npy", len(X) - len(kept))
+        for name in ("channels.npy", "excluded_subjects.npy"):
+            np.save(out / name, np.load(processed / name))
         metadata = _read_metadata(processed / "metadata.csv").iloc[kept]
         metadata.reset_index(drop=True).to_csv(out / "metadata.csv", index=False)
 
@@ -265,6 +444,12 @@ class MOABBCovariances(BaseDataset):
         self.covs = np.load(d / "covariances.npy")
         self.trial_index = np.load(d / "trial_index.npy")
         self.n_excluded = int(np.load(d / "n_excluded.npy"))
+        self.channels = np.load(d / "channels.npy").tolist()
+        self.excluded_subjects = np.load(d / "excluded_subjects.npy").tolist()
+        if self.excluded_subjects:
+            warnings.warn(f"{self.dataset.code}: subjects {self.excluded_subjects} excluded, "
+                          f"their channels differ from the {len(self.channels)} kept",
+                          UserWarning, stacklevel=4)
         self.means = np.load(d / "means.npy")
         self.metadata = _read_metadata(d / "metadata.csv")
         self.classes, self.labels = np.unique(np.load(d / "labels.npy"), return_inverse=True)
@@ -288,6 +473,13 @@ class MOABBCovariances(BaseDataset):
             if f"{kind}_0" in self.splits:
                 self.splits["recommended"] = self.splits[f"{kind}_0"]
                 break
+        if self.holdout is not None:
+            self.splits["stratified"] = stratified_split(self.labels, *self.holdout,
+                                                         seed=self.seed)
+        if self.subject_folds is not None:
+            self.splits.update(subject_fold_splits(
+                self.labels, self.subjects, self.sessions, self.subject_folds,
+                self.val_groups, self.calib_fraction, self.fold_seed))
         self.scale = 1.0
         if self.split is not None:
             if self.split not in self.splits:
@@ -311,3 +503,70 @@ class MOABBCovariances(BaseDataset):
         raw = (torch.from_numpy(np.array(self.epochs[self.trial_index[idx]].T, dtype=np.float32) * np.float32(root))
                if self.return_raw else None)
         return self._pack(cov, mean, raw), int(self.labels[idx])
+
+
+@DatasetManager.register_dataset("moabb")
+class MOABBDataset(MOABBCovariances):
+    """MOABB covariances built from class names, for configuration files.
+
+    Registered as ``"moabb"`` in :class:`~spdnet_datasets.manager.DatasetManager`,
+    so a Hydra ``dataset`` config of spdnet-training can select it::
+
+        name: moabb
+        dataset: BNCI2014_001
+        paradigm: MotorImagery
+        paradigm_params: {n_classes: 4, fmin: 8, fmax: 32, resample: 128}
+        split_strategy: stratified
+
+    Parameters
+    ----------
+    dataset, paradigm : str
+        Class names in :mod:`moabb.datasets` and :mod:`moabb.paradigms`.
+    dataset_params, paradigm_params : dict, optional
+        Keyword arguments of these classes (``sessions``, ``events``, ``tmin``...).
+    subjects : list of int, optional
+        Default: ``dataset.subject_list``.
+    exclude_subjects : list of int
+        Removed from ``subjects``.
+    holdout : (float, float)
+        ``(val_size, test_size)`` of the ``stratified`` split. The manager's
+        ``val_ratio`` and ``test_ratio`` do not apply to named splits.
+    split : str, optional
+        Split the geometric scale is fitted on. The manager sets it to
+        ``split_strategy``.
+    input_dim : int, optional
+        Expected number of channels, checked after loading.
+    data_dir : path, optional
+        Alias of ``cache_dir`` (the manager sets it from the config key ``path``).
+    **kwargs
+        Other arguments of :class:`MOABBCovariances`.
+    """
+
+    def __init__(self, dataset, paradigm="MotorImagery", *, dataset_params=None,
+                 paradigm_params=None, subjects=None, exclude_subjects=(),
+                 holdout=(0.1, 0.15), split=None, input_dim=None, data_dir=None,
+                 **kwargs):
+        try:
+            import moabb.datasets
+            import moabb.paradigms
+        except ImportError as exc:
+            raise ImportError("MOABBDataset needs moabb: "
+                              "pip install 'spdnet-datasets[moabb]'") from exc
+
+        for module, name in ((moabb.datasets, dataset), (moabb.paradigms, paradigm)):
+            if not hasattr(module, name):
+                raise ValueError(f"{module.__name__} has no {name!r}")
+        ds = getattr(moabb.datasets, dataset)(**(dataset_params or {}))
+        pa = getattr(moabb.paradigms, paradigm)(**(paradigm_params or {}))
+        excluded = set(exclude_subjects)
+        subjects = ds.subject_list if subjects is None else subjects
+        subjects = [s for s in subjects if s not in excluded]
+        if not subjects:
+            raise ValueError(f"{dataset}: no subject left after exclude_subjects")
+        if data_dir is not None:
+            kwargs.setdefault("cache_dir", data_dir)
+        super().__init__(ds, pa, subjects, holdout=holdout, split=split, **kwargs)
+        n_channels = self.covs.shape[-1]
+        if input_dim is not None and input_dim != n_channels:
+            raise ValueError(f"input_dim={input_dim}, but {dataset} gives "
+                             f"{n_channels} channels")
