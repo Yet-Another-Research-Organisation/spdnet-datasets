@@ -146,6 +146,9 @@ the one of the frame). S depends on the size of the nut: 20 to 71 tokens (median
 in all), padded with masked tokens; it exceeds the S ≤ 32 rule of the other modes by design.
 Measured: 100 % SPD tokens, κ median 8.9e3.
 
+```{dataset-figure} hyperpistachio/series_inner_windows
+```
+
 ```python
 from spdnet_datasets.series import CovarianceSeries
 
