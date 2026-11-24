@@ -1,1 +1,2 @@
 - A. Sheikh-Akbari and H. Mehrabinejad, "HyperPistachio: A Hyperspectral Image Dataset of Aflatoxin B1 Contaminated Pistachio Nuts", Zenodo, 2026. doi:[10.5281/zenodo.20027441](https://doi.org/10.5281/zenodo.20027441)
+- A. N. Ndu, S. Mahroughi, H. Mehrabinejad and A. Sheikh-Akbari, "Enhancing Hyperspectral Aflatoxin Detection in Pistachios Using SE-Based Spectral Attention", *15th Mediterranean Conference on Embedded Computing (MECO)*, 2026, pp. 1–4. doi:[10.1109/MECO70748.2026.11579024](https://doi.org/10.1109/MECO70748.2026.11579024)

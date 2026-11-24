@@ -1,8 +1,9 @@
 """ATRNet-STAR: airborne X/Ku-band quad-pol SAR chips of 40 civilian vehicles.
 
-Reference: Liu Y. et al., *ATRNet-STAR: A Large Dataset and Benchmark Towards
-Remote Sensing Object Recognition in the Wild*, arXiv:2501.13354 (v4 in the
-dataset folder). Manual download (no checksum registry): the dataset must be
+Reference: Liu Y. et al., *ATRNet-STAR: A Large Dataset and Benchmark Toward
+Remote Sensing Object Recognition in the Wild*, IEEE TPAMI 48(6), 2026,
+doi:10.1109/TPAMI.2026.3658649 (preprint arXiv:2501.13354, v4 in the dataset
+folder). Manual download (no checksum registry): the dataset must be
 under ``<root>/SAR/ATRNet-STAR``.
 
 Layout::

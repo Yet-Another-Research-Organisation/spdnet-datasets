@@ -38,8 +38,11 @@ areas. The stacks are linear intensities, geocoded on a common EPSG:4326 grid
 (EPSG: European Petroleum Survey Group code; 4326 = WGS84 geographic
 coordinates).
 
-- Lin-Kwong-Chon C., Gallet M., *CPAZMAL: Cryosphere PAZ SAR Data for MAchine
-  Learning*, Workshop SAR & Cryosphere, 19 September 2024, LISTIC
+- Gallet M., Kaushik S., Lin-Kwong-Chon C., Ravanel L., Trouvé E., *CPAZMaL:
+  A New Dataset of X-Band SAR Time Series in the French Alps for Machine
+  Learning*, IEEE JSTARS 19, 2026, pp. 23685–23694,
+  doi:[10.1109/JSTARS.2026.3713622](https://doi.org/10.1109/JSTARS.2026.3713622).
+  First presented at the Workshop SAR & Cryosphere, LISTIC, 19 September 2024
   ([slides](https://www.univ-smb.fr/listic/wp-content/uploads/sites/66/2024/10/04_christophe_linkwongchon_cpazmaldataset.pdf)).
 - Context: Kaushik S. et al., *Analysis of the Temporal Evolution of Ice Aprons
   in the Mont-Blanc Massif Using X and C-Band SAR Images*, Frontiers in Remote

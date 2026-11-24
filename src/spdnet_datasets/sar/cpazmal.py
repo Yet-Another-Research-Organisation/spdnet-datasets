@@ -1,8 +1,9 @@
 """CPAZMaL: PAZ X-band dual-polarisation time series of the Mont-Blanc massif.
 
 Data: ``SAR/PAZ_S1_proc_v2/CPAZMaL.hdf5`` (+ ``CPAZMaL.txt``), also published on
-Hugging Face (``musmb/CPAZMaL``, Apache-2.0). Reference: Lin-Kwong-Chon C.,
-Gallet M., *CPAZMAL: Cryosphere PAZ SAR data for MAchine Learning* (LISTIC, 2024).
+Hugging Face (``musmb/CPAZMaL``, Apache-2.0). Reference: Gallet M. et al.,
+*CPAZMaL: A New Dataset of X-Band SAR Time Series in the French Alps for Machine
+Learning*, IEEE JSTARS 19, 2026, doi:10.1109/JSTARS.2026.3713622.
 
 Download: when ``CPAZMaL.hdf5`` is absent from ``data_dir``, the file of the
 pinned Hugging Face revision (1.5 GB, sha256 = LFS identifier, equal to the
