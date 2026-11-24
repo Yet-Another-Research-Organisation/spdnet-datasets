@@ -1,0 +1,25 @@
+{
+ "name": "hyperpistachio",
+ "kwargs": {},
+ "split": "recommended",
+ "p": 462,
+ "n_samples": 52,
+ "classes": [
+  "above_limit",
+  "below_limit"
+ ],
+ "counts": {
+  "train": [
+   12,
+   18
+  ],
+  "val": [
+   2,
+   8
+  ],
+  "test": [
+   4,
+   8
+  ]
+ }
+}
