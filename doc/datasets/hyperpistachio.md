@@ -58,6 +58,19 @@ checked) into `<cache_dir>/HyperPistachio/downloads/` and extracts it there
 fetch_hyperpistachio(archive="~/Downloads/Dataset.zip")
 ```
 
+## Raw data
+
+Windows of 32 × 32 pixels inside four pistachios (`unit="window"`, mean over the
+kept bands):
+
+```{dataset-figure} hyperpistachio/window/raw_samples
+```
+
+Mean spectrum of each class (`unit="pistachio"`, all 462 bands):
+
+```{dataset-figure} hyperpistachio/class_means
+```
+
 ## Covariance construction
 
 1. **Mask of the pistachio**, the recipe of the dataset atlas: Otsu threshold
@@ -83,6 +96,12 @@ the values of one cube); they are kept.
 | pistachio, `decimate=2` | 231 | 25 333 | 52 | 1.7e5 |
 | window 32×32, `decimate=6` | 77 | 1 024 | 2 541 | 8.9e3 |
 
+```{dataset-figure} hyperpistachio/cov_samples
+```
+
+```{dataset-figure} hyperpistachio/eigen_spectrum
+```
+
 ## Splits
 
 - `by_level` = `recommended`: `StratifiedGroupKFold(5)` grouped by level and
@@ -93,6 +112,12 @@ the values of one cube); they are kept.
   = 20 % of the training windows (empty with `unit="pistachio"`);
   `by_index_reverse` swaps them. It is the only split where every level is
   seen in training, hence the recommended split of `task="fine"`.
+
+```{dataset-figure} hyperpistachio/class_hist
+```
+
+```{dataset-figure} hyperpistachio/split_schema
+```
 
 ## Leakage risks and measures
 
