@@ -84,7 +84,7 @@ named splits.
 | same patch or neighbouring parcels | PASTIS-R | official folds by patch |
 | overlapping sliding windows | hyperspectral, SAR, CPAZMaL | spatial blocks + buffer: test windows closer than one window to a training window are removed |
 | same target in different conditions | ATRNet-STAR, MSTAR | official SOC/EOC protocols; overlap between protocols checked; the remaining same-vehicle effect is documented |
-| dates mixed between train and test | S1 Iceland, CPAZMaL, PASTIS-R C–E | temporal or geographic separation, dates recorded per sample |
+| dates mixed between train and test | CPAZMaL, PASTIS-R C–E | temporal or geographic separation, dates recorded per sample |
 | exact duplicates | DopNet, GTZAN | duplicates (MD5 of the signal) removed or kept on one side only |
 
 Each dataset page states the split used, its sizes, whether it comes from the
@@ -119,9 +119,6 @@ usable split in the paper (or it leaks), a grouped split is provided instead.
 | ATRNet-STAR | `SOC_40classes`, `EOC_*` | paper | — | no shared file name or MD5 within a protocol | same vehicles across train / test; heavy chip reuse **between** protocols (`protocol_overlap()`) |
 | MSTAR | SOC 17° / 15° | paper | — | — | same vehicles in train and test (protocol design) |
 | FUSAR-Ship 1.0 | StratifiedGroupKFold(5) | proposed | MMSI (ship identity) | no shared MMSI | — |
-
-Datasets only available on the `local` branch (S1 Iceland SAR, AVIRIS) document
-their splits on their own pages.
 
 ## Checks
 

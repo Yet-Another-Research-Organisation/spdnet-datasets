@@ -29,9 +29,7 @@ cache), leakage-free splits and a documentation page.
 | Hyperspectral (HSI) | GSOFF, Chikusei, UAV-HSI-Crop, Wheat disease, Placenta, Rices_90, HyperLeaf2024, DeepHS-Fruit, HyperPistachio |
 | Synthetic aperture radar (SAR) | Pol-InSAR-Island, CPAZMaL, S1SLC_CVDL, AIR-PolSAR-Seg, ATRNet-STAR, FUSAR-Ship 1.0, MSTAR |
 
-Branches: `timeseries` (series of covariances for Transformers), `local`
-(datasets not published yet: S1 Iceland SAR, AVIRIS), `moabb` (adapter for
-MOABB EEG datasets).
+Branch: `timeseries` (series of covariances for Transformers).
 
 ## Installation
 
