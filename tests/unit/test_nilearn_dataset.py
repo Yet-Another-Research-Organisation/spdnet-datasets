@@ -595,3 +595,16 @@ def test_cross_validate_folds_constant_predictor_has_p_one(cache, abide):
     assert res["mean"] == 0.5 and res["p_value"] == 1.0
     with pytest.raises(ValueError, match="stratified_fold"):
         cross_validate_folds(ds, _lr_on(0, 1), prefix="stratified_fold", n_permutations=0)
+
+
+def test_random_split_multi_site_is_leaky(cache, abide):
+    from ._random_split import assert_random_split
+
+    assert_random_split(lambda **kw: _make(cache, **kw), leaky=True, subset=False)
+
+
+def test_random_split_one_subject_per_group_is_not_leaky(cache, ds30):
+    from ._random_split import assert_random_split
+
+    assert_random_split(lambda **kw: _make(cache, dataset="ds000030", **kw), leaky=False,
+                        subset=False)

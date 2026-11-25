@@ -318,3 +318,16 @@ class _NaNParadigm(FakeParadigm):
 def test_non_finite_epochs_are_excluded(cache, estimator):
     ds = _make(cache, paradigm=_NaNParadigm(), estimator=estimator)
     assert ds.n_excluded == 1 and 0 not in set(ds.trial_index.tolist())
+
+
+def test_random_split(cache):
+    from ._random_split import assert_random_split
+
+    def make(**kw):
+        kw.setdefault("split", "recommended")
+        return _make(cache, **kw)
+
+    ds = assert_random_split(make, leaky=True, subset=False)
+    opts = _make(cache, split="random", random_split_options={"test_ratio": 0.5})
+    assert len(opts.splits["random"]["test"]) == round(0.5 * len(opts))
+    assert ds.splits["random"]["test"].tolist() != opts.splits["random"]["test"].tolist()

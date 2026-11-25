@@ -326,3 +326,16 @@ def test_bad_arguments(pastis_dir, tmp_path):
         _fetch(pastis_dir, tmp_path, scenario="F")
     with pytest.raises(ValueError, match="split"):
         _fetch(pastis_dir, tmp_path, split="random")
+
+
+def test_random_split(pastis_dir, tmp_path):
+    from ._random_split import assert_random_split
+
+    def make(**kw):
+        return PastisRDataset(pastis_dir, cache_dir=tmp_path / "c", ref_date=REF,
+                              verbose=False, **kw)
+
+    ds = assert_random_split(make, leaky=True)
+    # channel standardisation of "official": the covariance cache is shared
+    assert ds.report["covariance"]["train_folds"] == list(SPLITS["official"]["train"])
+    assert set(ds.splits) == {"official", "random"}
