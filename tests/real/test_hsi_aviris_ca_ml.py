@@ -54,7 +54,8 @@ def test_samples_splits_and_scale(ds):
     assert ds.fetched.n_obs[ds.fetched.ok].min() >= 2 * 155
     rec = ds.splits["recommended"]
     folds = ds.meta["fold"].to_numpy()
-    assert set(folds[rec["train"]]) == {0, 1, 2} and set(folds[rec["test"]]) == {4}
+    assert set(folds[rec["train"]]) == {1, 2, 3} and set(folds[rec["val"]]) == {0}
+    assert set(folds[rec["test"]]) == {4}
     for k in range(5):
         s = ds.splits[f"fold{k}"]
         assert_no_leakage(ds.groups[s["train"]], ds.groups[s["test"]])

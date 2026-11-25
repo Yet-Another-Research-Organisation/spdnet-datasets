@@ -45,8 +45,9 @@ Splits
 ------
 The release assigns whole 10.2 km blocks (``block10km``) to 5 spatial folds
 balanced on the multilabels. ``"fold<k>"``: test = fold ``k``, validation =
-fold ``k - 1`` (mod 5), train = the other three. ``"recommended"`` =
-``"train_val_test"`` = ``"fold4"`` (train folds 0-2, val 3, test 4), the
+fold ``k + 1`` (mod 5), train = the other three, as for the other
+hyperspectral loaders. ``"recommended"`` =
+``"train_val_test"`` = ``"fold4"`` (train folds 1-3, val 0, test 4), the
 ``train_val_test`` configuration of the release. ``groups`` = ``block10km``
 (the split unit: windows and dates of a block are never separated);
 ``"random"`` is sample-level, not stratified with the multilabel task, and
@@ -86,7 +87,7 @@ from ._common import HSIDataset, write_json
 
 DOMAIN, NAME = "HYPERSPECTRAL", "AVIRIS-CA-Multilabel"
 HF_REPO = "musmb/aviris-ca-multilabel"
-HF_REVISION = "0cc7afc9d49c18faa37622683e3839d4e30a24b9"
+HF_REVISION = "78d5e6b2f30926e01b9fd7a6e3a836dcbcba0930"
 HF_PRIVATE = True  # a token is required while the repository is private
 PAGE = f"https://huggingface.co/datasets/{HF_REPO}"
 N_FOLDS = 5
@@ -402,13 +403,13 @@ def fetch_aviris_ca_ml(data_dir=None, cache_dir=None, keep=None, estimator="ledo
 
 
 def fold_splits(fold, available=range(N_FOLDS)):
-    """``fold<k>`` splits (test = k, val = k - 1 mod 5, train = the others) and the
+    """``fold<k>`` splits (test = k, val = k + 1 mod 5, train = the others) and the
     ``recommended`` = ``train_val_test`` = ``fold4`` alias, as index arrays."""
     fold = np.asarray(fold)
     loaded = sorted(set(np.unique(fold).tolist()) & set(available))
     out = {}
     for k in loaded:
-        val_k = (k - 1) % N_FOLDS
+        val_k = (k + 1) % N_FOLDS
         test = np.flatnonzero(fold == k)
         val = np.flatnonzero(fold == val_k)
         train = np.flatnonzero((fold != k) & (fold != val_k))
