@@ -140,11 +140,11 @@ def test_date_mode_multilabel_and_folds(release, tmp_path):
     np.testing.assert_array_equal(y.numpy(), ref.to_numpy()[0])
     sp = ds.splits["recommended"]
     folds = ds.meta["fold"].to_numpy()
-    assert set(folds[sp["train"]]) == {0, 1, 2} and set(folds[sp["val"]]) == {3}
+    assert set(folds[sp["train"]]) == {1, 2, 3} and set(folds[sp["val"]]) == {0}
     assert set(folds[sp["test"]]) == {4}
     for k in range(5):
         s = ds.splits[f"fold{k}"]
-        assert set(folds[s["test"]]) == {k} and set(folds[s["val"]]) == {(k - 1) % 5}
+        assert set(folds[s["test"]]) == {k} and set(folds[s["val"]]) == {(k + 1) % 5}
         assert_no_leakage(ds.groups[s["train"]], ds.groups[s["test"]])
         assert_no_leakage(ds.groups[s["train"]], ds.groups[s["val"]])
     # normalisation: geometric mean of the training eigenvalues is 1
@@ -216,9 +216,9 @@ def test_random_split_warns_and_subset(release, tmp_path):
 
 
 def test_folds_restrict_the_shards(release, tmp_path):
-    # fold0: test 0, train 1 (val = fold 4, not loaded); fold1 would have no training part
-    ds = _ds(release, tmp_path, folds=[0, 1], split="fold0")
-    assert set(ds.meta["fold"]) == {0, 1} and set(ds.splits) == {"fold0", "random"}
+    # fold1: test 1, train 0 (val = fold 2, not loaded); fold0 would have no training part
+    ds = _ds(release, tmp_path, folds=[0, 1], split="fold1")
+    assert set(ds.meta["fold"]) == {0, 1} and set(ds.splits) == {"fold1", "random"}
     assert ds.fetched.shards == A.shard_paths([0, 1])
     with pytest.raises(ValueError, match="Unknown split"):
         _ds(release, tmp_path, folds=[0, 1])

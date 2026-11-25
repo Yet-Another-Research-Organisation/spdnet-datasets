@@ -14,7 +14,7 @@
 * - Samples
   - `mode="date"`: 24 211 window-dates (the QC-ok dates of the 2 034 windows) · `mode="series"`: 2 031 windows (3 have no QC-ok date)
 * - Splits
-  - `fold0` … `fold4` (5 spatial folds of 10 km blocks) · `recommended` = `train_val_test` = `fold4` (14 331 / 4 872 / 5 008 window-dates, 1 218 / 397 / 416 windows) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
+  - `fold0` … `fold4` (5 spatial folds of 10 km blocks) · `recommended` = `train_val_test` = `fold4` (14 313 / 4 890 / 5 008 window-dates, 1 203 / 412 / 416 windows) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - `spdnet_datasets.hyperspectral.aviris_ca_ml` (`fetch_aviris_ca_ml`, `AVIRISCAMultilabelDataset`, registry name `aviris_ca_ml`)
 ```
@@ -47,7 +47,7 @@ Service.
 
 - Release: Hugging Face dataset
   [`musmb/aviris-ca-multilabel`](https://huggingface.co/datasets/musmb/aviris-ca-multilabel),
-  revision `0cc7afc9`, 7.1 GB in 10 Parquet shards. The dataset card
+  revision `78d5e6b2`, 7.1 GB in 10 Parquet shards. The dataset card
   (`README.md`) and `metadata/checks.json` describe the construction and its
   checks.
 - Licence: **CC BY 4.0**. Any use must also credit the original data
@@ -66,7 +66,7 @@ Hugging Face token cache (`~/.cache/huggingface/token`, written by
 
 Without a local copy, `fetch_aviris_ca_ml()` downloads `bands.csv` and the
 shards of the requested folds from the pinned revision
-`0cc7afc9d49c18faa37622683e3839d4e30a24b9` into
+`78d5e6b2f30926e01b9fd7a6e3a836dcbcba0930` into
 `<cache_dir>/aviris_ca_ml/downloads/<revision>/` (sizes and sha256 checked;
 the sha256 are the LFS identifiers of the Hub). This folder is outside the
 `keep` policy and is never deleted by the loader. `folds=[0]` downloads only
@@ -238,11 +238,11 @@ The release groups the windows into 10.2 km × 10.2 km blocks (`block10km`) and
 assigns whole blocks to 5 folds, balancing every class and the number of
 windows (413 / 402 / 405 / 398 / 416 windows).
 
-- `fold<k>`: test = fold `k`, validation = fold `k − 1` (mod 5), train = the
-  three other folds;
-- `recommended` = `train_val_test` = `fold4`: train = folds 0–2, validation =
-  fold 3, test = fold 4, i.e. the `train_val_test` configuration of the
-  Hugging Face release (14 331 / 4 872 / 5 008 window-dates; 1 218 / 397 / 416
+- `fold<k>`: test = fold `k`, validation = fold `k + 1` (mod 5), train = the
+  three other folds, as for the other hyperspectral datasets;
+- `recommended` = `train_val_test` = `fold4`: train = folds 1–3, validation =
+  fold 0, test = fold 4, i.e. the `train_val_test` configuration of the
+  Hugging Face release (14 313 / 4 890 / 5 008 window-dates; 1 203 / 412 / 416
   windows in `mode="series"`);
 - `random`: sample-level, **leaky** (dates of one window and neighbouring
   windows on both sides) and not stratified with `task="multilabel"`.
