@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from ..base import BaseDataset
+from ..base import RANDOM, BaseDataset
 from ..core.estimators import channel_mean, estimate_covariance
 from ..core.fetch import Bunch
 from ..core.normalize import geometric_scale
@@ -142,7 +142,9 @@ class RadarCovarianceDataset(BaseDataset):
     ``create_dataloaders(dataset, split=name)`` works directly; ``split`` names
     the split whose training part fits the normalisation scale and the class
     weights. ``subset="train"|"val"|"test"`` restricts the instance to one part
-    of that split (``splits`` is then emptied).
+    of that split (``splits`` is then emptied). ``splits["random"]`` is a
+    sample-level split (``random_split_options``) that ignores the groups:
+    leaky when a group (person, recording) holds several samples.
 
     With ``normalize=True`` the covariances are multiplied by the geometric
     scale ``s`` of the training part, ``mean`` and ``raw`` by ``sqrt(s)``.
@@ -163,8 +165,9 @@ class RadarCovarianceDataset(BaseDataset):
 
     def _load_data(self):
         b = self._bunch
-        if self.split not in b.splits:
-            raise ValueError(f"Unknown split {self.split!r}; available: {sorted(b.splits)}")
+        if self.split not in b.splits and self.split != RANDOM:
+            raise ValueError(f"Unknown split {self.split!r}; "
+                             f"available: {sorted([*b.splits, RANDOM])}")
         names = np.array(b.class_names, dtype=object)[b.labels]
 
         present = set(names.tolist())
@@ -191,6 +194,8 @@ class RadarCovarianceDataset(BaseDataset):
         self.labels = np.array([label_of[int(j)] for j in idx], dtype=np.int64)
         self.groups = np.asarray(b.groups)[idx]
         self.meta = b.meta.iloc[idx].reset_index(drop=True)
+        splits[RANDOM] = self._make_random_split(self.labels, self.groups)
+        self._check_selected_split(self.split, self.groups)
 
         train = splits[self.split]["train"]
         if self.balance in ("undersample", "oversample"):

@@ -99,3 +99,16 @@ def test_max_classes_and_samples_keep_splits_in_range(gsoff_dir, tmp_path):
     parts = ds.splits["recommended"]
     assert all(len(v) == 0 or v.max() < len(ds) for v in parts.values())
     assert sum(len(v) for v in parts.values()) <= 10
+
+
+def test_random_split_mixes_the_spatial_blocks(gsoff_dir, tmp_path):
+    from ._random_split import assert_random_split
+
+    def make(**kw):
+        return GSOFFDataset(gsoff_dir, cache_dir=tmp_path / "cache", block=30, verbose=False,
+                            **kw)
+
+    ds = assert_random_split(make, leaky=True)  # several windows per spatial block
+    assert ds.split_leaky
+    assert set(ds.groups[ds.splits["random"]["train"]]) & set(
+        ds.groups[ds.splits["random"]["test"]])

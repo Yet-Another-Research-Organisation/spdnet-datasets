@@ -27,7 +27,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from ..base import BaseDataset
+from ..base import RANDOM, BaseDataset
 from ..core.estimators import (
     InsufficientSamplesError,
     NotSPDError,
@@ -352,7 +352,9 @@ class HSIDataset(BaseDataset):
     ``split`` names the split used for the normalisation scale and the
     balancing (``"recommended"`` by default); ``subset`` (``"train"``,
     ``"val"``, ``"test"``) optionally restricts the dataset to one part of it
-    (``splits`` is then emptied).
+    (``splits`` is then emptied). ``splits`` always holds ``"random"``, a
+    sample-level split (``random_split_options``) that ignores the groups and
+    is leaky when a group holds several samples.
 
     With ``normalize=True`` the covariances are multiplied by the geometric
     scale ``s`` of the training part, the mean and the raw pixels by
@@ -407,10 +409,12 @@ class HSIDataset(BaseDataset):
                 new = position[np.asarray(idx, dtype=np.int64)]
                 splits[name][part] = new[new >= 0]
         groups = np.asarray(bunch.groups)[index] if bunch.get("groups") is not None else None
+        splits[RANDOM] = self._make_random_split(y, groups)
 
         if split not in splits:
             raise ValueError(f"Unknown split {split!r}; available: {sorted(splits)}")
         self.split = split
+        self._check_selected_split(split, groups)
         self.class_weights = None
         if self.balance in ("undersample", "oversample"):
             for parts in splits.values():

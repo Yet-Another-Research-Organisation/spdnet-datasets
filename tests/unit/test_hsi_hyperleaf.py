@@ -69,3 +69,20 @@ def test_full_bands_need_enough_leaf_pixels(leaf_dir, tmp_path):
     """p = 204 needs 408 leaf pixels: the 400-pixel leaves are dropped and counted."""
     with pytest.raises(RuntimeError, match="No sample"):
         fetch_hyperleaf(leaf_dir, cache_dir=tmp_path / "c")
+
+
+def test_random_split_fits_the_scale_on_its_training_part(leaf_dir, tmp_path):
+    from ._random_split import assert_random_split
+
+    def make(**kw):
+        return HyperLeafDataset(leaf_dir, cache_dir=tmp_path / "c", band_step=4,
+                                verbose=False, **kw)
+
+    ds = assert_random_split(make, leaky=False)  # one leaf per plot in this fixture
+    # test cut stratified (5 leaves, 4 cultivars); 2 validation leaves cannot be
+    counts = np.bincount(ds.labels[ds.splits["random"]["test"]], minlength=4)
+    assert counts.max() - counts.min() <= 1 and not ds.random_split_stratified
+    reg = HyperLeafDataset(leaf_dir, cache_dir=tmp_path / "c", band_step=4, verbose=False,
+                           task="regression", regression_targets=("GrainWeight",),
+                           split="random")
+    assert not reg.random_split_stratified and len(reg.splits["random"]["test"]) == 5
