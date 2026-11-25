@@ -184,7 +184,7 @@ these heuristic flags is set (`metadata/dates.parquet`):
 
 28 245 of the 28 476 window-dates are acquired and 24 211 pass the QC; only
 these are used by default (`qc=True`). With `qc=False`, every acquired date
-with at least `2p` valid pixels is kept (25 611 window-dates). The QC flags
+with at least `2p` valid pixels and an SPD estimate is kept (25 611 window-dates). The QC flags
 concern the image only: a date failing the QC keeps its labels.
 
 In `mode="series"`, the 14 dates of a window form a series of covariances:

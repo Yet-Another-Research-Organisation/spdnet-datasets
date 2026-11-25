@@ -1,7 +1,7 @@
 """Hugging Face download of AVIRIS-C California multilabel (private: needs a token).
 
-``pytest -m network``: the small files (bands, classes, window table) of the pinned
-revision; with ``-m "slow and network"`` also one 732 MB shard. Skipped without a
+``pytest -m "network and not slow"``: the small files (bands, classes, window table)
+of the pinned revision; ``-m network`` also downloads one 732 MB shard. Skipped without a
 Hugging Face token (``HF_TOKEN`` or ``~/.cache/huggingface/token``).
 """
 
