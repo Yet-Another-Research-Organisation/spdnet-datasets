@@ -14,7 +14,7 @@
 * - Samples
   - 4 199 windows (4 844 extracted, 645 in the buffer zone discarded)
 * - Splits
-  - `spatial` = `recommended` (320-pixel blocks with a buffer: 2 421 / 789 / 989)
+  - `spatial` = `recommended` (320-pixel blocks with a buffer: 2 421 / 789 / 989) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - `spdnet_datasets.hyperspectral.chikusei` (`fetch_chikusei`, `ChikuseiDataset`, registry name `chikusei`)
 ```

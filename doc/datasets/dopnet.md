@@ -14,7 +14,7 @@
 * - Samples
   - 2 145 gestures (1 753 training file, 392 test file) of 3 076, after removing duplicates and gestures with T < 96
 * - Splits
-  - `official` (training files / test file: 1 753 / 0 / 392, default of the class) · `person0`…`person5` leave-one-person-out; `recommended` = `person<fold>` (default `person0`)
+  - `official` (training files / test file: 1 753 / 0 / 392, default of the class) · `person0`…`person5` leave-one-person-out; `recommended` = `person<fold>` (default `person0`) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - `spdnet_datasets.radar_microdoppler.dopnet` (`fetch_dopnet`, `DopNetDataset`, registry name `dopnet`)
 ```

@@ -14,7 +14,7 @@
 * - Samples
   - 77 GHz: 645 · xethru: 633 (duplicates removed)
 * - Splits
-  - `fold0`…`fold3` (participant-grouped 4-fold; `recommended` = `fold<fold>`, default `fold0`), no validation part
+  - `fold0`…`fold3` (participant-grouped 4-fold; `recommended` = `fold<fold>`, default `fold0`), no validation part · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - `spdnet_datasets.radar_microdoppler.ci4r` (`fetch_ci4r`, `CI4RDataset`, registry name `ci4r`)
 ```

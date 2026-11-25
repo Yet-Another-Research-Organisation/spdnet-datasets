@@ -14,7 +14,7 @@
 * - Samples
   - 8 803 grains from 180 cubes (none discarded)
 * - Splits
-  - `bundle` = `recommended` (bundle 1 → 2: 3 518 / 880 / 4 405) · `bundle_reverse` (3 524 / 881 / 4 398) · `cross_session` (test restricted to 17 varieties: 846)
+  - `bundle` = `recommended` (bundle 1 → 2: 3 518 / 880 / 4 405) · `bundle_reverse` (3 524 / 881 / 4 398) · `cross_session` (test restricted to 17 varieties: 846) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - `spdnet_datasets.hyperspectral.rices90` (`fetch_rices90`, `Rices90Dataset`, registry name `rices90`)
 ```

@@ -146,6 +146,7 @@ depends on the `return_*` flags:
 | `recommended` | first fold of the strictest available protocol | |
 | `stratified` | trials split into train / val / test, stratified by class (only with `holdout=(val_size, test_size)`) | |
 | `subject_fold_<k>` | cross-subject folds with held-out validation subjects and a calibration pool (only with `subject_folds=n`) | |
+| `random` | sample-level 70 / 10 / 20, stratified by class, trials of a subject-session on both sides (`random_split_options`; `split="random"` warns, see {doc}`/guide/splits`) | |
 
 Every split has `train`, `val` and `test` (the `subject_fold_<k>` splits also
 `calib_val` and `calib`). In the MOABB protocols `val` is empty, since MOABB has

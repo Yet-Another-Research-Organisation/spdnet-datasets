@@ -14,7 +14,7 @@
 * - Samples
   - 5 183 recordings of the 95 species with at least 10 recordings in the copy
 * - Splits
-  - `group_kfold` = `recommended`: 5-fold `StratifiedGroupKFold` by recordist (fold 1: 3 120 / 1 032 / 1 031)
+  - `group_kfold` = `recommended`: 5-fold `StratifiedGroupKFold` by recordist (fold 1: 3 120 / 1 032 / 1 031) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - `spdnet_datasets.audio.birdset_xcm` (`fetch_birdset_xcm`, `BirdSetXCMDataset`, registry name `birdset_xcm`)
 ```

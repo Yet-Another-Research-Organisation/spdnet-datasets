@@ -12,7 +12,7 @@
 * - Outputs
   - cov · mean (40,) · raw (n, 40) valid pixels
 * - Splits
-  - `sgkf5_fold0` … `sgkf5_fold4` (`recommended` = fold 0; descending orbit (DSC): 39 / 14 / 13 parcels)
+  - `sgkf5_fold0` … `sgkf5_fold4` (`recommended` = fold 0; descending orbit (DSC): 39 / 14 / 13 parcels) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - {mod}`spdnet_datasets.sar.cpazmal` (`fetch_cpazmal`, `CPAZMaLDataset`)
 ```

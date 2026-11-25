@@ -12,7 +12,7 @@
 * - Outputs
   - raw (32, 32, 4) log10(1 + amplitude) of HH, HV, VH, VV (H horizontal, V vertical; emission then reception) · mean (4,)
 * - Splits
-  - `macro1024_fold0` … `macro1024_fold4` (`recommended` = fold 0; 33 407 / 11 013 / 11 710)
+  - `macro1024_fold0` … `macro1024_fold4` (`recommended` = fold 0; 33 407 / 11 013 / 11 710) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - {mod}`spdnet_datasets.sar.air_polsar_seg` (`fetch_air_polsar_seg`, `AIRPolSARSegDataset`)
 ```

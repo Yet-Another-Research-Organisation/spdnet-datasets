@@ -12,7 +12,7 @@
 * - Outputs
   - raw (128, 128, 4) amplitudes, (128, 128, 8) complex parts, or (128, 128, 1) 8-bit amplitude · mean (per channel)
 * - Splits
-  - one SOC (standard operating conditions) or EOC (extended operating conditions) protocol per instance (`split=`): `SOC_40classes`, `EOC_scene`, `EOC_depression`, `EOC_azimuth`, `EOC_band`, `EOC_pol`; inside it, `dataset.splits["official"]`
+  - one SOC (standard operating conditions) or EOC (extended operating conditions) protocol per instance (`split=`): `SOC_40classes`, `EOC_scene`, `EOC_depression`, `EOC_azimuth`, `EOC_band`, `EOC_pol`; inside it, `dataset.splits["official"]`, `"recommended"` and `"random"` (sample-level 70 / 10 / 20 of the protocol's chips, see {doc}`/guide/splits`)
 * - Module
   - {mod}`spdnet_datasets.sar.atrnet_star` (`fetch_atrnet_star`, `ATRNetSTARDataset`, `protocol_overlap`)
 ```

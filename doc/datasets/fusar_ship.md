@@ -12,7 +12,7 @@
 * - Outputs
   - raw (224, 224, 1) log-amplitude · mean (1,)
 * - Splits
-  - `sgkf5_fold0` … `sgkf5_fold4` (`recommended` = fold 0; 3 118 / 1 040 / 1 040)
+  - `sgkf5_fold0` … `sgkf5_fold4` (`recommended` = fold 0; 3 118 / 1 040 / 1 040) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - {mod}`spdnet_datasets.sar.fusar_ship` (`fetch_fusar_ship`, `FUSARShipDataset`; registry names `fusar_ship` and `fusar`)
 ```

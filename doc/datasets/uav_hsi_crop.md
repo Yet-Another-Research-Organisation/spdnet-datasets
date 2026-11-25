@@ -14,7 +14,7 @@
 * - Samples
   - 12 923 windows (XJM 5 207, MJK_N 3 504, MJK_S 4 212); 303 discarded (< 2p non-zero pixels)
 * - Splits
-  - `spatial` = `recommended` (7 549 / 2 570 / 2 798) · `official` (7 116 / 773 / 1 912) · `scene_transfer` (MJK_N → MJK_S: 3 504 / 0 / 4 212)
+  - `spatial` = `recommended` (7 549 / 2 570 / 2 798) · `official` (7 116 / 773 / 1 912) · `scene_transfer` (MJK_N → MJK_S: 3 504 / 0 / 4 212) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - `spdnet_datasets.hyperspectral.uav` (`fetch_uav`, `UAVDataset`, registry name `uav`)
 ```

@@ -22,7 +22,7 @@ Add the page to the toctree and the tiles of its domain page
 * - Outputs
   - cov · mean · raw (<shape>)
 * - Splits
-  - `official` (<sizes>) · `recommended` (<sizes>)
+  - `official` (<sizes>) · `recommended` (<sizes>) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - {mod}`spdnet_datasets.<domain>.<module>` (`fetch_<name>`, `<Name>Dataset`)
 ```

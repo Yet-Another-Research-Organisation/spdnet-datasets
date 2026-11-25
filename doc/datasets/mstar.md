@@ -12,7 +12,7 @@
 * - Outputs
   - raw (128, 128, 1) intensity, amplitude, or (128, 128, 2) complex · mean (per channel)
 * - Splits
-  - `official` (SOC, standard operating conditions: 17° train, 15° test; 2 472 / 275 / 2 425)
+  - `official` (SOC, standard operating conditions: 17° train, 15° test; 2 472 / 275 / 2 425) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - {mod}`spdnet_datasets.sar.mstar` (`fetch_mstar`, `MSTARDataset`)
 ```
