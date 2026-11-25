@@ -28,7 +28,9 @@ def test_mosaic_cells_and_groups():
     for k, v in CELLS.items():
         assert abs(counts[k] - v) <= 0.02 * v
     assert ds.meta["block"].nunique() == 123
-    for parts in ds.splits.values():
+    for name, parts in ds.splits.items():
+        if name == "random":  # sample-level split, leaky by design
+            continue
         assert not set(ds.groups[parts["train"]]) & set(ds.groups[parts["test"]])
     assert ds.label_conflicts == 0
     # leakage: no cell content shared between train and test

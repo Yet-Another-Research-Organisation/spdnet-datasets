@@ -64,7 +64,7 @@ from ..core.estimators import channel_mean
 from ..core.fetch import Bunch
 from ..manager import DatasetManager
 from ..utils.sources import existing_dir, source_dir
-from ._common import finalize_labels
+from ._common import check_split_name, finalize_labels
 
 DOMAIN, NAME = "SAR", "MSTAR_SOC"
 PAGE = "https://github.com/omae11/MSTAR-dataset/tree/d99007290d20ce52933c8bf0f8c3f461acd522ee"
@@ -159,6 +159,9 @@ class MSTARDataset(BaseDataset):
     source : {"jpg", "amplitude", "complex"}
     crop : int
         Side of the centre crop (``<= 128`` keeps every class).
+    split : str
+        Split whose training part fits the class weights (``"recommended"``
+        = ``"official"``, or ``"random"``: sample-level, mixes 17 and 15 deg).
     verify, val_size, cache_dir
         See :func:`fetch_mstar`.
     **kwargs
@@ -168,10 +171,10 @@ class MSTARDataset(BaseDataset):
 
     OUTPUTS = ("raw", "mean")
 
-    def __init__(self, data_dir=None, *, source="jpg", crop=128, verify="size", val_size=0.1,
-                 cache_dir=None, **kwargs):
+    def __init__(self, data_dir=None, *, source="jpg", crop=128, split="recommended",
+                 verify="size", val_size=0.1, cache_dir=None, **kwargs):
         root = dataset_path(DOMAIN, NAME, data_dir)
-        self.source, self.crop = source, crop
+        self.source, self.crop, self.split = source, crop, split
         self._fetch = {"source": source, "verify": verify, "val_size": val_size,
                        "cache_dir": cache_dir}
         self._root = root
@@ -183,6 +186,7 @@ class MSTARDataset(BaseDataset):
         self.data_dir = Path(b.root)
         # no group: one vehicle (serial number) per class, the same at 17 and 15 deg
         keep = finalize_labels(self, b.meta["label"].to_numpy(), None, b.splits)
+        check_split_name(self.splits, self.split)
         self.meta = b.meta.iloc[keep].reset_index(drop=True)
         self.samples = list(range(len(self.meta)))
         if self.verbose:

@@ -68,7 +68,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from ..base import BaseDataset
+from ..base import RANDOM, BaseDataset
 from ..core.config import dataset_path, get_cache_dir
 from ..core.estimators import (
     InsufficientSamplesError,
@@ -298,8 +298,9 @@ class CPAZMaLDataset(BaseDataset):
     data_dir : path, optional
         Default ``<root>/SAR/PAZ_S1_proc_v2``.
     split : str
-        Split whose training part fits the normalisation (``"recommended"`` or
-        ``"sgkf5_fold{k}"``); all splits are in ``dataset.splits``.
+        Split whose training part fits the normalisation (``"recommended"``,
+        ``"sgkf5_fold{k}"`` or ``"random"``, sample-level and leaky: a site
+        holds several parcels); all splits are in ``dataset.splits``.
     cache_dir, keep, orbit, n_dates, scale, max_mask_value, min_pixels, block
         See :func:`fetch_cpazmal`.
     **kwargs
@@ -335,7 +336,7 @@ class CPAZMaLDataset(BaseDataset):
         self.covariances = b.covariances[keep]
         self.means = b.means[keep]
         self.scale = 1.0
-        if self.normalize and self.splits:
+        if self.normalize and (set(self.splits) - {RANDOM} or self.split == RANDOM):
             self.scale = train_scale(self.covariances, self.splits, self.split)
         elif self.normalize:
             warnings.warn("No split available: covariances are not normalised", UserWarning, stacklevel=2)

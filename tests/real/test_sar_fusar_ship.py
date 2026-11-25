@@ -14,6 +14,8 @@ def test_counts_groups_and_folds():
     assert len(ds) == 5198 and len(ds.classes) == 10  # fiche: categories >= 30 chips
     counts = ds.meta["label"].value_counts()
     assert counts["Cargo"] == 2114 and counts["LawEnforce"] == 35
-    for parts in ds.splits.values():
+    for name, parts in ds.splits.items():
+        if name == "random":  # sample-level split, leaky by design
+            continue
         assert not set(ds.groups[parts["train"]]) & set(ds.groups[parts["test"]])
         assert 900 < len(parts["test"]) < 1200

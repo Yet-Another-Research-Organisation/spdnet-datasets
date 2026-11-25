@@ -24,6 +24,8 @@ def test_parcels_per_class(orbit, missing):
     assert ds.covariances.shape == (sum(expected.values()), 40, 40)
     check_spd(ds.covariances)
     assert ds.meta["n_pixels"].min() >= 80
-    for parts in ds.splits.values():
+    for name, parts in ds.splits.items():
+        if name == "random":  # sample-level split, leaky by design
+            continue
         assert not set(ds.groups[parts["train"]]) & set(ds.groups[parts["test"]])
     assert len(set(ds.groups[ds.splits["recommended"]["test"]])) >= 10

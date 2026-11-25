@@ -367,7 +367,10 @@ class ATRNetSTARDataset(BaseDataset):
         Protocol among :data:`PROTOCOLS` (``"SOC_40classes"`` by default).
         ``dataset.splits`` holds ``"official"`` (train/test of the protocol,
         validation = 10 % of train), ``"official_<cond>"`` (one test
-        condition) and ``"recommended"``.
+        condition), ``"recommended"`` and ``"random"`` (sample-level split of
+        the protocol's chips, ``random_split_options``; since ``split`` names
+        the protocol here, the class weights always come from
+        ``"recommended"``).
     representation : {"Slant_Range", "Amplitude_8bit"}
     slant_features : {"amplitude", "complex"}
     cache_dir, verify, val_size

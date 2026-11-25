@@ -37,7 +37,9 @@ def fusar_dir(tmp_path):
 def test_folds_never_split_a_vessel(fusar_dir):
     ds = FUSARShipDataset(fusar_dir, image_size=16, return_raw=True, verbose=False)
     assert len(np.unique(ds.groups)) == 20
-    for parts in ds.splits.values():
+    for name, parts in ds.splits.items():
+        if name == "random":  # sample-level split, leaky by design
+            continue
         for a, b in (("train", "test"), ("train", "val"), ("val", "test")):
             assert not set(ds.groups[parts[a]]) & set(ds.groups[parts[b]])
     assert DatasetManager.DATASETS["fusar"] is DatasetManager.DATASETS["fusar_ship"] is FUSARShipDataset

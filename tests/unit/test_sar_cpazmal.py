@@ -91,7 +91,9 @@ def test_blocks_keep_parcel_groups_and_threshold(cpaz_dir, tmp_path):
     ds = _make(cpaz_dir, tmp_path, n_dates=10, block=10, min_pixels=40)
     assert (ds.meta["n_pixels"] >= 40).all()
     assert len(ds) > 15
-    for parts in ds.splits.values():
+    for name, parts in ds.splits.items():
+        if name == "random":  # sample-level split, leaky by design
+            continue
         assert_no_leakage(ds.groups[parts["train"]], ds.groups[parts["test"]])
         assert_no_leakage(ds.groups[parts["val"]], ds.groups[parts["test"]])
 
@@ -153,3 +155,10 @@ def test_fetch_replays_from_cache(cpaz_dir, tmp_path):
     with pytest.raises(ValueError, match="return_raw"):
         CPAZMaLDataset(cpaz_dir, cache_dir=tmp_path / "c", keep="keep_covariance",
                        return_raw=True, verbose=False)
+
+
+def test_random_split(cpaz_dir, tmp_path):
+    from ._random_split import assert_random_split
+
+    # one parcel per site in this fixture: the random split does not mix a site
+    assert_random_split(lambda **kw: _make(cpaz_dir, tmp_path, **kw), leaky=False, subset=False)

@@ -56,7 +56,9 @@ def test_macro_block_folds_with_guard(air_dir, tmp_path):
     ds = AIRPolSARSegDataset(root, cache_dir=tmp_path / "c", cell=8, macro=32, return_mean=True, verbose=False)
     assert ds[0][0].shape == (4,)
     xy = ds.meta[["row", "col"]].to_numpy() + ds.meta[["component"]].to_numpy() * 10_000
-    for parts in ds.splits.values():
+    for name, parts in ds.splits.items():
+        if name == "random":  # sample-level split, leaky by design
+            continue
         assert not set(ds.groups[parts["train"]]) & set(ds.groups[parts["test"]])
         if len(parts["train"]) and len(parts["test"]):
             d = np.abs(xy[parts["train"]][:, None] - xy[parts["test"]][None]).max(-1)

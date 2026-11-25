@@ -75,3 +75,18 @@ def test_no_groups_and_stratified_validation(mstar_dir):
     s = ds.splits["official"]
     # stratified draw in the 17 deg chips: 3 of the 6 training chips of each class
     assert ds.meta["label"][s["val"]].value_counts().to_dict() == dict.fromkeys(ds.classes, 3)
+
+
+def test_random_split_without_groups_does_not_warn(mstar_dir):
+    from ._random_split import assert_random_split
+
+    def make(**kw):
+        return MSTARDataset(mstar_dir, crop=16, return_raw=True, balance="weights",
+                            verbose=False, **kw)
+
+    ds = assert_random_split(make, leaky=False, cov=False, subset=False)
+    y = ds.targets[ds.splits["random"]["train"]]
+    counts = np.bincount(y, minlength=len(ds.classes))
+    np.testing.assert_allclose(ds.class_weights * counts, (ds.class_weights * counts)[0])
+    with pytest.raises(ValueError, match="Unknown split"):
+        make(split="nope")
