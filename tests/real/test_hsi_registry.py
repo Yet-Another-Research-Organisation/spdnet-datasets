@@ -20,6 +20,7 @@ CASES = {
     "hyperleaf": ("HyperLeaf2024", {}),
     "deephsfruit": ("DeepHS-Fruit", {}),
     "hyperpistachio": ("HyperPistachio", {}),
+    "aviris_ca_ml": ("AVIRIS-CA-Multilabel", {}),
 }
 
 

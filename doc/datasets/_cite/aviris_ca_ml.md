@@ -1,0 +1,3 @@
+- "AVIRIS-C California hyperspectral time series, multilabel land cover", Hugging Face dataset, 2026, CC BY 4.0. <https://huggingface.co/datasets/musmb/aviris-ca-multilabel> (revision `0cc7afc9d49c18faa37622683e3839d4e30a24b9`)
+- AVIRIS-Classic L2 calibrated reflectance: NASA Jet Propulsion Laboratory, distributed by the ORNL DAAC, NASA Earthdata (CMR collection `C2711871294-ORNL_CLOUD`); cite the ORNL DAAC dataset as indicated on its landing page. <https://daac.ornl.gov/AVIRIS/>
+- USDA National Agricultural Statistics Service Cropland Data Layer, 2008–2021, USDA-NASS, Washington, DC. <https://www.nass.usda.gov/Research_and_Science/Cropland/>

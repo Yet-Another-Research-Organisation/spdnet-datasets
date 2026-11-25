@@ -1,6 +1,6 @@
 # Hyperspectral
 
-Airborne, UAV and laboratory hyperspectral images: the covariance of the bands over the pixels of a window, a leaf, a grain or a fruit.
+Airborne, UAV and laboratory hyperspectral images: the covariance of the bands over the pixels of a window, a leaf, a grain or a fruit, and an airborne time series of windows.
 
 ::::{grid} 1 2 3 3
 :gutter: 3
@@ -114,6 +114,18 @@ Laboratory, aflatoxin in pistachios
 {bdg-secondary-line}`462×462` {bdg-secondary-line}`EU limit / 26 levels` {bdg-secondary-line}`regression`
 :::
 
+:::{grid-item-card} AVIRIS-C California multilabel
+:link: aviris_ca_ml
+:link-type: doc
+:img-top: ../_static/previews/aviris_ca_ml/thumb.png
+:img-alt: preview of AVIRIS-C California multilabel
+:class-card: sd-card-hover
+
+Airborne time series, land cover
+
+{bdg-secondary-line}`155×155` {bdg-secondary-line}`13 labels` {bdg-secondary-line}`multilabel` {bdg-secondary-line}`14 dates`
+:::
+
 ::::
 
 ```{toctree}
@@ -128,4 +140,5 @@ rices90
 hyperleaf
 deephsfruit
 hyperpistachio
+aviris_ca_ml
 ```

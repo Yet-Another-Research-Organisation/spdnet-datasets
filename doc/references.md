@@ -154,6 +154,13 @@ source page instead.
 ```{include} datasets/_cite/hyperpistachio.md
 ```
 
+### AVIRIS-C California multilabel
+
+{doc}`Dataset page <datasets/aviris_ca_ml>`
+
+```{include} datasets/_cite/aviris_ca_ml.md
+```
+
 ## SAR
 
 ### Pol-InSAR-Island

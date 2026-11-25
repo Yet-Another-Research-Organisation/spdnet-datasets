@@ -112,6 +112,7 @@ usable split in the paper (or it leaks), a grouped split is provided instead.
 | Rices_90 | bundle 1 → bundle 2 | proposed | cube (variety–session) | grains of a cube kept together | variety and session confounded for 73 varieties |
 | HyperLeaf2024 | grouped split | proposed | plot | no shared plot | official test set unlabelled |
 | DeepHS-Fruit ⚠️ | grouped by physical fruit | proposed | fruit (both faces) | no shared fruit | the v2 official split leaks (46 / 140 test cubes) |
+| AVIRIS-C California multilabel | 5 spatial folds (`fold4` = release `train_val_test`) | paper (release) | 10 km block (all dates of a window) | no shared block or window | 1.0 % of the windows touch a window of another fold |
 | Pol-InSAR-Island | 5 folds on 512 m UTM blocks, guard band | proposed | spatial block | no shared block, guard band | official checkerboard is optimistic (warning) |
 | CPAZMaL | StratifiedGroupKFold(5) | proposed | site | no shared site | only 66–67 parcels by default (no parcel shapefile) |
 | S1SLC_CVDL | leave-one-city-out | proposed | city | no shared city | radiometric shift between cities |

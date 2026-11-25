@@ -270,6 +270,36 @@ def hyperpistachio():
     return out
 
 
+def aviris_ca_ml():
+    """One window at four of its QC-ok dates (false colour: NIR 860 / red 650 / green 550 nm,
+    one stretch for the four dates so that the changes stay visible)."""
+    import pandas as pd
+    import pyarrow.parquet as pq
+
+    from spdnet_datasets.hyperspectral import aviris_ca_ml as A
+
+    root = Path(os.environ.get("SPDNET_AVIRIS_CA_ML_DIR")
+                or DATA / "HYPERSPECTRAL/AVIRIS-CA-Multilabel").expanduser()
+    wl = A.read_bands(root)["wavelength_nm"].to_numpy()
+    rgb = [int(np.argmin(np.abs(wl - w))) for w in (860, 650, 550)]
+    W = pd.read_parquet(root / "metadata/windows.parquet")
+    # a window with grapes and at least 12 QC-ok dates (vineyards change with the seasons)
+    wid = int(W[(W.label_grapes == 1) & (W.n_ok_dates >= 12)].window_id.iloc[0])
+    for rel in A.shard_paths():
+        t = pq.read_table(root / rel, filters=[("window_id", "=", wid)],
+                          columns=["cube", "dates", "qc_ok"])
+        if t.num_rows:
+            break
+    cube = A.decode_cubes(t.column("cube"), 14, len(wl))[0]
+    ok = np.flatnonzero(np.asarray(t.column("qc_ok")[0].as_py()))
+    dates = t.column("dates")[0].as_py()
+    pick = ok[np.linspace(0, len(ok) - 1, 4).round().astype(int)]
+    imgs = np.stack([np.moveaxis(np.asarray(cube[k][rgb], np.float64), 0, -1) for k in pick])
+    lo, hi = np.nanpercentile(imgs, [2, 98])
+    imgs = np.nan_to_num(np.clip((imgs - lo) / (hi - lo), 0, 1))
+    return [("rgb", img, dates[k]) for img, k in zip(imgs, pick, strict=True)]
+
+
 # --- SAR ----------------------------------------------------------------------------
 def _chips(name, channel=0, log=True, **kw):
     s = _loader_samples(name, return_raw=True, **kw)
@@ -367,7 +397,7 @@ def synthetic():
 PREVIEWS = {f.__name__: f for f in (
     esc50, gtzan, birdset_xcm, urbansound8k, hdm05, ntu120, ci4r, dopnet, mvdoppler, pastis_r,
     chikusei, gsoff, uav_hsi_crop, kaggle_wheat, placenta, rices90, hyperleaf, deephsfruit,
-    hyperpistachio, pol_insar_island, cpazmal, s1slc_cvdl, air_polsar_seg, atrnet_star,
+    hyperpistachio, aviris_ca_ml, pol_insar_island, cpazmal, s1slc_cvdl, air_polsar_seg, atrnet_star,
     fusar_ship, mstar, moabb, nilearn, synthetic)}
 
 

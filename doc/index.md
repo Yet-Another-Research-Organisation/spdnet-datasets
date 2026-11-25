@@ -173,7 +173,7 @@ PASTIS-R
 :img-alt: the Chikusei scene in false colours
 :class-card: sd-card-hover
 
-Chikusei, GSOFF, UAV-HSI-Crop, HyperLeaf, DeepHS-Fruit and 4 more
+Chikusei, GSOFF, UAV-HSI-Crop, HyperLeaf, DeepHS-Fruit and 5 more
 :::
 
 :::{grid-item-card} SAR

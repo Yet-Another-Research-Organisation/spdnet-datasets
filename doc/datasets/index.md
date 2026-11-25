@@ -68,7 +68,7 @@ Crop types from Sentinel-1 and Sentinel-2.
 
 Airborne, UAV and laboratory imagers.
 
-{bdg-secondary-line}`9 datasets`
+{bdg-secondary-line}`10 datasets`
 :::
 
 :::{grid-item-card} SAR
