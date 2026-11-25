@@ -6,7 +6,7 @@
 * - Domain
   - hyperspectral imaging (HSI), airborne, time series, land cover
 * - Task(s)
-  - multilabel classification, 13 classes (default, `task="multilabel"`) · regression of the 13 CDL proportions (`task="regression"`) · dominant class (`task="fine"`)
+  - multilabel classification, 13 classes (default, `task="multilabel"`) · regression of the 13 CDL proportions (`task="regression"`) · dominant class (`task="fine"`) · four learning scenarios (`scenario=`: `pure`, `stable`, `spacetime`, `stability`, see *Learning scenarios* below)
 * - Covariance
   - 155×155 (155 cleaned bands of 224), one per (window, date), n = the valid pixels of the 32 × 32 window (821 to 1 024, median 1 024; n / 2p ≥ 2.6); Ledoit-Wolf by default
 * - Outputs
@@ -64,8 +64,8 @@ credentialed sources ({doc}`/getting_started/installation`): `HF_TOKEN`, the
 Hugging Face token cache (`~/.cache/huggingface/token`, written by
 `huggingface-cli login`), the system keyring, then a hidden prompt.
 
-Without a local copy, `fetch_aviris_ca_ml()` downloads `bands.csv` and the
-shards of the requested folds from the pinned revision
+Without a local copy, `fetch_aviris_ca_ml()` downloads `bands.csv`,
+`metadata/cdl_by_year.parquet` and the shards of the requested folds from the pinned revision
 `78d5e6b2f30926e01b9fd7a6e3a836dcbcba0930` into
 `<cache_dir>/aviris_ca_ml/downloads/<revision>/` (sizes and sha256 checked;
 the sha256 are the LFS identifiers of the Hub). This folder is outside the
@@ -266,6 +266,129 @@ gives the window of each sample. `folds=` loads a subset of the folds; a
 For a geographic-transfer test, the dataset card suggests holding out the zone
 `Z2_SantaBarbara` or `Z4_SFBay_JasperRidge` (`meta["zone"]`) and training on
 windows far from it (more than 25 km).
+
+## Learning scenarios
+
+`scenario=` selects the windows and the target of four problems of increasing
+difficulty. Each one works in `mode="date"` (one covariance per QC-ok date of
+the kept windows) and in `mode="series"` (one series per kept window). The
+selection is made inside the folds of the release: the `fold<k>` splits, the
+`random` split and the normalisation are recomputed on the kept samples.
+`scenario=None` (default) keeps the behaviour described above.
+
+All four use the **change** of a window, `meta["change"]`
+({func}`~spdnet_datasets.hyperspectral.aviris_ca_ml.window_change`): over the
+distinct CDL years of the window's used dates (the QC-ok ones with
+`qc=True`), the largest total variation `0.5 · Σ |p_t − p_s|` between the
+13-class proportions of two years. The proportions are the exact ones of
+`metadata/cdl_by_year.parquet` (the per-date proportions of the shards are
+rounded), and the change is rounded to 1e-9, so that a variation of exactly
+0.05 (20 CDL pixels of 400) is counted as ≤ 0.05. On the 2 031 windows that
+have a QC-ok date: median 0.098, 99th percentile 0.20, maximum 0.20; 569
+windows ≤ 0.05, 493 in ]0.05, 0.10], 969 > 0.10.
+
+| Scenario | Selection | Target (default task; other) | Windows (fold 0 / 1 / 2 / 3 / 4) | Window-dates | `recommended` train / val / test: window-dates (windows) | Classes | Difficulty |
+|---|---|---|---|---|---|---|---|
+| `pure` | one class ≥ `purity` = 0.75 in every used year | that class (`fine`) | 401 (103 / 72 / 69 / 67 / 90) | 4 679 | 2 393 / 1 209 / 1 077 (208 / 103 / 90) | 12 | easy |
+| `pure`, `pure_max_change=0.05` | idem and change ≤ 0.05 | that class (`fine`) | 217 (54 / 34 / 45 / 33 / 51) | 2 463 | 1 240 / 630 / 593 (112 / 54 / 51) | 9 | easy |
+| `stable` | change ≤ `stable_max_change` = 0.05 | window proportions (`regression`; `multilabel`) | 569 (115 / 111 / 112 / 103 / 128) | 6 713 | 3 819 / 1 359 / 1 535 (326 / 115 / 128) | 13 outputs | medium |
+| `spacetime` | every window | per-date proportions in `mode="date"`, window proportions in `mode="series"` (`regression`; `multilabel`) | 2 031 (412 / 402 / 404 / 397 / 416) | 24 211 | 14 313 / 4 890 / 5 008 (1 203 / 412 / 416) | 13 outputs | hard |
+| `stability` | change ≤ 0.05 or > `changing_min_change` = 0.10 | `stable` = 0 / `changing` = 1 (`fine`) | 1 538 (318 / 295 / 303 / 310 / 312): 569 stable, 969 changing | 18 384 | 10 853 / 3 790 / 3 741 (908 / 318 / 312) | 2 | exploratory |
+| `stability`, `task="regression"` | every window | the change (scalar) | 2 031 | 24 211 | as `spacetime` | — | exploratory |
+
+`recommended` = `fold4`: train = folds 1–3, validation = fold 0, test =
+fold 4. Counts measured on the release with `qc=True` (real-data tests).
+
+### `pure` (T1, easy)
+
+Windows where one class covers at least `purity` (0.75) of the mapped CDL
+pixels **in every used year**; the label is that class (single-label
+classification). Classes with fewer than `min_class_windows` (10) such windows
+are dropped; the count is made over the loaded windows (the whole release with
+the default `folds=None`), never per split, so the class list does not depend
+on the split. With the defaults, 12 classes of 10 to 45 windows: almond 37,
+shrubland 45, water 45, evergreen_forest 45, mixed_forest 29,
+grassland_pasture 45, barren 37, developed_high 29, developed_low 10,
+developed_medium 24, developed_open 20, grapes 35 (`other` is never pure).
+The default does not require stability: a window can be 80 % almond one year
+and 95 % the next. `pure_max_change=0.05` gives the strict version (232
+windows before the class filter; developed_low 9, mixed_forest 5 and grapes 1
+are then dropped: 217 windows, 9 classes).
+
+*Meaning*: can the spectral covariance of one date (or the series) recognise
+a nearly homogeneous land-cover type? It is the closest to a classical
+patch-classification benchmark. *Limits*: few windows per class (a test fold
+holds only a few windows of each class), and a 75 % threshold still leaves a quarter
+of other covers; the purity comes from the CDL, a 30 m classifier product.
+
+### `stable` (T2, medium)
+
+Windows whose composition hardly changes over the used years (change ≤
+`stable_max_change`); the target is the **window** proportions (regression,
+default) or the window labels (presence ≥ 10 %, `task="multilabel"`). Since
+the composition is stable, every date of a window has the same target in
+`mode="date"`.
+
+*Meaning*: unmixing / multilabel recognition of mixed windows when the ground
+truth does not move, so that date-to-date differences are acquisition effects
+(season, geometry, atmosphere), not land-cover change. *Limits*: stable
+windows are biased towards slowly changing covers (forests, water, urban);
+crops rotate and are under-represented.
+
+### `spacetime` (T3, hard)
+
+Every window. In `mode="series"` the target is the window proportions, the
+proportions averaged over the window's years; a window that is 30 % class A
+and 70 % class B every year and one that is A for 30 % of the years and B for
+70 % get the **same** target. In `mode="date"` the target is the proportions
+of the CDL of the acquisition year (per-date labels). Regression by default,
+`task="multilabel"` gives the presences.
+
+*Meaning*: the general problem, with mixed and changing windows; the series
+model has to integrate the dates into an average composition, the date model
+has to read the composition of one year. *Limits*: the targets carry the CDL
+year-to-year noise (see below), and a series target that averages different
+years cannot be checked on any single image.
+
+### `stability` (T4, exploratory)
+
+Binary classification of the windows: `stable` (change ≤ 0.05, index 0) vs
+`changing` (change > 0.10, index 1); the 493 windows in between are left out
+to keep a margin. `task="regression"` predicts the change itself, on every
+window.
+
+*Limits, to read before using it*: the release contains **almost no strong
+change**. The change is capped at 0.20 by construction: the 2 034 windows are
+those of the earlier "MIX" build of this dataset
+(`AVIRIS-C_CA_TS14_MIX/code/22_selection_mix.py`), which kept only the
+windows with at least 14 flight dates, at least 320 mapped CDL pixels in every
+flight year, and a largest total variation between flight years of **at most
+0.2**. "Changing" therefore means a change of 10 to 20 % of the window, and
+part of a 5–10 % change is likely CDL year-to-year classification noise rather
+than a real change on the ground. For the same reason no "change type" (which
+class replaces which) nor "change date" variant is offered: there are too few
+real transitions to learn them.
+
+### Usage of the scenarios
+
+```python
+from spdnet_datasets.hyperspectral import AVIRISCAMultilabelDataset
+
+R = "~/aviris-ca-multilabel"
+t1 = AVIRISCAMultilabelDataset(R, scenario="pure")                        # 4 679 × 155 × 155, 12 classes
+t1s = AVIRISCAMultilabelDataset(R, scenario="pure", pure_max_change=0.05)  # strict, 9 classes
+t2 = AVIRISCAMultilabelDataset(R, scenario="stable", mode="series")       # 569 windows, proportions
+t2m = AVIRISCAMultilabelDataset(R, scenario="stable", task="multilabel")
+t3 = AVIRISCAMultilabelDataset(R, scenario="spacetime", mode="series")    # 2 031 windows
+t4 = AVIRISCAMultilabelDataset(R, scenario="stability")                   # stable 0 / changing 1
+t4r = AVIRISCAMultilabelDataset(R, scenario="stability", task="regression")
+t1.meta[["window_id", "pure_class", "change"]]
+```
+
+Incompatible combinations raise a `ValueError`: `pure` is single-label only,
+`stable` and `spacetime` take `regression` or `multilabel`, `stability` takes
+`fine` or `regression`; `label_level` is set by the scenario; a scenario that
+keeps no sample (thresholds too strict) is an error.
 
 ## Supported tasks
 

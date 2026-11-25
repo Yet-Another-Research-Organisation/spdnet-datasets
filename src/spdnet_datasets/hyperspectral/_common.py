@@ -366,6 +366,9 @@ class HSIDataset(BaseDataset):
     scale ``s`` of the training part, the mean and the raw pixels by
     ``sqrt(s)``.
 
+    ``bunch.class_order`` (optional) fixes the order of the class indices of the
+    classification tasks (default: the sorted class names).
+
     ``task="multilabel"`` needs ``bunch.multilabels`` (n, k) 0/1 and
     ``bunch.label_names``: the target is a float32 vector, ``classes=`` /
     ``max_classes`` select label columns, ``balance="weights"`` gives the
@@ -410,7 +413,14 @@ class HSIDataset(BaseDataset):
                                         drop_classes=self.drop_classes,
                                         merge_classes=self.merge_classes)
             index = index[keep]
+            order = bunch.get("class_order")
+            if order is not None:  # dataset-defined class order instead of the sorted names
+                order = [c for c in order if c in names]
+                y = np.array([order.index(names[v]) for v in y], dtype=np.int64)
+                names = order
             selected = self._limit_classes(names)
+            if order is not None and selected is not names:
+                selected = [c for c in names if c in selected]
             in_sel = np.isin(y, [names.index(c) for c in selected])
             remap = {names.index(c): i for i, c in enumerate(selected)}
             index, y = index[in_sel], np.array([remap[v] for v in y[in_sel]], dtype=np.int64)
