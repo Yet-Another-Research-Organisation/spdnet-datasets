@@ -3,9 +3,100 @@
 Samples carry a group (subject, session, patch, spatial block, parcel, site,
 ...). Splits never separate a group; spatial splits additionally drop test
 windows that overlap a training window.
+
+:func:`random_split` is the exception: a sample-level split, exposed by every
+loader as ``dataset.splits["random"]``. It ignores the groups and is optimistic
+(leaky) as soon as a group holds several samples (:func:`shares_groups`).
 """
 
 import numpy as np
+
+RANDOM_SPLIT_DEFAULTS = {"val_ratio": 0.1, "test_ratio": 0.2, "seed": None, "stratify": True}
+
+
+def shares_groups(groups):
+    """True if ``groups`` is given and at least one group holds several samples.
+
+    A sample-level split of such a dataset can put samples of one group on both
+    sides, so its scores are optimistic.
+    """
+    if groups is None:
+        return False
+    groups = np.asarray(groups)
+    return len(groups) > 0 and len(np.unique(groups)) < len(groups)
+
+
+def _random_split(labels, *, val_ratio=0.1, test_ratio=0.2, seed=0, stratify=True):
+    """:func:`random_split` plus a flag telling whether it is stratified."""
+    labels = np.asarray(labels)
+    n = len(labels)
+    if not (0 <= val_ratio < 1 and 0 <= test_ratio < 1 and val_ratio + test_ratio < 1):
+        raise ValueError(f"val_ratio and test_ratio must be in [0, 1) with a sum < 1, "
+                         f"got {val_ratio} and {test_ratio}")
+    n_test, n_val = int(round(test_ratio * n)), int(round(val_ratio * n))
+    if n and n - n_test - n_val < 1:
+        raise ValueError(f"random split of {n} samples leaves no training sample")
+    rng = np.random.RandomState(seed)
+    # regression targets (float) are never stratified
+    stratify = bool(stratify) and labels.dtype.kind not in "fc"
+    rest, test, ok_test = _cut(np.arange(n), labels, n_test, stratify, seed, rng)
+    train, val, ok_val = _cut(rest, labels, n_val, stratify, seed, rng)
+    parts = {k: np.sort(np.asarray(v, dtype=np.int64))
+             for k, v in (("train", train), ("val", val), ("test", test))}
+    return parts, stratify and ok_test and ok_val
+
+
+def _cut(idx, labels, size, stratify, seed, rng):
+    """``(rest, part, stratified)``: ``size`` samples of ``idx`` drawn into ``part``."""
+    if size == 0:
+        return idx, idx[:0], True
+    if stratify:
+        from sklearn.model_selection import train_test_split
+
+        try:
+            rest, part = train_test_split(idx, test_size=size, stratify=labels[idx],
+                                          random_state=seed)
+            return rest, part, True
+        except ValueError:  # a class with < 2 samples, or fewer samples than classes
+            pass
+    perm = rng.permutation(idx)
+    return perm[size:], perm[:size], False
+
+
+def random_split(labels, *, val_ratio=0.1, test_ratio=0.2, seed=0, stratify=True):
+    """Sample-level train/val/test split (the ``"random"`` split of every loader).
+
+    Parameters
+    ----------
+    labels : array (n,)
+        Class index (or name) of each sample, or regression targets (float).
+    val_ratio, test_ratio : float
+        Fractions of the *whole* dataset; the sizes are ``round(ratio * n)``
+        and the training part gets the rest.
+    seed : int
+        Random state; the split depends only on ``labels`` and ``seed``.
+    stratify : bool
+        Keep the class proportions in the three parts
+        (:func:`sklearn.model_selection.train_test_split`, test part first).
+        A cut where it is infeasible (a class with fewer than two samples, or
+        fewer test or validation samples than classes) falls back to a plain
+        random draw of the same size, the other cut staying stratified when
+        possible. Float labels (regression) are never stratified.
+
+    Returns
+    -------
+    dict
+        ``{"train", "val", "test"}`` sorted, disjoint index arrays covering
+        ``range(n)``.
+
+    Notes
+    -----
+    The groups (subject, plot, spatial block...) are ignored: when a group
+    holds several samples (:func:`shares_groups`), samples of one group fall
+    in train and test and the scores are optimistic.
+    """
+    return _random_split(labels, val_ratio=val_ratio, test_ratio=test_ratio, seed=seed,
+                         stratify=stratify)[0]
 
 
 def group_split(y, groups, *, val_size=0.1, test_size=0.2, seed=0):

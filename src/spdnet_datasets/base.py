@@ -14,6 +14,19 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset, Subset, random_split
 
 from .core.outputs import ALL_OUTPUTS, pack_outputs, validate_output_request
+from .core.splits import RANDOM_SPLIT_DEFAULTS, _random_split, shares_groups
+
+RANDOM = "random"  # name of the sample-level split added to every dataset.splits
+
+
+def _caller_stacklevel():
+    """``stacklevel`` of the first frame outside this package (for warnings)."""
+    import sys
+
+    frame, level = sys._getframe(1), 1
+    while frame is not None and frame.f_globals.get("__name__", "").startswith("spdnet_datasets"):
+        frame, level = frame.f_back, level + 1
+    return level
 
 
 class BaseDataset(Dataset, ABC):
@@ -45,6 +58,7 @@ class BaseDataset(Dataset, ABC):
         merge_classes: dict | None = None,
         balance: str | None = None,
         normalize: bool = True,
+        random_split_options: dict | None = None,
         **kwargs  # Accept any additional parameters
     ):
         """
@@ -66,6 +80,10 @@ class BaseDataset(Dataset, ABC):
             merge_classes: Mapping {old_class: new_class}
             balance: None, 'undersample', 'oversample' or 'weights'
             normalize: Apply the geometric scale fitted on the training split
+            random_split_options: Options of the sample-level ``"random"`` split
+                added to ``splits`` (keys ``val_ratio`` 0.1, ``test_ratio`` 0.2,
+                ``seed`` = ``seed``, ``stratify`` True; see
+                :func:`spdnet_datasets.core.splits.random_split`)
             **kwargs: Additional dataset-specific parameters
         """
         self.data_dir = Path(data_dir)
@@ -85,6 +103,16 @@ class BaseDataset(Dataset, ABC):
         self.merge_classes = merge_classes
         self.balance = balance
         self.normalize = normalize
+        unknown = set(random_split_options or {}) - set(RANDOM_SPLIT_DEFAULTS)
+        if unknown:
+            raise ValueError(f"Unknown random_split_options {sorted(unknown)}; "
+                             f"expected keys among {sorted(RANDOM_SPLIT_DEFAULTS)}")
+        self.random_split_options = {**RANDOM_SPLIT_DEFAULTS, **(random_split_options or {})}
+        if self.random_split_options["seed"] is None:
+            self.random_split_options["seed"] = seed
+        self.random_split_stratified = None  # set when the "random" split is built
+        self.random_split_leaky = None  # idem: True if a group holds several samples
+        self.split_leaky = False  # True when the selected split mixes groups (split="random")
 
         # Will be set by subclasses
         self.classes = []
@@ -155,6 +183,30 @@ class BaseDataset(Dataset, ABC):
                 if self.verbose:
                     print(f"Class {class_name}: {len(class_samples)} samples (not limited)")
         return limited_samples
+
+    def _make_random_split(self, labels, groups=None):
+        """Sample-level ``"random"`` split of the loaded samples.
+
+        ``labels`` are the final labels of the samples (after the task and the
+        class selection); float labels (regression) are not stratified. Sets
+        :attr:`random_split_stratified` and :attr:`random_split_leaky`.
+        """
+        o = self.random_split_options
+        parts, self.random_split_stratified = _random_split(
+            labels, val_ratio=o["val_ratio"], test_ratio=o["test_ratio"], seed=o["seed"],
+            stratify=o["stratify"])
+        self.random_split_leaky = shares_groups(groups)
+        return parts
+
+    def _check_selected_split(self, split, groups=None):
+        """Set :attr:`split_leaky`; warn once when ``split="random"`` mixes groups."""
+        self.split_leaky = split == RANDOM and shares_groups(groups)
+        if self.split_leaky:
+            warnings.warn(
+                f"{type(self).__name__}(split='random'): sample-level split on a dataset "
+                "whose groups hold several samples; samples of one group fall in train and "
+                "test, so the scores are optimistic. Use split='recommended' for a "
+                "leakage-free evaluation.", UserWarning, stacklevel=_caller_stacklevel())
 
     def get_num_classes(self) -> int:
         """Return number of classes."""

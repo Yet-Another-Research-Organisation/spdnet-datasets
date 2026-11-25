@@ -5,7 +5,7 @@
 - :mod:`.normalize`: geometric normalisation fitted on the training split.
 - :mod:`.outputs`: output contract (covariance, mean, raw).
 - :mod:`.tasks`: fine / coarse / regression tasks, class dropping and balancing.
-- :mod:`.splits`: grouped and spatial splits, leakage checks.
+- :mod:`.splits`: grouped, spatial and random splits, leakage checks.
 - :mod:`.fetch`: downloads, checksums, manifest checks and staged cache.
 """
 
@@ -28,6 +28,8 @@ from .splits import (
     assert_no_leakage,
     assert_no_window_overlap,
     group_split,
+    random_split,
+    shares_groups,
     spatial_block_split,
 )
 from .tasks import apply_task, balance_indices, class_weights
@@ -39,6 +41,7 @@ __all__ = [
     "check_sample_size", "check_spd", "class_weights", "dataset_path", "download",
     "estimate_covariance",
     "estimate_covariances", "geometric_scale", "get_cache_dir", "get_data_root",
-    "group_split", "pack_outputs", "run_pipeline", "spatial_block_split",
+    "group_split", "pack_outputs", "random_split", "run_pipeline", "shares_groups",
+    "spatial_block_split",
     "validate_output_request", "verify_local",
 ]
