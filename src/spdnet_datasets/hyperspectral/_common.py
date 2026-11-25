@@ -36,7 +36,13 @@ from ..core.estimators import (
 )
 from ..core.fetch import Bunch
 from ..core.normalize import geometric_scale
-from ..core.tasks import apply_task, balance_indices, class_weights
+from ..core.tasks import (
+    MULTILABEL,
+    apply_task,
+    balance_indices,
+    class_weights,
+    pos_weights,
+)
 
 # ---------------------------------------------------------------------------
 # Pixels and covariances
@@ -359,6 +365,12 @@ class HSIDataset(BaseDataset):
     With ``normalize=True`` the covariances are multiplied by the geometric
     scale ``s`` of the training part, the mean and the raw pixels by
     ``sqrt(s)``.
+
+    ``task="multilabel"`` needs ``bunch.multilabels`` (n, k) 0/1 and
+    ``bunch.label_names``: the target is a float32 vector, ``classes=`` /
+    ``max_classes`` select label columns, ``balance="weights"`` gives the
+    per-label positive weights (:func:`~spdnet_datasets.core.tasks.pos_weights`)
+    and the ``"random"`` split is not stratified.
     """
 
     COARSE_MAP = None
@@ -378,6 +390,21 @@ class HSIDataset(BaseDataset):
                 raise ValueError("drop_classes / merge_classes do not apply to regression")
             y = np.asarray(targets, dtype=np.float64)
             self.classes = list(bunch.get("target_names", []))
+        elif self.task == MULTILABEL:
+            if bunch.get("multilabels") is None:
+                raise ValueError(f"{type(self).__name__} has no multilabel target")
+            if self.drop_classes or self.merge_classes or self.max_samples_per_class:
+                raise ValueError("drop_classes / merge_classes / max_samples_per_class do "
+                                 "not apply to task='multilabel' (select label columns "
+                                 "with classes=)")
+            names = list(bunch.label_names)
+            selected = self._limit_classes(names)
+            if selected is not names:  # keep the dataset order of the label columns
+                selected = [c for c in names if c in selected]
+            # float labels: the "random" split is not stratified (no class per sample)
+            y = np.asarray(bunch.multilabels, dtype=np.float32)[:, [names.index(c)
+                                                                    for c in selected]]
+            self.classes = list(selected)
         else:
             y, keep, names = apply_task(labels, task=self.task, coarse_map=self.COARSE_MAP,
                                         drop_classes=self.drop_classes,
@@ -416,7 +443,12 @@ class HSIDataset(BaseDataset):
         self.split = split
         self._check_selected_split(split, groups)
         self.class_weights = None
-        if self.balance in ("undersample", "oversample"):
+        if self.task == MULTILABEL and self.balance not in (None, "weights"):
+            raise ValueError("task='multilabel' supports balance=None or 'weights' "
+                             "(positive weights per label)")
+        if self.task == MULTILABEL and self.balance == "weights":
+            self.class_weights = pos_weights(y[splits[split]["train"]])
+        elif self.balance in ("undersample", "oversample"):
             for parts in splits.values():
                 train = parts["train"]
                 parts["train"] = train[balance_indices(y[train], self.balance, seed=self.seed)]
@@ -444,7 +476,7 @@ class HSIDataset(BaseDataset):
         self.groups = groups
         self.splits = splits
         self.meta = bunch.meta.iloc[index].reset_index(drop=True)
-        names = self.classes if self.task != "regression" else None
+        names = self.classes if self.task not in ("regression", MULTILABEL) else None
         self.samples = [
             {"index": int(k),
              "class_idx": int(v) if names is not None else None,
@@ -478,14 +510,21 @@ class HSIDataset(BaseDataset):
         x = self._pack(cov, mean, raw)
         if self.transform is not None:
             x = self.transform(x)
+        return x, self._target(i)
+
+    def _target(self, i):
+        """Target of sample ``i``: class index, float64 targets (regression) or float32
+        0/1 vector (multilabel)."""
         y = self.labels[i]
         if self.task == "regression":
-            return x, torch.tensor(np.array(y, dtype=np.float64))
-        return x, int(y)
+            return torch.tensor(np.array(y, dtype=np.float64))
+        if self.task == MULTILABEL:
+            return torch.from_numpy(np.array(y, dtype=np.float32))
+        return int(y)
 
     @property
     def num_classes(self):
-        """Number of classes (0 for regression)."""
+        """Number of classes, or of labels with ``task="multilabel"`` (0 for regression)."""
         return len(self.classes) if self.task != "regression" else 0
 
     def _load_data(self):  # data are loaded by _setup

@@ -52,3 +52,30 @@ def test_make_figures_writes_every_kind(tmp_path, monkeypatch):
     assert {f.stem for f in out.glob("*.png")} == static | {f"{k}_dark" for k in static}
     assert summary["p"] == 4 and summary["counts"]["train"] == [10, 10, 0]
     assert json.loads((tmp_path / "toy" / "summary.json").read_text())["n_samples"] == 30
+
+
+class _ToyMultilabel(_ToyFigures):
+    task = "multilabel"
+
+    def __init__(self, data_dir, **kw):
+        super().__init__(data_dir, **kw)
+        self.task = "multilabel"
+        self.labels = (np.random.default_rng(1).random((30, 3)) < 0.5).astype(np.float32)
+
+    def __getitem__(self, i):
+        X = self.raw[i].reshape(-1, 4)
+        return self._pack(np.cov(X.T), X.mean(0), self.raw[i]), self.labels[i]
+
+
+def test_make_figures_multilabel(tmp_path, monkeypatch):
+    monkeypatch.syspath_prepend(str(TOOL.parent))
+    spec = importlib.util.spec_from_file_location("make_figures", TOOL)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    monkeypatch.setattr(mod, "OUT", tmp_path)
+    monkeypatch.setitem(DatasetManager.DATASETS, "_toy_ml", _ToyMultilabel)
+    ds = _ToyMultilabel(str(tmp_path))
+    summary = mod.build("_toy_ml", {"data_dir": str(tmp_path)}, "official", "toy_ml")
+    # label counts per split part are the column sums of the 0/1 labels
+    assert summary["counts"]["train"] == ds.labels[:20].sum(0).astype(int).tolist()
+    assert summary["counts"]["test"] == ds.labels[20:].sum(0).astype(int).tolist()

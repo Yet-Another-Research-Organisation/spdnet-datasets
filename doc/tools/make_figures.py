@@ -47,7 +47,11 @@ def _layout(fig, title, **kw):
 
 
 def _samples(ds, idx):
-    """Return covs, means, raws, labels for the given indices."""
+    """Return covs, means, raws, labels for the given indices.
+
+    Labels are class indices, -2 for a vector target (multilabel: see
+    :func:`_multilabels`).
+    """
     covs, means, raws, ys = [], [], [], []
     for i in idx:
         x, y = ds[int(i)]
@@ -87,6 +91,15 @@ def build(name, kwargs, split, page, max_samples=600, seed=0):
     covs = np.stack(covs)
     p = covs.shape[-1]
     names = list(getattr(ds, "classes", [])) or [str(c) for c in np.unique(ys)]
+    Y = _multilabels(ds)  # (n, k) 0/1 for task="multilabel", else None
+    if Y is not None:
+        Ys = Y[idx]
+
+    def title(j):
+        if Y is not None:  # the labels present in the sample, at most two
+            present = [names[c] for c in np.flatnonzero(Ys[j])]
+            return " + ".join(present[:2]) + (" + …" if len(present) > 2 else "")
+        return names[ys[j]] if ys[j] >= 0 else "?"
     out = OUT / page
     out.mkdir(parents=True, exist_ok=True)
 
@@ -94,8 +107,7 @@ def build(name, kwargs, split, page, max_samples=600, seed=0):
     # raw_samples
     if raws and np.asarray(raws[0]).ndim >= 2:
         k = min(4, len(raws))
-        fig = make_subplots(rows=1, cols=k, subplot_titles=[names[ys[j]] if ys[j] >= 0 else "?"
-                                                            for j in range(k)])
+        fig = make_subplots(rows=1, cols=k, subplot_titles=[title(j) for j in range(k)])
         for j in range(k):
             r = np.asarray(raws[j], dtype=float)
             img = r.mean(-1) if r.ndim == 3 else r.T  # band-mean image or (p, T) spectrogram
@@ -109,33 +121,41 @@ def build(name, kwargs, split, page, max_samples=600, seed=0):
     fig = go.Figure()
     # without a mean output (provided matrices), the profile is the log10 variance
     M = np.stack(means) if means else np.log10(np.diagonal(covs, axis1=1, axis2=2))
-    for c, color in zip(np.unique(ys[ys >= 0])[:8], SERIES, strict=False):
-        fig.add_scatter(y=M[ys == c].mean(0), mode="lines", name=names[c],
+    if Y is not None:  # samples where the label is present, the 8 most frequent labels
+        members = {c: Ys[:, c] > 0 for c in np.argsort(-Ys.sum(0), kind="stable")[:8]}
+    else:
+        members = {c: ys == c for c in np.unique(ys[ys >= 0])[:8]}
+    for (c, sel), color in zip(members.items(), SERIES, strict=False):
+        fig.add_scatter(y=M[sel].mean(0), mode="lines", name=names[c],
                         line={"width": 2, "color": color})
     what = "profile" if means else "log10 variance"
-    _layout(fig, f"Mean channel {what} per class (first 8 classes)", xaxis_title="channel",
+    which = "8 most frequent labels" if Y is not None else "first 8 classes"
+    _layout(fig, f"Mean channel {what} per class ({which})", xaxis_title="channel",
             yaxis_title="mean" if means else "log10 variance")
     figs["class_means"] = fig
 
     # class_hist
     fig = go.Figure()
-    all_y = _all_labels(ds)
+    all_y = _all_labels(ds) if Y is None else None
     splits = ds.splits.get(split) if getattr(ds, "splits", None) else None
-    parts = splits or {"all": np.arange(len(all_y))}
+    parts = splits or {"all": np.arange(len(ds))}
     counts = {}
     for (s, ii), color in zip(parts.items(), SERIES, strict=False):
         ii = np.asarray(ii, dtype=int)
-        cnt = np.bincount(all_y[ii][all_y[ii] >= 0], minlength=len(names))
+        if Y is not None:  # samples where each label is present
+            cnt = Y[ii].sum(0).astype(int)
+        else:
+            cnt = np.bincount(all_y[ii][all_y[ii] >= 0], minlength=len(names))
         counts[s] = cnt.tolist()
         fig.add_bar(x=names, y=cnt, name=f"{s} ({len(ii)})", marker_color=color)
-    _layout(fig, f"Samples per class ({split or 'all'})", barmode="group",
+    _layout(fig, f"Samples per {'label' if Y is not None else 'class'} ({split or 'all'})",
+            barmode="group",
             yaxis_title="samples")
     figs["class_hist"] = fig
 
     # cov_samples
     k = min(4 if p <= 128 else 2, len(covs))  # fewer panels for large p (file size)
-    fig = make_subplots(rows=1, cols=k, subplot_titles=[names[ys[j]] if ys[j] >= 0 else "?"
-                                                        for j in range(k)])
+    fig = make_subplots(rows=1, cols=k, subplot_titles=[title(j) for j in range(k)])
     for j in range(k):
         d = np.sqrt(np.diag(covs[j]))
         corr = (covs[j] / np.outer(d, d)).astype(np.float32)
@@ -178,6 +198,13 @@ def build(name, kwargs, split, page, max_samples=600, seed=0):
                "n_samples": int(len(ds)), "classes": names, "counts": counts}
     (out / "summary.json").write_text(json.dumps(summary, indent=1))
     return summary
+
+
+def _multilabels(ds):
+    """(n, k) 0/1 labels of a ``task="multilabel"`` dataset, else ``None``."""
+    if getattr(ds, "task", None) != "multilabel":
+        return None
+    return np.asarray(ds.labels) > 0
 
 
 def _all_labels(ds):

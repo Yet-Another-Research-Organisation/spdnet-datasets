@@ -23,7 +23,7 @@ MODULES = [
     "radar_microdoppler.ci4r", "radar_microdoppler.mvdoppler", "radar_microdoppler.dopnet",
     "sits.pastis_r", "hyperspectral.gsoff", "hyperspectral.chikusei", "hyperspectral.uav",
     "hyperspectral.kaggle_wheat", "hyperspectral.placenta", "hyperspectral.rices90",
-    "hyperspectral.hyperpistachio",
+    "hyperspectral.hyperpistachio", "hyperspectral.aviris_ca_ml",
     "hyperspectral.hyperleaf", "hyperspectral.deephsfruit", "sar.cpazmal",
     "sar.pol_insar_island", "sar.s1slc_cvdl", "sar.air_polsar_seg", "sar.atrnet_star",
     "sar.fusar_ship", "sar.mstar",
@@ -36,6 +36,8 @@ DOWNLOADABLE |= {"audio.birdset_xcm", "skeleton.hdm05", "radar_microdoppler.dopn
 DOWNLOADABLE |= {"hyperspectral.chikusei", "hyperspectral.placenta", "hyperspectral.rices90",
                  "hyperspectral.hyperpistachio",
                  "sar.pol_insar_island", "sar.air_polsar_seg", "sar.fusar_ship"}
+# Hugging Face with a token (private repository), revision and LFS sha256 pinned
+DOWNLOADABLE |= {"hyperspectral.aviris_ca_ml"}
 CREDENTIALS = {"hyperspectral.kaggle_wheat", "hyperspectral.hyperleaf", "sar.atrnet_star"}
 
 

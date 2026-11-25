@@ -1,0 +1,72 @@
+{
+ "name": "aviris_ca_ml",
+ "kwargs": {
+  "data_dir": "/home/mgallet/projets/aviris-ca-multilabel-release",
+  "verbose": false
+ },
+ "split": "recommended",
+ "p": 155,
+ "n_samples": 24211,
+ "classes": [
+  "almond",
+  "shrubland",
+  "water",
+  "evergreen_forest",
+  "mixed_forest",
+  "grassland_pasture",
+  "barren",
+  "developed_high",
+  "developed_low",
+  "developed_medium",
+  "developed_open",
+  "grapes",
+  "other"
+ ],
+ "counts": {
+  "train": [
+   1199,
+   3997,
+   1351,
+   2627,
+   1523,
+   2857,
+   802,
+   1843,
+   4804,
+   4690,
+   4332,
+   1462,
+   2338
+  ],
+  "val": [
+   391,
+   1468,
+   476,
+   962,
+   494,
+   1001,
+   343,
+   629,
+   1703,
+   1628,
+   1457,
+   494,
+   836
+  ],
+  "test": [
+   380,
+   1387,
+   481,
+   915,
+   517,
+   993,
+   331,
+   635,
+   1488,
+   1636,
+   1469,
+   489,
+   730
+  ]
+ }
+}
