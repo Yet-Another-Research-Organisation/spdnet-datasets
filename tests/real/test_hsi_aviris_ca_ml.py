@@ -71,3 +71,38 @@ def test_series_mode():
     assert int(mask.sum()) == int((s._series_index[0] >= 0).sum())
     w = s.fetched.windows.set_index("window_id").loc[int(s.meta.window_id[0])]
     np.testing.assert_array_equal(y.numpy(), w[[f"label_{c}" for c in A.CLASSES]].to_numpy())
+
+
+# learning scenarios (qc=True): windows, window-dates, number of classes (None: regression)
+SCENARIOS = {
+    "pure": ({"scenario": "pure"}, 401, 4679, 12),
+    "pure_strict": ({"scenario": "pure", "pure_max_change": 0.05}, 217, 2463, 9),
+    "stable": ({"scenario": "stable"}, 569, 6713, None),
+    "spacetime": ({"scenario": "spacetime"}, 2031, 24211, None),
+    "stability": ({"scenario": "stability"}, 1538, 18384, 2),
+    "stability_reg": ({"scenario": "stability", "task": "regression"}, 2031, 24211, None),
+}
+
+
+def test_change_distribution(ds):
+    ch = ds.window_stats["change"].to_numpy()
+    assert len(ch) == 2031 and ch.max() == pytest.approx(0.2)  # cap of the window selection
+    assert int((ch <= 0.05).sum()) == 569 and int((ch > 0.10).sum()) == 969
+    assert np.median(ch) == pytest.approx(0.0975, abs=1e-3)
+
+
+@pytest.mark.parametrize("name", sorted(SCENARIOS))
+def test_scenario_counts(name):
+    kw, n_windows, n_dates, n_classes = SCENARIOS[name]
+    d = A.AVIRISCAMultilabelDataset(ROOT, verbose=False, **kw)
+    s = A.AVIRISCAMultilabelDataset(ROOT, mode="series", verbose=False, **kw)
+    assert len(d) == n_dates and len(s) == n_windows == len(np.unique(d.window_ids))
+    if n_classes is not None:
+        assert len(d.classes) == len(s.classes) == n_classes
+    folds = d.meta["fold"].to_numpy()
+    rec = d.splits["recommended"]
+    assert set(folds[rec["train"]]) <= {1, 2, 3} and set(folds[rec["test"]]) == {4}
+    assert_no_leakage(d.groups[rec["train"]], d.groups[rec["test"]])
+    if name == "stability":
+        counts = np.bincount(s.labels)
+        assert d.classes == ["stable", "changing"] and counts.tolist() == [569, 969]

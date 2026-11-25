@@ -35,6 +35,29 @@ def _nested(values, dims):
     return arr
 
 
+# CDL proportions per date by window type (w % 5), see the scenario tests:
+# 0 pure water, constant (change 0); 1 pure almond 0.80 then 0.95 (change 0.15);
+# 2 grapes 0.6 / 0.2 / 0.6 against other (change 0.4); 3 mixed, change 0.07;
+# 4 random (Dirichlet, change > 0.1)
+def _props(rng, w):
+    kind, P = w % 5, np.zeros((T, K), np.float32)
+    ci = {c: i for i, c in enumerate(A.CLASSES)}
+    if kind == 0:
+        P[:, ci["water"]], P[:, ci["barren"]] = 0.9, 0.1
+    elif kind == 1:
+        P[:, ci["almond"]] = [0.80, 0.95, 0.95]
+        P[:, ci["other"]] = 1 - P[:, ci["almond"]]
+    elif kind == 2:
+        P[:, ci["grapes"]] = [0.6, 0.2, 0.6]
+        P[:, ci["other"]] = 1 - P[:, ci["grapes"]]
+    elif kind == 3:
+        P[:, ci["shrubland"]] = [0.5, 0.43, 0.5]
+        P[:, ci["grassland_pasture"]] = 1 - P[:, ci["shrubland"]]
+    else:
+        P = rng.dirichlet(np.ones(K) * 0.3, size=T).astype(np.float32)
+    return P
+
+
 def _window(rng, w, fold):
     dates = ["2013-04-10", "2014-05-07", "2015-06-11"]
     acquired = np.ones(T, bool)
@@ -50,7 +73,7 @@ def _window(rng, w, fold):
         cube[0, :, :, :4] = np.nan  # 12 valid pixels < 2p = 16
     if w == 3:
         cube[0, 3, 0, :3] = 5000.0  # SWIR-like outliers, clipped to 1.5
-    props = rng.dirichlet(np.ones(K) * 0.3, size=T).astype(np.float32)
+    props = _props(rng, w)
     labels = (props >= 0.1).astype(np.int8)
     labels[~acquired] = -1
     props[~acquired] = np.nan
@@ -89,15 +112,23 @@ def release(tmp_path):
                   "release_index": [list(kept).index(b) if b in kept else -1
                                     for b in range(B_ALL)]}).to_csv(root / "bands.csv",
                                                                      index=False)
-    w = 0
+    w, cdl = 0, []
     for fold in range(5):
         rows = []
         for _ in range(4):
             rows.append(_window(rng, w, fold))
             w += 1
+        for r in rows:  # exact proportions per (window, year) of the acquired dates
+            for k, d in enumerate(r["dates"]):
+                if d:
+                    cdl.append({"window_id": r["window_id"], "year": int(d[:4]),
+                                **{f"prop_{c}": float(v) for c, v in
+                                   zip(A.CLASSES, r["props_date"][k], strict=True)}})
         for i, part in enumerate((rows[:2], rows[2:])):
             pq.write_table(_table(part), root / "data" / f"fold_{fold}-0000{i}-of-00002.parquet",
                            row_group_size=1)
+    (root / "metadata").mkdir()
+    pd.DataFrame(cdl).to_parquet(root / A.CDL_BY_YEAR)
     return root
 
 
@@ -236,7 +267,7 @@ def test_download_with_token_into_the_cache(release, tmp_path, monkeypatch):
     from spdnet_datasets.core import access
 
     files = {}
-    for rel in ["bands.csv"] + A.shard_paths():
+    for rel in ["bands.csv", A.CDL_BY_YEAR] + A.shard_paths():
         data = (release / rel).read_bytes()
         files[rel] = (len(data), hashlib.sha256(data).hexdigest())
     monkeypatch.setattr(A, "HF_FILES", files)
@@ -255,10 +286,10 @@ def test_download_with_token_into_the_cache(release, tmp_path, monkeypatch):
     monkeypatch.setattr(access, "hf_download", fake_hf_download)
     cache = tmp_path / "cache"
     ds = A.AVIRISCAMultilabelDataset(tmp_path / "absent", cache_dir=cache, verbose=False)
-    assert len(ds) == 57 and len(calls) == 11
+    assert len(ds) == 57 and len(calls) == 12
     assert ds.data_dir == cache / "aviris_ca_ml" / "downloads" / A.HF_REVISION
     A.AVIRISCAMultilabelDataset(tmp_path / "absent", cache_dir=cache, verbose=False)
-    assert len(calls) == 11  # nothing downloaded again
+    assert len(calls) == 12  # nothing downloaded again
 
 
 def test_registry_and_dataloaders(release, tmp_path):
@@ -277,3 +308,106 @@ def test_pos_weights():
     np.testing.assert_allclose(pos_weights(Y), [1 / 3, 1.0, 0.0])
     with pytest.raises(ValueError):
         pos_weights(np.zeros(3))
+
+
+# --------------------------------------------------------------- learning scenarios
+KIND = {1000 + w: w % 5 for w in range(20)}
+
+
+def _kinds(ds):
+    return {KIND[int(w)] for w in ds.meta["window_id"]}
+
+
+def test_window_change_statistics(release, tmp_path):
+    ds = _ds(release, tmp_path)
+    st = ds.window_stats
+    assert st.loc[1000, "change"] == 0 and st.loc[1000, "n_years"] == 2  # padded date
+    assert st.loc[1001, "change"] == pytest.approx(0.15, abs=1e-6)  # QC-failed 2014 unused
+    assert st.loc[1002, "change"] == pytest.approx(0.4, abs=1e-6)  # sparse 2013 unused
+    assert st.loc[1003, "change"] == pytest.approx(0.07, abs=1e-6)
+    assert (st.loc[[1004, 1009, 1014, 1019], "change"] > 0.10).all()
+    assert st.loc[1000, "pure_class"] == "water" and st.loc[1006, "pure_class"] == "almond"
+    assert st.loc[1003, "pure_class"] == ""
+    assert "change" in ds.meta and np.isfinite(ds.meta["change"]).all()
+
+
+@pytest.mark.parametrize("mode", ["date", "series"])
+def test_pure_scenario(release, tmp_path, mode):
+    ds = _ds(release, tmp_path, mode=mode, scenario="pure", min_class_windows=3)
+    assert ds.task == "fine" and ds.classes == ["almond", "water"]
+    assert _kinds(ds) == {0, 1} and len(np.unique(ds.window_ids)) == 8
+    assert len(ds) == (22 if mode == "date" else 8)
+    for i in range(len(ds)):
+        want = "water" if KIND[int(ds.meta.window_id[i])] == 0 else "almond"
+        assert ds.classes[ds[i][1]] == want
+    # strict: almond windows change by 0.15 -> dropped; too few windows -> class dropped
+    strict = _ds(release, tmp_path, mode=mode, scenario="pure", min_class_windows=3,
+                 pure_max_change=0.05)
+    assert strict.classes == ["water"] and _kinds(strict) == {0}
+    with pytest.raises(ValueError, match="keeps no sample"):
+        _ds(release, tmp_path, mode=mode, scenario="pure", min_class_windows=5)
+    hi = _ds(release, tmp_path, mode=mode, scenario="pure", min_class_windows=3, purity=0.85)
+    assert hi.classes == ["water"]  # almond is 0.80 in its first year
+
+
+def test_stable_scenario(release, tmp_path):
+    reg = _ds(release, tmp_path, scenario="stable")
+    assert reg.task == "regression" and _kinds(reg) == {0} and len(reg) == 11
+    W = reg.fetched.windows.set_index("window_id")
+    m = reg.meta.iloc[0]
+    np.testing.assert_allclose(reg[0][1].numpy(),
+                               W.loc[m.window_id, [f"prop_{c}" for c in A.CLASSES]].to_numpy(
+                                   np.float64))
+    ml = _ds(release, tmp_path, scenario="stable", task="multilabel", mode="series")
+    assert len(ml) == 4 and ml[0][1].shape == (K,)
+    wider = _ds(release, tmp_path, scenario="stable", stable_max_change=0.08,
+                changing_min_change=0.1)
+    assert _kinds(wider) == {0, 3}
+    # splits and normalisation on the kept samples
+    folds = reg.meta["fold"].to_numpy()
+    sp = reg.splits["recommended"]
+    assert set(folds[sp["test"]]) <= {4} and len(np.concatenate(list(sp.values()))) == len(reg)
+    train = np.stack([reg[i][0].numpy() for i in sp["train"]])
+    assert abs(np.mean(np.log(np.linalg.eigvalsh(train)))) < 1e-10
+
+
+def test_spacetime_scenario(release, tmp_path):
+    d = _ds(release, tmp_path, scenario="spacetime")
+    assert len(d) == 57 and d.task == "regression" and d.label_level == "date"
+    D = d.fetched.dates
+    m = d.meta.iloc[4]
+    ref = D[(D.window_id == m.window_id) & (D.t == m.t)][[f"prop_{c}" for c in A.CLASSES]]
+    np.testing.assert_allclose(d[4][1].numpy(), ref.to_numpy(np.float64)[0])
+    s = _ds(release, tmp_path, scenario="spacetime", mode="series", task="multilabel")
+    assert len(s) == 20 and s.label_level == "window"
+
+
+@pytest.mark.parametrize("mode", ["date", "series"])
+def test_stability_scenario(release, tmp_path, mode):
+    ds = _ds(release, tmp_path, mode=mode, scenario="stability")
+    assert ds.classes == ["stable", "changing"]  # stable = 0, changing = 1
+    assert _kinds(ds) == {0, 1, 2, 4}  # 0.07 (kind 3) is in the excluded band
+    for i in range(len(ds)):
+        assert ds[i][1] == (0 if KIND[int(ds.meta.window_id[i])] == 0 else 1)
+    reg = _ds(release, tmp_path, mode=mode, scenario="stability", task="regression")
+    assert len(reg) == (57 if mode == "date" else 20)
+    y = reg[0][1]
+    assert y.ndim == 0 and float(y) == pytest.approx(reg.meta["change"][0])
+
+
+def test_scenario_errors(release, tmp_path):
+    with pytest.raises(ValueError, match="scenario must be"):
+        _ds(release, tmp_path, scenario="change_type")
+    with pytest.raises(ValueError, match="not available"):
+        _ds(release, tmp_path, scenario="pure", task="regression")
+    with pytest.raises(ValueError, match="not available"):
+        _ds(release, tmp_path, scenario="stable", task="fine")
+    with pytest.raises(ValueError, match="not available"):
+        _ds(release, tmp_path, scenario="stability", task="multilabel")
+    with pytest.raises(ValueError, match="label_level"):
+        _ds(release, tmp_path, scenario="stable", label_level="date")
+    with pytest.raises(ValueError, match="stable_max_change"):
+        _ds(release, tmp_path, scenario="stability", stable_max_change=0.2)
+    # no scenario: unchanged behaviour (multilabel per date, every sample)
+    ds = _ds(release, tmp_path)
+    assert ds.scenario is None and ds.task == "multilabel" and len(ds) == 57

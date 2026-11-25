@@ -60,7 +60,7 @@ Hugging Face dataset ``musmb/aviris-ca-multilabel``, **private** for now (a read
 token of an account with access: ``HF_TOKEN``, ``~/.cache/huggingface/token``,
 the keyring or a prompt, see :mod:`spdnet_datasets.core.access`), pinned at
 revision :data:`HF_REVISION`. Without a local copy, the shards of the requested
-``folds`` and ``bands.csv`` are downloaded once (sizes and sha256 =
+``folds``, ``bands.csv`` and ``metadata/cdl_by_year.parquet`` are downloaded once (sizes and sha256 =
 LFS identifiers checked) into ``<cache_dir>/aviris_ca_ml/downloads/<revision>/``
 (7.1 GB for all folds), outside the ``keep`` policy. A local copy of the release
 (``git clone`` / ``huggingface-cli download`` folder) is read in place::
@@ -97,6 +97,8 @@ HF_FILES = {
     "classes.csv": (1_669, "46fce9db9172cc34c011d4b11ef490c873505d9fa592664b56b7f93e8bf9902a"),
     "metadata/windows.parquet": (
         187_995, "6d010a26110a74e7f2d9869eb2d8345f572bece031bf22531ee9577a91525195"),
+    "metadata/cdl_by_year.parquet": (
+        584_748, "482f8b2f970e7da2321fdb92954b4215e03d77903d41a1b925188a375e5e70bb"),
     "metadata/dates.parquet": (
         702_010, "6b8dd32a179bc9017ee1ca95d3a694fcf6de3c091f595589455d89d8a693bc19"),
     "data/fold_0-00000-of-00002.parquet": (
@@ -125,9 +127,19 @@ CLASSES = ("almond", "shrubland", "water", "evergreen_forest", "mixed_forest",
            "grassland_pasture", "barren", "developed_high", "developed_low",
            "developed_medium", "developed_open", "grapes", "other")
 CLIP = (-0.05, 1.5)
+CDL_BY_YEAR = "metadata/cdl_by_year.parquet"  # exact CDL proportions per window and year
 MODES = ("date", "series")
 LABEL_LEVELS = ("date", "window")
 TASKS = ("multilabel", "regression", "fine")
+#: Learning scenarios: allowed tasks (the first one is the default).
+SCENARIOS = {
+    None: ("multilabel", "regression", "fine"),
+    "pure": ("fine",),
+    "stable": ("regression", "multilabel"),
+    "spacetime": ("regression", "multilabel"),
+    "stability": ("fine", "regression"),
+}
+STABILITY_CLASSES = ("stable", "changing")
 WINDOW_COLUMNS = ["window_id", "fold", "zone", "block10km", "lat", "lon", "x_min", "y_max",
                   "n_ok_dates"]
 
@@ -173,7 +185,7 @@ def download_files(paths, cache_dir=None, interactive=None):
 
 
 def locate_release(data_dir=None, *, archive=None, cache_dir=None, folds=None, verify="size"):
-    """Folder holding ``bands.csv`` and the shards of ``folds``.
+    """Folder holding ``bands.csv``, ``metadata/cdl_by_year.parquet`` and the shards of ``folds``.
 
     Tried in order: ``data_dir`` (default ``<root>/HYPERSPECTRAL/AVIRIS-CA-Multilabel``),
     ``archive`` (a folder with the release layout, read in place), then the
@@ -181,7 +193,7 @@ def locate_release(data_dir=None, *, archive=None, cache_dir=None, folds=None, v
     local copy are checked against the pinned sizes (``verify="size"``),
     ``verify="sha256"`` hashes them, ``verify=None`` skips the check.
     """
-    needed = ["bands.csv"] + shard_paths(folds)
+    needed = ["bands.csv", CDL_BY_YEAR] + shard_paths(folds)
     candidates = [dataset_path(DOMAIN, NAME, data_dir)]
     if archive is not None:
         a = Path(archive).expanduser()
@@ -402,11 +414,52 @@ def fetch_aviris_ca_ml(data_dir=None, cache_dir=None, keep=None, estimator="ledo
         shards=shards, covariance_path=cdir, processed_path=res.processed_dir)
 
 
+def window_change(dates, cdl=None, purity=0.75):
+    """Per-window statistics of the CDL proportions over the years of its used dates.
+
+    ``dates``: one row per used (window, date) with ``window_id`` and ``date``
+    (``YYYY-MM-DD``); each distinct year counts once. The proportions of a year
+    are read from ``cdl`` (``metadata/cdl_by_year.parquet``: ``window_id``,
+    ``year`` and the ``prop_<class>`` columns, float64) when given, else from
+    the ``prop_<class>`` columns of ``dates`` (rounded in the release). The
+    change is rounded to 1e-9 so that a total variation of exactly 0.05 (20 CDL
+    pixels of 400) is not split by floating-point noise.
+
+    Returns a DataFrame indexed by ``window_id`` with ``n_years``, ``change``
+    (largest total variation ``0.5 * sum |p_t - p_s|`` between two years, 0
+    with one year), ``pure_class`` (class whose proportion is ``>= purity`` in
+    every year, ``""`` if none) and ``pure_share`` (its smallest proportion
+    over the years).
+    """
+    cols = [f"prop_{c}" for c in CLASSES]
+    d = dates.assign(year=dates["date"].astype(str).str[:4].astype(int)).drop_duplicates(
+        ["window_id", "year"])
+    if cdl is not None:
+        d = d[["window_id", "year"]].merge(cdl[["window_id", "year", *cols]],
+                                           on=["window_id", "year"], how="left")
+        if d[cols].isna().any(axis=None):
+            raise ValueError("cdl_by_year lacks the proportions of some (window, year)")
+    rows = {}
+    for wid, g in d.groupby("window_id"):
+        P = g[cols].to_numpy(np.float64)
+        tv = 0.5 * np.abs(P[:, None] - P[None]).sum(-1).max()
+        low = P.min(0)
+        c = int(np.argmax(low))
+        rows[wid] = {"n_years": len(P), "change": round(float(tv), 9),
+                     "pure_class": CLASSES[c] if low[c] >= purity - 1e-9 else "",
+                     "pure_share": float(low[c])}
+    out = pd.DataFrame.from_dict(rows, orient="index",
+                                 columns=["n_years", "change", "pure_class", "pure_share"])
+    out.index.name = "window_id"
+    return out
+
+
 def fold_splits(fold, available=range(N_FOLDS)):
     """``fold<k>`` splits (test = k, val = k + 1 mod 5, train = the others) and the
     ``recommended`` = ``train_val_test`` = ``fold4`` alias, as index arrays."""
     fold = np.asarray(fold)
-    loaded = sorted(set(np.unique(fold).tolist()) & set(available))
+    # the folds of the loaded shards: a scenario may leave a fold without sample
+    loaded = sorted(set(available))
     out = {}
     for k in loaded:
         val_k = (k + 1) % N_FOLDS
@@ -433,12 +486,36 @@ class AVIRISCAMultilabelDataset(HSIDataset):
         ``"date"`` (default): one ``p x p`` covariance per valid (window, date);
         ``"series"``: one sample per window, ``x = (tokens (14, p, p), mask
         (14,)[, mean (14, p)][, raw (14, 32, 32, p)])``.
-    task : {"multilabel", "regression", "fine"}
-        13-dim 0/1 float32 vector (default), the 13 CDL proportions, or the
-        dominant class.
+    task : {"multilabel", "regression", "fine"}, optional
+        13-dim 0/1 float32 vector (default without scenario), the 13 CDL
+        proportions, or the dominant class; the default of a scenario is the
+        first task of :data:`SCENARIOS`.
     label_level : {"date", "window"}, optional
         Labels of the acquisition year (default with ``mode="date"``) or of the
-        window (default and only choice with ``mode="series"``).
+        window (default and only choice with ``mode="series"``). Set by the
+        scenario when there is one.
+    scenario : {None, "pure", "stable", "spacetime", "stability"}
+        Learning scenario (sample selection and target, see the dataset page):
+
+        - ``"pure"``: windows where one class covers ``>= purity`` in every used
+          year (and ``change <= pure_max_change`` if set); label = that class
+          (``task="fine"``); classes with fewer than ``min_class_windows`` such
+          windows (counted over the loaded folds) are dropped;
+        - ``"stable"``: windows with ``change <= stable_max_change``; target =
+          window proportions (``"regression"``) or window labels
+          (``"multilabel"``);
+        - ``"spacetime"``: every window; target = per-date proportions or
+          labels in ``mode="date"``, window ones in ``mode="series"``;
+        - ``"stability"``: ``"stable"`` (``change <= stable_max_change``, index
+          0) vs ``"changing"`` (``change > changing_min_change``, index 1), the
+          windows in between dropped (``task="fine"``); ``task="regression"``:
+          the change itself, every window.
+
+        ``change`` (``meta["change"]``, :func:`window_change`) is computed over
+        the distinct CDL years of the window's used dates (QC-ok ones when
+        ``qc=True``). Splits and normalisation are computed on the kept samples.
+    purity, pure_max_change, min_class_windows, stable_max_change, changing_min_change
+        Thresholds of the scenarios (defaults 0.75, None, 10, 0.05, 0.10).
     split : str
         Split fitting the normalisation: ``"recommended"`` (= ``"fold4"`` =
         ``"train_val_test"``), ``"fold<k>"`` or ``"random"`` (sample-level, leaky).
@@ -456,19 +533,35 @@ class AVIRISCAMultilabelDataset(HSIDataset):
     With ``normalize=True`` the covariances are multiplied by the geometric scale
     ``s`` of the training covariances (``s = exp(-mean(logdet) / p)``), the mean
     and the raw pixels by ``sqrt(s)``. ``groups`` = 10 km block; ``meta`` has
-    ``window_id``, ``fold``, ``zone``, ``lat``, ``lon`` (and ``date``,
-    ``flight_id``, ``t`` in date mode).
+    ``window_id``, ``fold``, ``zone``, ``lat``, ``lon``, ``change``,
+    ``n_years``, ``pure_class``, ``pure_share`` (and ``date``, ``flight_id``,
+    ``t`` in date mode).
     """
 
-    def __init__(self, data_dir=None, *, mode="date", task="multilabel", label_level=None,
+    def __init__(self, data_dir=None, *, mode="date", task=None, label_level=None,
+                 scenario=None, purity=0.75, pure_max_change=None, min_class_windows=10,
+                 stable_max_change=0.05, changing_min_change=0.10,
                  split="recommended", subset=None, folds=None, qc=True, band_step=1,
                  clip=CLIP, min_pixels=None, min_dates=1, cache_dir=None, keep=None,
                  force=False, verify="size", archive=None, estimator="ledoit_wolf",
                  **kwargs):
         if mode not in MODES:
             raise ValueError(f"mode must be one of {MODES}")
-        if task not in TASKS:
-            raise ValueError(f"task must be one of {TASKS}")
+        if scenario not in SCENARIOS:
+            raise ValueError(f"scenario must be one of {list(SCENARIOS)}")
+        allowed = SCENARIOS[scenario]
+        task = allowed[0] if task is None else task
+        if task not in allowed:
+            raise ValueError(f"task={task!r} is not available with scenario={scenario!r}; "
+                             f"choose among {allowed}")
+        if scenario is not None and label_level is not None:
+            raise ValueError(f"label_level is set by scenario={scenario!r}; leave it to None")
+        if stable_max_change > changing_min_change:
+            raise ValueError("stable_max_change must be <= changing_min_change")
+        if scenario == "spacetime":
+            label_level = "date" if mode == "date" else "window"
+        elif scenario is not None:
+            label_level = "window"
         label_level = label_level or ("date" if mode == "date" else "window")
         if label_level not in LABEL_LEVELS:
             raise ValueError(f"label_level must be one of {LABEL_LEVELS}")
@@ -481,33 +574,72 @@ class AVIRISCAMultilabelDataset(HSIDataset):
                                folds=folds, qc=qc, band_step=band_step, clip=clip,
                                min_pixels=min_pixels, archive=archive)
         self.mode, self.label_level, self.min_dates = mode, label_level, min_dates
+        self.scenario = scenario
         self.fetched = b
         self.data_dir = Path(b.root)
         self.bands, self.wavelengths = b.bands, b.wavelengths
         W = b.windows.set_index("window_id", drop=False)
         D = b.dates[b.ok].reset_index(drop=True)
+        cdl = pd.read_parquet(Path(b.root) / CDL_BY_YEAR,
+                              columns=["window_id", "year", *[f"prop_{c}" for c in CLASSES]])
+        self.window_stats = stats = window_change(D, cdl, purity)
+        W = W.join(stats)
         if mode == "date":
-            table = D.join(W[["fold", "zone", "block10km", "lat", "lon"]], on="window_id")
-            src = table if label_level == "date" else W.loc[table["window_id"]]
-            self._cov_index = table["cov_index"].to_numpy(np.int64)
+            table = D.join(W[["fold", "zone", "block10km", "lat", "lon", *stats.columns]],
+                           on="window_id")
+            grid = None
         else:
             S = int(b.info["n_dates_per_window"])
             grid = np.full((len(W), S), -1, np.int64)
             pos = {w: i for i, w in enumerate(W.index)}
             grid[D["window_id"].map(pos).to_numpy(), D["t"].to_numpy()] = D["cov_index"]
             keep_w = (grid >= 0).sum(1) >= min_dates
-            table = W[keep_w].reset_index(drop=True)
-            src = table
-            self._series_index = grid[keep_w]
+            table, grid = W[keep_w].reset_index(drop=True), grid[keep_w]
+
+        # scenario: windows kept, then class labels and class order
+        class_order, names = None, None
+        change = table["change"].to_numpy(np.float64)
+        keep_s = np.ones(len(table), bool)
+        if scenario == "pure":
+            ok_w = stats["pure_class"] != ""
+            if pure_max_change is not None:
+                ok_w &= stats["change"] <= pure_max_change
+            counts = stats.loc[ok_w, "pure_class"].value_counts()
+            class_order = [c for c in CLASSES if counts.get(c, 0) >= min_class_windows]
+            ok_w &= stats["pure_class"].isin(class_order)
+            keep_s = table["window_id"].isin(stats.index[ok_w]).to_numpy()
+            names = table["pure_class"].to_numpy(object)
+        elif scenario == "stable":
+            keep_s = change <= stable_max_change
+        elif scenario == "stability" and task == "fine":
+            stable = change <= stable_max_change
+            keep_s = stable | (change > changing_min_change)
+            names = np.where(stable, STABILITY_CLASSES[0], STABILITY_CLASSES[1])
+            class_order = list(STABILITY_CLASSES)
+        table = table[keep_s].reset_index(drop=True)
+        if not len(table):
+            raise ValueError(f"scenario={scenario!r} keeps no sample with these thresholds")
+        names = None if names is None else names[keep_s]
+        if mode == "date":
+            self._cov_index = table["cov_index"].to_numpy(np.int64)
+        else:
+            self._series_index = grid[keep_s]
+        src = table if label_level == "date" or mode == "series" else W.loc[table["window_id"]]
         Y = src[[f"label_{c}" for c in CLASSES]].to_numpy(np.float32)
         P = src[[f"prop_{c}" for c in CLASSES]].to_numpy(np.float64)
+        targets, target_names = P, [f"prop_{c}" for c in CLASSES]
+        if scenario == "stability" and task == "regression":
+            targets, target_names = table["change"].to_numpy(np.float64), ["change"]
+        if names is None:
+            names = np.asarray(CLASSES)[P.argmax(1)]
         bunch = Bunch(
             covariances=None,  # scale fitted below from the stored log-determinants
-            means=None, labels=np.asarray(CLASSES)[P.argmax(1)], targets=P,
-            target_names=[f"prop_{c}" for c in CLASSES], multilabels=Y,
+            means=None, labels=np.asarray(names, dtype=str), targets=targets,
+            target_names=target_names, multilabels=Y, class_order=class_order,
             label_names=list(CLASSES), groups=table["block10km"].to_numpy(np.int64),
-            meta=table.reset_index(drop=True), info=b.info,
-            splits=fold_splits(table["fold"].to_numpy()),
+            meta=table, info=b.info,
+            splits=fold_splits(table["fold"].to_numpy(),
+                               available=np.unique(b.windows["fold"]).tolist()),
             processed_path=b.processed_path)
         self._setup(bunch, split, None)
         self.scale = self._fit_scale() if self.normalize else 1.0
@@ -515,7 +647,8 @@ class AVIRISCAMultilabelDataset(HSIDataset):
             self._restrict(subset)
         self.window_ids = self.meta["window_id"].to_numpy(np.int64)
         if self.verbose:
-            print(f"AVIRIS-C CA multilabel ({mode}, p={len(self.bands)}): {len(self)} "
+            print(f"AVIRIS-C CA multilabel ({mode}, scenario={scenario}, "
+                  f"p={len(self.bands)}): {len(self)} "
                   f"samples, {len(np.unique(self.window_ids))} windows, scale {self.scale:.3e}")
 
     # -- helpers -----------------------------------------------------------------------
@@ -605,5 +738,6 @@ class AVIRISCAMultilabelDataset(HSIDataset):
         return x, self._target(i)
 
 
-__all__ = ["CLASSES", "HF_REPO", "HF_REVISION", "AVIRISCAMultilabelDataset",
-           "download_files", "fetch_aviris_ca_ml", "fold_splits", "locate_release"]
+__all__ = ["CLASSES", "HF_REPO", "HF_REVISION", "SCENARIOS", "AVIRISCAMultilabelDataset",
+           "download_files", "fetch_aviris_ca_ml", "fold_splits", "locate_release",
+           "window_change"]
