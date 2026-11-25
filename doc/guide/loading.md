@@ -37,6 +37,13 @@ they are random permutations. The split depends only on `seed`: two
 configurations with the same seed and dataset get the same test set, whatever
 their batch size.
 
+This sample-level split ignores the groups and keeps the normalisation and
+class weights fitted on the dataset's own split (`"recommended"` by default).
+For a random split with statistics fitted on its own training part, build the
+dataset with `split="random"` (options in `random_split_options`); in a
+configuration, `split_strategy: random` is enough: the manager forwards it as
+`split=` to the datasets whose constructor takes `split`. See {doc}`splits`.
+
 ## What a batch contains
 
 Each item is `(x, label)`. In the covariance modes, `x` is an SPD matrix of

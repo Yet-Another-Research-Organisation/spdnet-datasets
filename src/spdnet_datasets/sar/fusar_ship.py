@@ -58,7 +58,12 @@ from ..core.config import dataset_path
 from ..core.fetch import Bunch, download
 from ..manager import DatasetManager
 from ..utils.sources import existing_dir, source_dir
-from ._common import check_split_groups, finalize_labels, group_kfold_splits
+from ._common import (
+    check_split_groups,
+    check_split_name,
+    finalize_labels,
+    group_kfold_splits,
+)
 
 DOMAIN, NAME = "SAR", "FUSAR_Ship1.0"
 PAGE = "https://emwlab.fudan.edu.cn/resources/list.htm"
@@ -164,6 +169,10 @@ class FUSARShipDataset(BaseDataset):
         Standardise each raw chip (mean 0, std 1).
     preload : bool
         Load every chip into memory at construction.
+    split : str
+        Split whose training part fits the class weights (``"recommended"``,
+        ``"sgkf5_fold{k}"`` or ``"random"``: sample-level, leaky since a vessel
+        appears in several chips).
     verify, cache_dir
         See :func:`fetch_fusar_ship`.
     **kwargs
@@ -175,8 +184,9 @@ class FUSARShipDataset(BaseDataset):
 
     def __init__(self, data_dir=None, *, class_level="basic", min_samples_per_class=30,
                  exclude_classes=None, image_size=224, standardize=True, preload=False,
-                 verify="size", cache_dir=None, **kwargs):
+                 split="recommended", verify="size", cache_dir=None, **kwargs):
         root = dataset_path(DOMAIN, NAME, data_dir)
+        self.split = split
         self.class_level, self.image_size, self.standardize = class_level, image_size, standardize
         self._fetch = {"class_level": class_level, "min_samples_per_class": min_samples_per_class,
                        "exclude_classes": tuple(exclude_classes or ()), "verify": verify,
@@ -194,6 +204,7 @@ class FUSARShipDataset(BaseDataset):
         self.data_dir = Path(b.root)
         keep = finalize_labels(self, b.meta["label"].to_numpy(), b.meta["group"].to_numpy(), b.splits)
         check_split_groups(self.splits, self.groups)
+        check_split_name(self.splits, self.split)
         self.meta = b.meta.iloc[keep].reset_index(drop=True)
         self.dropped = b.dropped
         self.samples = list(range(len(self.meta)))

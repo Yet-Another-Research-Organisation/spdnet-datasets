@@ -12,7 +12,7 @@
 * - Outputs
   - raw (100, 100, 4) complex parts or (100, 100, 2) amplitudes · mean (|HH|, |HV|)
 * - Splits
-  - `loco_Houston` (= `recommended`), `loco_Chicago`, `loco_Sao_Paulo` (leave one city out)
+  - `loco_Houston` (= `recommended`), `loco_Chicago`, `loco_Sao_Paulo` (leave one city out) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - {mod}`spdnet_datasets.sar.s1slc_cvdl` (`fetch_s1slc_cvdl`, `S1SLCCVDLDataset`)
 ```

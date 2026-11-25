@@ -14,7 +14,7 @@
 * - Samples
   - 3 193 cubes (fruit mode) · 596 (ripeness mode); none discarded
 * - Splits
-  - `by_fruit` = `recommended` (grouped by physical fruit; fruit mode 1 915 / 639 / 639, ripeness mode 356 / 120 / 120) · `official` (ripeness mode: 384 / 72 / 140, leaks)
+  - `by_fruit` = `recommended` (grouped by physical fruit; fruit mode 1 915 / 639 / 639, ripeness mode 356 / 120 / 120) · `official` (ripeness mode: 384 / 72 / 140, leaks) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - `spdnet_datasets.hyperspectral.deephsfruit` (`fetch_deephsfruit`, `DeepHSFruitDataset`, registry name `deephsfruit`)
 ```

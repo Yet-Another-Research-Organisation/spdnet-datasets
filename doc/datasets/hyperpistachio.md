@@ -14,7 +14,7 @@
 * - Samples
   - 52 pistachios, or 2 541 windows (20 to 71 per pistachio, median 49); none discarded
 * - Splits
-  - `by_level` = `recommended` (5 folds grouped by level: 30 / 10 / 12 pistachios for fold 0) · `by_index` (cubes `_0001` → `_0002`) · `by_index_reverse`; with `task="fine"`, `recommended` = `by_index`
+  - `by_level` = `recommended` (5 folds grouped by level: 30 / 10 / 12 pistachios for fold 0) · `by_index` (cubes `_0001` → `_0002`) · `by_index_reverse`; with `task="fine"`, `recommended` = `by_index` · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - `spdnet_datasets.hyperspectral.hyperpistachio` (`fetch_hyperpistachio`, `HyperPistachioDataset`, registry name `hyperpistachio`)
 ```

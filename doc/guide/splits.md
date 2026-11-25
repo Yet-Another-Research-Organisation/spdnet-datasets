@@ -8,7 +8,8 @@ therefore exposes:
 - `dataset.groups`: one group identifier per sample;
 - `dataset.splits`: named splits `{"train": idx, "val": idx, "test": idx}`.
   `"official"` is the split of the reference paper when there is one;
-  `"recommended"` is a leakage-free split otherwise.
+  `"recommended"` is a leakage-free split otherwise; `"random"` is a
+  sample-level split present on every loader (see below).
 
 ```python
 from spdnet_datasets import create_dataloaders
@@ -17,6 +18,63 @@ train, val, test = create_dataloaders(ds, split="official", batch_size=32)
 
 `create_dataloaders` without `split=` still performs the former sample-level
 split, and warns when the dataset provides groups.
+
+## Recommended, named and random splits
+
+Three kinds of split live side by side in `dataset.splits`:
+
+- **`"recommended"`**: the default of every loader, leakage-free: the official
+  split when it does not leak, a grouped or spatial split otherwise.
+- **Named grouped splits** (`"by_plot"`, `"spatial"`, `"sgkf5_fold<k>"`,
+  `"cross_subject_<k>"`, `"loco_<City>"`...): the folds behind `"recommended"`
+  and the other protocols of the dataset page. None of them shares a group
+  between train, validation and test.
+- **`"random"`**: a sample-level split, built by
+  {func}`~spdnet_datasets.core.splits.random_split` on the loaded samples
+  (after the task and the class selection): 70 / 10 / 20 %, stratified by class
+  (shuffled for regression targets), seeded with the dataset `seed`. It
+  ignores the groups. It exists to measure how optimistic a random evaluation
+  is, or to compare with papers that used one, not to report results.
+
+The split given at construction (`split=`) is the one whose training part
+fits the statistics: the normalisation scale `s` (covariance × `s`, mean and raw
+× `√s`), the class weights and the balancing. `subset="train" | "val" | "test"`
+selects one of its parts. So `split="random"` gives statistics fitted on the
+random training part, which `create_dataloaders(split=...)` alone cannot do
+(without `split=`, it splits the samples itself while the statistics stay those
+of `"recommended"`):
+
+```python
+from spdnet_datasets import create_dataloaders
+from spdnet_datasets.hyperspectral import HyperLeafDataset
+
+ds = HyperLeafDataset(split="random", random_split_options={"test_ratio": 0.25, "seed": 1})
+train, val, test = create_dataloaders(ds, split="random", batch_size=32)
+train_only = HyperLeafDataset(split="random", subset="train")
+```
+
+`random_split_options` takes `val_ratio` (0.1), `test_ratio` (0.2), `seed`
+(default: the dataset `seed`) and `stratify` (`True`). A stratified cut that is
+infeasible (a class with a single sample, fewer test or validation samples
+than classes) falls back to a plain random draw of the same size;
+`dataset.random_split_stratified` tells whether both cuts were stratified. The
+split is made of indices computed after loading, so the caches are unchanged.
+
+**Leakage.** When a group holds several samples (two leaves of a plot, the
+windows of a spatial block, the trials of a subject), the random split puts
+samples of one group in train and test. `dataset.random_split_leaky` records
+it, and constructing the dataset with `split="random"` then sets
+`dataset.split_leaky = True` and emits a single `UserWarning`. On HyperLeaf2024,
+the benchmark diagnostic gives an accuracy of about 0.62–0.69 with the
+`by_plot` split against 0.95 with the random one (SPDNet with batch
+normalisation; 0.35 against 0.87 without): the random split leaks plots.
+
+A few loaders have constraints: `ATRNetSTARDataset` uses `split=` for the
+protocol, so its `"random"` split is only in `dataset.splits` (class weights
+from `"recommended"`); `PastisRDataset(split="random")` keeps the channel
+standardisation of `"official"` (its cache is keyed by training folds). The
+synthetic generator and the legacy `spdnet_datasets.real` loaders have no
+named splits.
 
 ## Strategies
 

@@ -190,3 +190,10 @@ def test_deprecated_alias():
 
         importlib.reload(legacy)
     assert legacy.CI4RDataset is CI4RDataset
+
+
+def test_random_split(data, tmp_path):
+    from ._random_split import assert_random_split
+
+    kw = {"band": 0.5, "p": P, "cache_dir": tmp_path / "cache", "verify": None, "verbose": False}
+    assert_random_split(lambda **extra: CI4RDataset(data, **kw, **extra), leaky=True)

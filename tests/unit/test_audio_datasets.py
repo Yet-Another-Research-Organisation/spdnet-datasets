@@ -130,7 +130,7 @@ def test_subset_attributes_are_aligned(esc50_dir, tmp_path):
     assert len(ds.groups) == len(ds.labels) == len(ds.meta) == len(ds) == 23
     assert set(ds.meta["fold"]) == {1, 4, 5}
     assert [ds[i][1] for i in range(len(ds))] == ds.labels.tolist()
-    assert ds.splits == {} and set(ds.full_splits) == {"official", "recommended"}
+    assert ds.splits == {} and set(ds.full_splits) == {"official", "recommended", "random"}
     with pytest.raises(ValueError, match="Unknown split"):
         create_dataloaders(ds, num_workers=0, split="recommended", verbose=False)
 
@@ -233,3 +233,13 @@ def test_limit_is_part_of_the_cache_key(esc50_dir, tmp_path):
         small = fetch_esc50(esc50_dir, cache_dir=tmp_path / "cache", limit=10)
     full = fetch_esc50(esc50_dir, cache_dir=tmp_path / "cache")
     assert len(small.labels) + len(small.excluded) == 10 and len(full.labels) == 39
+
+
+def test_esc50_random_split(esc50_dir, tmp_path):
+    from ._random_split import assert_random_split
+
+    ds = assert_random_split(lambda **kw: _esc(esc50_dir, tmp_path, **kw), leaky=True)
+    w = _esc(esc50_dir, tmp_path, split="random", balance="weights")
+    assert w.class_weights is not None
+    sub = _esc(esc50_dir, tmp_path, split="random", subset="test")
+    np.testing.assert_array_equal(sub.labels, ds.labels[ds.splits["random"]["test"]])

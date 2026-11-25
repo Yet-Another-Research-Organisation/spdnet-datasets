@@ -12,7 +12,7 @@
 * - Outputs
   - cov · mean · raw (`logpower` only): labelled pixels (n, 12), or the (32, 32, 12) grid with `raw_layout="grid"`
 * - Splits
-  - `spatial512_fold0` … `fold4` (`recommended` = fold 0; 2 700 / 982 / 1 107) · `fp1_to_fp2` · `official` checkerboard (optimistic)
+  - `spatial512_fold0` … `fold4` (`recommended` = fold 0; 2 700 / 982 / 1 107) · `fp1_to_fp2` · `official` checkerboard (optimistic) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - {mod}`spdnet_datasets.sar.pol_insar_island` (`fetch_pol_insar_island`, `PolInSARIslandDataset`)
 ```

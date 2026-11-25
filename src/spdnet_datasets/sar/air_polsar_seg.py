@@ -63,7 +63,12 @@ from ..core.config import dataset_path
 from ..core.fetch import Bunch, download, run_pipeline
 from ..manager import DatasetManager
 from ..utils.sources import existing_dir, source_dir
-from ._common import check_split_groups, finalize_labels, group_kfold_splits
+from ._common import (
+    check_split_groups,
+    check_split_name,
+    finalize_labels,
+    group_kfold_splits,
+)
 
 DOMAIN, NAME = "SAR", "AIR-PolSAR-Seg"
 PAGE = "https://github.com/AICyberTeam/AIR-PolSAR-Seg"
@@ -303,6 +308,10 @@ class AIRPolSARSegDataset(BaseDataset):
         Default ``<root>/SAR/AIR-PolSAR-Seg``.
     cache_dir, keep, cell, purity, min_annotated, macro
         See :func:`fetch_air_polsar_seg`.
+    split : str
+        Split whose training part fits the class weights (``"recommended"``,
+        ``"macro1024_fold{k}"`` or ``"random"``: sample-level, leaky since
+        neighbouring cells fall on both sides).
     **kwargs
         :class:`~spdnet_datasets.base.BaseDataset` arguments; exactly one of
         ``return_raw`` / ``return_mean``.
@@ -311,8 +320,9 @@ class AIRPolSARSegDataset(BaseDataset):
     OUTPUTS = ("raw", "mean")
 
     def __init__(self, data_dir=None, *, cache_dir=None, keep=None, cell=32, purity=0.75,
-                 min_annotated=0.9, macro=1024, verify="size", **kwargs):
+                 min_annotated=0.9, macro=1024, verify="size", split="recommended", **kwargs):
         root = dataset_path(DOMAIN, NAME, data_dir)
+        self.split = split
         self._fetch = {"cache_dir": cache_dir, "keep": keep, "cell": cell, "purity": purity,
                        "min_annotated": min_annotated, "macro": macro, "verify": verify}
         self._root = root
@@ -324,6 +334,7 @@ class AIRPolSARSegDataset(BaseDataset):
         self.data_dir = Path(b.root)
         keep = finalize_labels(self, b.meta["label"].to_numpy(), b.meta["block"].to_numpy(), b.splits)
         check_split_groups(self.splits, self.groups)
+        check_split_name(self.splits, self.split)
         self.meta = b.meta.iloc[keep].reset_index(drop=True)
         self.positions, self.overlaps, self.label_conflicts = b.positions, b.overlaps, b.label_conflicts
         self._cells = np.load(Path(b.processed_dir) / "cells.npy", mmap_mode="r")

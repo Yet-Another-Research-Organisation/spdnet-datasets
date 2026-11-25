@@ -86,6 +86,12 @@ and no test statistic leaks. The covariance cache therefore depends on the split
 At load time, the scalar geometric normalisation of ``core.normalize`` is fitted on
 the training covariances (``normalize=True``).
 
+``split="random"`` (sample-level split of the parcels, ``random_split_options``)
+fits the geometric scale and the class weights on its own training part, but the
+channel standardisation still comes from the training folds of ``"official"``:
+the random split mixes neighbouring parcels (and the parcels of one patch)
+between train and test, so it is leaky twice and only meant for comparison.
+
 Splits
 ------
 ``"official"``: folds 1-3 train, 4 validation, 5 test (by patch, the folds being
@@ -137,7 +143,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from ..base import BaseDataset
+from ..base import RANDOM, BaseDataset
 from ..core import (
     KEEP,
     Bunch,
@@ -766,8 +772,11 @@ class PastisRDataset(BaseDataset):
     data_dir : path, optional
         See :func:`fetch_pastis_r`.
     scenario : {"A", "B", "C", "D", "E"}
-    split : {"official", "cv1", ..., "cv5"}
+    split : {"official", "cv1", ..., "cv5", "random"}
         Split exposed in ``self.splits`` and used to fit the normalisations.
+        ``self.splits`` also holds ``"random"`` (sample-level, leaky) when
+        ``subset`` is None; with ``split="random"`` the channel standardisation
+        is that of ``"official"`` (see the module docstring).
     subset : {"train", "val", "test"}, optional
         Keep only this part of the split (default: all samples).
     cache_dir, keep, force, verify, **date and channel options
@@ -802,8 +811,10 @@ class PastisRDataset(BaseDataset):
         self._load_data()
 
     def _load_data(self):
+        # the random split has no fold structure: channel standardisation of "official"
+        named = "official" if self.split == RANDOM else self.split
         b = fetch_pastis_r(self._data_arg, self.cache_dir, estimator=self.estimator,
-                           scenario=self.scenario, split=self.split, **self._fetch_kwargs)
+                           scenario=self.scenario, split=named, **self._fetch_kwargs)
         self.report, self.channels = b.report, b.channels
         names = np.array([CLASSES[i] for i in b.labels], dtype=object)
         y, keep, class_names = apply_task(names, task=self.task, coarse_map=COARSE_MAP,
@@ -827,14 +838,18 @@ class PastisRDataset(BaseDataset):
             take = np.sort(np.concatenate(take))
             idx, y = idx[take], y[take]
 
-        parts = make_splits(b.meta["fold"].to_numpy()[idx], b.groups[idx], self.split)
+        splits = {named: make_splits(b.meta["fold"].to_numpy()[idx], b.groups[idx], named),
+                  RANDOM: self._make_random_split(y, b.groups[idx])}
+        self._check_selected_split(self.split, b.groups[idx])
+        parts = splits[self.split]
         self.scale = 1.0
         if self.normalize and len(parts["train"]):  # fitted on the training part only
             self.scale = geometric_scale(b.covariances[idx[parts["train"]]])
         self.class_weights = None
         if self.balance in ("undersample", "oversample"):  # before the subset selection
-            tr = parts["train"]
-            parts["train"] = tr[balance_indices(y[tr], self.balance, seed=self.seed)]
+            for p in splits.values():
+                tr = p["train"]
+                p["train"] = tr[balance_indices(y[tr], self.balance, seed=self.seed)]
         if self.balance == "weights":
             self.class_weights = class_weights(y[parts["train"]], n_classes=len(class_names))
         if self.subset is not None:
@@ -850,7 +865,7 @@ class PastisRDataset(BaseDataset):
         self.samples = list(range(len(idx)))
         self.classes = list(class_names)
         self.class_to_idx = {c: i for i, c in enumerate(self.classes)}
-        self.splits = {self.split: parts}
+        self.splits = {self.split: parts} if self.subset is not None else splits
         self.covariances = apply_scale(self.covariances, self.scale)
 
         self._pixels = None

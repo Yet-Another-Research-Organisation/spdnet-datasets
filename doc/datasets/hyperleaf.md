@@ -14,7 +14,7 @@
 * - Samples
   - 1 590 labelled leaves (none discarded)
 * - Splits
-  - `by_plot` = `recommended` (24 reconstructed plots, fold 0: 960 / 310 / 320)
+  - `by_plot` = `recommended` (24 reconstructed plots, fold 0: 960 / 310 / 320) · `random` (sample-level 70 / 10 / 20: leaks plots, see {doc}`/guide/splits`)
 * - Module
   - `spdnet_datasets.hyperspectral.hyperleaf` (`fetch_hyperleaf`, `HyperLeafDataset`, registry name `hyperleaf`)
 ```

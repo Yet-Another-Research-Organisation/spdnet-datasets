@@ -28,7 +28,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from spdnet_datasets.base import BaseDataset
+from spdnet_datasets.base import RANDOM, BaseDataset
 from spdnet_datasets.core.config import get_cache_dir
 from spdnet_datasets.core.estimators import NotSPDError
 from spdnet_datasets.core.fetch import run_pipeline
@@ -451,6 +451,10 @@ class NilearnConnectomes(BaseDataset):
         Recompute the cached time series and covariances.
     seed : int
         Random state of the splits.
+    random_split_options : dict, optional
+        Options of the ``random`` split (``val_ratio`` 0.1, ``test_ratio``
+        0.2, ``seed`` = ``seed``, ``stratify`` True, ignored for the
+        regression; see :func:`spdnet_datasets.core.splits.random_split`).
 
     Attributes
     ----------
@@ -473,8 +477,9 @@ class NilearnConnectomes(BaseDataset):
         two sites), ``site_fold_<k>`` (``abide``, ``adhd``: leave-one-site-out
         folds, see :func:`site_fold_split`), ``stratified_fold_<k>`` (single-site
         datasets: :data:`N_FOLDS` folds, see :func:`stratified_fold_split`) and
-        ``recommended`` (``site_grouped`` when available, else ``stratified``).
-        Each is ``{"train", "val", "test"}``. Score the folds with
+        ``recommended`` (``site_grouped`` when available, else ``stratified``)
+        and ``random`` (sample-level, ``random_split_options``; on multi-site
+        data it mixes the sites and ``split="random"`` warns). Each is ``{"train", "val", "test"}``. Score the folds with
         :func:`~spdnet_datasets.nilearn.cross_validate_folds`.
     scale : float
         Geometric scale applied to the covariances.
@@ -491,7 +496,8 @@ class NilearnConnectomes(BaseDataset):
                  estimator="scm", allow_small_n=False, standardize=True, confounds=True,
                  fetcher_kwargs=None, keep=None, return_mean=False, return_raw=False,
                  split="recommended", normalize=True, data_dir=None, cache_dir=None,
-                 force=False, seed=0, verbose=False, diagnosis=None):
+                 force=False, seed=0, verbose=False, diagnosis=None,
+                 random_split_options=None):
         if dataset not in DATASETS:
             raise ValueError(f"dataset must be one of {DATASETS}, got {dataset!r}")
         atlas = atlas or DEFAULT_ATLAS[dataset]
@@ -517,7 +523,7 @@ class NilearnConnectomes(BaseDataset):
         cache_dir.mkdir(parents=True, exist_ok=True)
         super().__init__(cache_dir, seed=seed, verbose=verbose, return_mean=return_mean,
                          return_raw=return_raw, estimator=estimator, task=task,
-                         normalize=normalize)
+                         normalize=normalize, random_split_options=random_split_options)
         self.dataset, self.atlas, self.n_subjects = dataset, atlas, n_subjects
         self.allow_small_n, self.standardize, self.confounds = allow_small_n, standardize, confounds
         self.fetcher_kwargs = dict(fetcher_kwargs or {})
@@ -683,6 +689,8 @@ class NilearnConnectomes(BaseDataset):
             if name in self.splits:
                 self.splits["recommended"] = self.splits[name]
                 break
+        self.splits[RANDOM] = self._make_random_split(self.labels, self.groups)
+        self._check_selected_split(self.split, self.groups)
         if multi_site and self.split == "stratified":
             warnings.warn("split='stratified' mixes acquisition sites between train and test: "
                           "the score is optimistic. Use split='site_grouped'.",

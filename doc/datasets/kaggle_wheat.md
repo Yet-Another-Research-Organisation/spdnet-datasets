@@ -14,7 +14,7 @@
 * - Samples
   - 575 labelled patches (600 minus 23 entirely zero and 2 with fewer than 2p non-zero pixels)
 * - Splits
-  - `stratified` = `recommended` (5 folds, fold 0: 344 / 116 / 115)
+  - `stratified` = `recommended` (5 folds, fold 0: 344 / 116 / 115) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - `spdnet_datasets.hyperspectral.kaggle_wheat` (`fetch_kaggle_wheat`, `KaggleWheatDataset`, registry name `kaggle_wheat`)
 ```

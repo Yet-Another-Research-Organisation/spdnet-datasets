@@ -12,7 +12,7 @@
 * - Outputs
   - cov · mean · raw (n, p) pixels of the parcel
 * - Splits
-  - `official` (folds 1-3 / 4 / 5) · `cv1` … `cv5`
+  - `official` (folds 1-3 / 4 / 5) · `cv1` … `cv5` · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - {mod}`spdnet_datasets.sits.pastis_r` (`fetch_pastis_r`, `PastisRDataset`)
 ```
@@ -207,6 +207,13 @@ patches. The loader applies them by patch:
 
 The group of a sample is its patch. `make_splits` checks with
 `assert_no_leakage` that train, validation and test never share a patch.
+
+`split="random"` (also in `dataset.splits` when `subset` is None) is a
+sample-level 70 / 10 / 20 split of the parcels, for comparison only. The
+geometric scale and the class weights are fitted on its training part, but the
+channel standardisation is that of `official` (the covariance cache is keyed by
+training folds): parcels of one patch fall on both sides, and a `UserWarning`
+is raised.
 
 ```{dataset-figure} pastis_r/split_schema
 ```

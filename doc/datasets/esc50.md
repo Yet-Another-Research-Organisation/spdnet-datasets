@@ -14,7 +14,7 @@
 * - Samples
   - 1 979 clips (2 000 minus 4 mostly silent clips and 17 numerically singular covariances)
 * - Splits
-  - `official` = `recommended`: 5 official folds, test = fold `fold`, val = next fold, train = the 3 others (fold 1: 1 198 / 400 / 398)
+  - `official` = `recommended`: 5 official folds, test = fold `fold`, val = next fold, train = the 3 others (fold 1: 1 198 / 400 / 398) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - `spdnet_datasets.audio.esc50` (`fetch_esc50`, `ESC50Dataset`, registry name `esc50`)
 ```

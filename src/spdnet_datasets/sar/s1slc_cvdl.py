@@ -232,7 +232,9 @@ class S1SLCCVDLDataset(BaseDataset):
     data_dir : path, optional
         Default ``<root>/SAR/S1SLC_CVDL``.
     split : str
-        Split whose training part fits the per-city normalisation.
+        Split whose training part fits the per-city normalisation
+        (``"recommended"``, ``"loco_<City>"`` or ``"random"``: sample-level,
+        mixes the cities).
     features : {"complex", "amplitude"}
     n_stat_patches : int
         Patches per city used for the RMS estimate.

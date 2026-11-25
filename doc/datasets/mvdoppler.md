@@ -14,7 +14,7 @@
 * - Samples
   - 54 834 snapshots (54 836 in `design_table.csv`, 2 unreadable files) from 4 210 recordings of 13 subjects
 * - Splits
-  - official 4-fold, disjoint in subjects: `fold0`…`fold3`; `official` = `fold<fold>` (default `fold0`: 39 362 / 4 069 / 11 403)
+  - official 4-fold, disjoint in subjects: `fold0`…`fold3`; `official` = `fold<fold>` (default `fold0`: 39 362 / 4 069 / 11 403) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - `spdnet_datasets.radar_microdoppler.mvdoppler` (`fetch_mvdoppler`, `MVDopplerDataset`, registry name `mvdoppler`)
 ```

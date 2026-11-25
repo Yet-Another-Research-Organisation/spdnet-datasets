@@ -14,7 +14,7 @@
 * - Samples
   - 1 249 windows, none discarded
 * - Splits
-  - `spatial` = `recommended` (96-pixel blocks, fold 0: 739 / 250 / 255)
+  - `spatial` = `recommended` (96-pixel blocks, fold 0: 739 / 250 / 255) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - `spdnet_datasets.hyperspectral.gsoff` (`fetch_gsoff`, `GSOFFDataset`, registry name `gsoff`)
 ```

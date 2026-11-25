@@ -14,7 +14,7 @@
 * - Samples
   - `c93`: 1 482 sequences (604 of 2 086 excluded, T < 186) · `c31`: 2 086
 * - Splits
-  - `stratified` = `recommended`: 5 stratified folds (`c93`, fold 1: 888 / 297 / 297; `c31`: 1 251 / 417 / 418). No actor split possible.
+  - `stratified` = `recommended`: 5 stratified folds (`c93`, fold 1: 888 / 297 / 297; `c31`: 1 251 / 417 / 418). No actor split possible. · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - `spdnet_datasets.skeleton.hdm05` (`fetch_hdm05`, `HDM05Dataset`, registry name `hdm05`)
 ```

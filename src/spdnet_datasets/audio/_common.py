@@ -28,7 +28,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from ..base import BaseDataset
+from ..base import RANDOM, BaseDataset
 from ..core import (
     Bunch,
     InsufficientSamplesError,
@@ -272,6 +272,10 @@ class SequenceCovarianceDataset(BaseDataset):
       (:attr:`full_splits`). With ``subset=None`` they index the dataset and
       are exposed as :attr:`splits`; with a subset, :attr:`splits` is empty and
       :attr:`labels`, :attr:`groups` and :attr:`meta` describe the subset.
+    - :attr:`full_splits` always holds ``"random"``, a sample-level split
+      (``random_split_options``) that ignores the groups; ``split="random"``
+      fits the normalisation on its training part and warns when a group holds
+      several samples (leaky split).
     - ``balance="undersample" | "oversample"`` resamples the training indices
       of the selected split only; ``"weights"`` sets :attr:`class_weights`
       (computed on the training set).
@@ -347,6 +351,8 @@ class SequenceCovarianceDataset(BaseDataset):
             warnings.warn(f"No split available for this selection: {exc}", UserWarning,
                           stacklevel=3)
             self.full_splits = {}
+        self.full_splits[RANDOM] = self._make_random_split(labels, groups)
+        self._check_selected_split(self.split, groups)
         parts = self.full_splits.get(self.split)
         if parts is None and (self.subset is not None or self.normalize):
             raise ValueError(f"Unknown split {self.split!r}; "

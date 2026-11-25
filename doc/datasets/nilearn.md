@@ -228,6 +228,7 @@ level:
 | `site_fold_<k>` | leave-one-site-out: test = every subject of the k-th site (sites sorted by name), val = the next site, train = the others | `abide`, `adhd`: one fold per site |
 | `stratified_fold_<k>` | fold k of a shuffled 5-fold `StratifiedKFold` on the label (`KFold` for regression); val = fold k + 1 | single-site datasets: `development`, `nki`, `ds000030` |
 | `recommended` | `site_grouped`, or `stratified` for the single-site datasets (one sample per subject) | default |
+| `random` | sample-level 70 / 10 / 20, stratified on the label (shuffled for the regression), `random_split_options` | comparison only: on `abide` / `adhd` it mixes the sites and `split="random"` warns; on the single-site datasets (one sample per subject) it does not leak |
 
 Each split is built on its own. On a small cohort, the `stratified` test and
 validation parts are enlarged to hold at least one subject per class; a split

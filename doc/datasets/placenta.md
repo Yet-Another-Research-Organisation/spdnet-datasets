@@ -14,7 +14,7 @@
 * - Samples
   - 76 862 windows (77 203 minus 341 singular sample covariance matrices, SCM, 0.44 %)
 * - Splits
-  - `by_image` = `recommended` (81 images, fold 0: 45 939 / 15 851 / 15 072) · `dye_transfer` (red_blue → ICG: 46 303 / 0 / 30 559)
+  - `by_image` = `recommended` (81 images, fold 0: 45 939 / 15 851 / 15 072) · `dye_transfer` (red_blue → ICG: 46 303 / 0 / 30 559) · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - `spdnet_datasets.hyperspectral.placenta` (`fetch_placenta`, `PlacentaDataset`, registry name `placenta`)
 ```

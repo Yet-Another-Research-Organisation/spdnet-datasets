@@ -14,7 +14,7 @@
 * - Samples
   - 985 excerpts (999 in the copy, minus 14 exact duplicates)
 * - Splits
-  - `stratified` = `recommended`: 5 stratified folds (fold 1: 591 / 197 / 197). No official split.
+  - `stratified` = `recommended`: 5 stratified folds (fold 1: 591 / 197 / 197). No official split. · `random` (sample-level 70 / 10 / 20, ignores the groups, see {doc}`/guide/splits`)
 * - Module
   - `spdnet_datasets.audio.gtzan` (`fetch_gtzan`, `GTZANDataset`, registry name `gtzan`)
 ```

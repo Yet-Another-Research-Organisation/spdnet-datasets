@@ -6,6 +6,7 @@ keeps its own reading, preprocessing and split logic.
 
 import numpy as np
 
+from ..base import RANDOM
 from ..core.normalize import geometric_scale
 from ..core.splits import assert_no_leakage
 from ..core.tasks import apply_task, balance_indices, class_weights
@@ -26,6 +27,9 @@ def finalize_labels(ds, labels, groups, splits, *, coarse_map=None):
         dataset has no physical group (``ds.groups`` is then ``None``).
     splits : dict
         ``{name: {"train": idx, "val": idx, "test": idx}}`` on the loaded samples.
+        The sample-level ``"random"`` split (``ds.random_split_options``) is
+        added on the kept samples; with ``ds.split == "random"`` a
+        ``UserWarning`` is emitted when a group holds several samples.
     coarse_map : dict, optional
         ``{fine_class: coarse_class}`` used by ``task="coarse"``.
 
@@ -67,6 +71,13 @@ def finalize_labels(ds, labels, groups, splits, *, coarse_map=None):
 
     remap = np.full(len(labels), -1, dtype=np.int64)
     remap[keep] = np.arange(len(keep))
+    kept_groups = None if groups is None else np.asarray(groups)[keep]
+    # the random split is drawn on the kept samples, then expressed on the loaded
+    # ones like the others so that it goes through the same remap and balancing
+    # (skipped for objects that are not a BaseDataset)
+    if hasattr(ds, "_make_random_split"):
+        random = ds._make_random_split(y, kept_groups)
+        splits = {**splits, RANDOM: {k: keep[v] for k, v in random.items()}}
     new_splits = {}
     for name, parts in splits.items():
         new_parts = {}
@@ -81,8 +92,10 @@ def finalize_labels(ds, labels, groups, splits, *, coarse_map=None):
     ds.targets = y
     ds.classes = names
     ds.class_to_idx = {c: i for i, c in enumerate(names)}
-    ds.groups = None if groups is None else np.asarray(groups)[keep]
+    ds.groups = kept_groups
     ds.splits = new_splits
+    if hasattr(ds, "split") and hasattr(ds, "_check_selected_split"):
+        ds._check_selected_split(ds.split, kept_groups)
     train = new_splits.get(getattr(ds, "split", "recommended"), {}).get("train", ())
     ds.class_weights = (class_weights(y[train], n_classes=len(names)) if len(train)
                         else None)
@@ -90,13 +103,24 @@ def finalize_labels(ds, labels, groups, splits, *, coarse_map=None):
 
 
 def check_split_groups(splits, groups):
-    """Assert that no group is shared between the parts of every split."""
+    """Assert that no group is shared between the parts of every grouped split.
+
+    The sample-level ``"random"`` split is skipped: it is leaky by design.
+    """
     groups = np.asarray(groups)
-    for parts in splits.values():
+    for name, parts in splits.items():
+        if name == RANDOM:
+            continue
         names = [k for k in ("train", "val", "test") if k in parts]
         for i, a in enumerate(names):
             for b in names[i + 1:]:
                 assert_no_leakage(groups[parts[a]], groups[parts[b]])
+
+
+def check_split_name(splits, split):
+    """Raise ``ValueError`` if ``split`` is not a key of ``splits``."""
+    if split not in splits:
+        raise ValueError(f"Unknown split {split!r}; available: {sorted(splits)}")
 
 
 def train_scale(covs, splits, split):

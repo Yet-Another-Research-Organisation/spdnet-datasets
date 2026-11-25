@@ -26,7 +26,7 @@ import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
 
-from ..base import BaseDataset
+from ..base import RANDOM, BaseDataset
 from ..core.config import get_cache_dir
 from ..core.estimators import InsufficientSamplesError, NotSPDError
 from ..core.fetch import run_pipeline
@@ -292,6 +292,10 @@ class MOABBCovariances(BaseDataset):
     fold_seed : int
         Random state of the subject groups of these folds. Kept apart from
         ``seed`` so that a subject stays in the same fold across runs.
+    random_split_options : dict, optional
+        Options of the ``random`` split (``val_ratio`` 0.1, ``test_ratio``
+        0.2, ``seed`` = ``seed``, ``stratify`` True; see
+        :func:`spdnet_datasets.core.splits.random_split`).
     cache_dir : path, optional
         Default: ``$SPDNET_CACHE_DIR``.
     force : bool
@@ -314,7 +318,9 @@ class MOABBCovariances(BaseDataset):
         (see :func:`moabb_splits`), ``recommended``, an alias of the first
         fold of the strictest protocol available (cross-subject, then
         cross-session, then within-session), ``stratified`` when ``holdout``
-        is set, and ``subject_fold_<k>`` when ``subject_folds`` is set.
+        is set, ``subject_fold_<k>`` when ``subject_folds`` is set, and
+        ``random``, a sample-level split that mixes the trials of a
+        subject-session between train and test (``split="random"`` warns).
     scale : float
         Geometric scale applied to the covariances.
     channels : list of str
@@ -333,11 +339,12 @@ class MOABBCovariances(BaseDataset):
                  return_mean=False, return_raw=False, split=None, normalize=True,
                  n_folds=5, holdout=None, subject_folds=None, val_groups=1,
                  calib_fraction=0.5, fold_seed=0, cache_dir=None, force=False, seed=42,
-                 verbose=False):
+                 verbose=False, random_split_options=None):
         cache_dir = get_cache_dir() if cache_dir is None else Path(cache_dir).expanduser()
         cache_dir.mkdir(parents=True, exist_ok=True)
         super().__init__(cache_dir, seed=seed, verbose=verbose, return_mean=return_mean,
-                         return_raw=return_raw, estimator=estimator, normalize=normalize)
+                         return_raw=return_raw, estimator=estimator, normalize=normalize,
+                         random_split_options=random_split_options)
         if return_raw and keep == "keep_covariance":
             raise ValueError("return_raw=True needs the cached epochs: use "
                              "keep='keep_processed' or 'keep_full', not 'keep_covariance'.")
@@ -480,6 +487,8 @@ class MOABBCovariances(BaseDataset):
             self.splits.update(subject_fold_splits(
                 self.labels, self.subjects, self.sessions, self.subject_folds,
                 self.val_groups, self.calib_fraction, self.fold_seed))
+        self.splits[RANDOM] = self._make_random_split(self.labels, self.groups)
+        self._check_selected_split(self.split, self.groups)
         self.scale = 1.0
         if self.split is not None:
             if self.split not in self.splits:

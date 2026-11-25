@@ -445,7 +445,8 @@ class PolInSARIslandDataset(BaseDataset):
     split : str
         Split whose training part fits the normalisation: ``"recommended"``,
         ``"spatial512_fold{k}"``, ``"fp1_to_fp2"`` or, with ``cells="official"``,
-        ``"official"`` (emits a ``UserWarning``: optimistic).
+        ``"official"`` (emits a ``UserWarning``: optimistic), or ``"random"``
+        (sample-level, leaky: neighbouring cells on both sides).
     cells : {"union", "official"}, optional
         Default ``"official"`` if ``split == "official"`` else ``"union"``.
     cache_dir, keep, representation, bands, cell, purity, min_labelled, block
